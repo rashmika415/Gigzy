@@ -284,7 +284,7 @@ export default function Register() {
               </TouchableOpacity>
             </View>
             {confirmPassword.length > 0 && password !== confirmPassword && (
-              <Text style={styles.matchError}>Passwords don't match</Text>
+              <Text style={styles.matchError}>{"Passwords don't match"}</Text>
             )}
           </View>
 

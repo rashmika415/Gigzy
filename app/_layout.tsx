@@ -26,7 +26,7 @@ function RootLayoutNav() {
       // Logged in → send to app home
       router.replace('/(app)/home');
     }
-  }, [user, loading, segments]);
+  }, [user, loading, segments, router]);
 
   return (
     <>
