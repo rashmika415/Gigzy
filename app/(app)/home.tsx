@@ -7,12 +7,14 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
-import { getGigsByClient, getRecentGigs } from '../../services/gigService';
+import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig } from '../../services/gigService';
 import { Gig } from '../../types/gig';
 
 export default function Home() {
@@ -22,29 +24,76 @@ export default function Home() {
 
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [loadingGigs, setLoadingGigs] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
+  // Real-time Firestore synchronization
   useEffect(() => {
-    async function loadGigs() {
-      if (!user) return;
-      setLoadingGigs(true);
-      try {
-        if (role === 'client') {
-          // If business owner, fetch their posted gigs
-          const userGigs = await getGigsByClient(user.uid);
-          setGigs(userGigs);
-        } else {
-          // Otherwise fetch recent available gigs
-          const recent = await getRecentGigs(5);
-          setGigs(recent);
-        }
-      } catch (err) {
-        console.error('Failed to load gigs:', err);
-      } finally {
-        setLoadingGigs(false);
-      }
+    if (!user) {
+      setLoadingGigs(false);
+      return;
     }
-    loadGigs();
+
+    setLoadingGigs(true);
+    setLoadError('');
+
+    let unsubscribe: () => void = () => {};
+
+    if (role === 'client') {
+      // Business owner: subscribe to their own posted gigs in real time
+      unsubscribe = subscribeToClientGigs(
+        user.uid,
+        (clientGigs) => {
+          setGigs(clientGigs);
+          setLoadingGigs(false);
+        },
+        (err) => {
+          setLoadError(err.message);
+          setLoadingGigs(false);
+        }
+      );
+    } else {
+      // Freelancer: subscribe to recent open gigs across the platform
+      unsubscribe = subscribeToRecentGigs(
+        10,
+        (recentGigs) => {
+          setGigs(recentGigs);
+          setLoadingGigs(false);
+        },
+        (err) => {
+          setLoadError(err.message);
+          setLoadingGigs(false);
+        }
+      );
+    }
+
+    return () => {
+      unsubscribe();
+    };
   }, [user, role]);
+
+  const handleDeleteGig = (gigId: string, gigTitle: string) => {
+    Alert.alert(
+      'Delete Gig',
+      `Are you sure you want to remove "${gigTitle}"? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteGig(gigId);
+              try {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } catch {}
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to delete gig.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const getRoleLabel = () => {
     if (role === 'admin') return 'Platform Admin';
@@ -95,7 +144,12 @@ export default function Home() {
 
           <TouchableOpacity
             style={styles.postGigButton}
-            onPress={() => router.push('/(app)/post-gig' as any)}
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              router.push('/(app)/post-gig' as any);
+            }}
             activeOpacity={0.85}
           >
             <Ionicons name="add-circle-outline" size={20} color="#080B14" />
@@ -108,7 +162,7 @@ export default function Home() {
           {[
             { label: 'Gigs Active', value: gigs.length.toString(), emoji: '💼' },
             { label: 'Earnings', value: '$0', emoji: '💰' },
-            { label: 'Reviews', value: '5.0', emoji: '⭐' },
+            { label: 'Rating', value: '5.0', emoji: '⭐' },
           ].map((stat) => (
             <View key={stat.label} style={styles.statCard}>
               <Text style={styles.statEmoji}>{stat.emoji}</Text>
@@ -118,12 +172,19 @@ export default function Home() {
           ))}
         </View>
 
-        {/* Recent Gigs List */}
+        {/* Real-time Gigs List Section */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {role === 'client' ? 'Your Posted Gigs' : 'Explore Latest Gigs'}
-            </Text>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>
+                {role === 'client' ? 'Your Posted Gigs' : 'Explore Latest Gigs'}
+              </Text>
+              <View style={styles.liveIndicator}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>Live Sync</Text>
+              </View>
+            </View>
+
             <TouchableOpacity
               onPress={() => router.push('/(app)/post-gig' as any)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -135,6 +196,12 @@ export default function Home() {
           {loadingGigs ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator color={colors.primary} size="small" />
+              <Text style={styles.loadingText}>Syncing with Cloud Firestore...</Text>
+            </View>
+          ) : loadError ? (
+            <View style={styles.errorBox}>
+              <Ionicons name="alert-circle-outline" size={24} color={colors.error} />
+              <Text style={styles.errorText}>{loadError}</Text>
             </View>
           ) : gigs.length === 0 ? (
             <View style={styles.emptyCard}>
@@ -142,7 +209,7 @@ export default function Home() {
               <Text style={styles.emptyTitle}>No Gigs Found</Text>
               <Text style={styles.emptyText}>
                 {role === 'client'
-                  ? 'You have not posted any gigs yet. Tap "Post a New Gig" above to create your first listing!'
+                  ? 'You have not posted any gigs yet. Tap "Post a New Gig" above to create your first listing in Firestore!'
                   : 'Be the first to create or browse new opportunities on the platform.'}
               </Text>
             </View>
@@ -154,10 +221,21 @@ export default function Home() {
                     <View style={styles.gigCategoryBadge}>
                       <Text style={styles.gigCategoryBadgeText}>{gig.category}</Text>
                     </View>
-                    <View style={styles.gigPayBadge}>
-                      <Text style={styles.gigPayText}>
-                        ${gig.pay} {gig.payType === 'hourly' ? '/hr' : ''}
-                      </Text>
+                    <View style={styles.gigHeaderRight}>
+                      <View style={styles.gigPayBadge}>
+                        <Text style={styles.gigPayText}>
+                          ${gig.pay} {gig.payType === 'hourly' ? '/hr' : ''}
+                        </Text>
+                      </View>
+                      {role === 'client' && (
+                        <TouchableOpacity
+                          style={styles.deleteGigBtn}
+                          onPress={() => handleDeleteGig(gig.id, gig.title)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="trash-outline" size={16} color={colors.error} />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
 
@@ -167,6 +245,20 @@ export default function Home() {
                   <Text style={styles.gigItemDesc} numberOfLines={2}>
                     {gig.description}
                   </Text>
+
+                  {/* Skills tags preview */}
+                  {gig.skills && gig.skills.length > 0 && (
+                    <View style={styles.skillsRow}>
+                      {gig.skills.slice(0, 3).map((skill) => (
+                        <View key={skill} style={styles.skillChip}>
+                          <Text style={styles.skillChipText}>{skill}</Text>
+                        </View>
+                      ))}
+                      {gig.skills.length > 3 && (
+                        <Text style={styles.moreSkillsText}>+{gig.skills.length - 3} more</Text>
+                      )}
+                    </View>
+                  )}
 
                   <View style={styles.gigItemFooter}>
                     <View style={styles.gigMetaRow}>
@@ -362,10 +454,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.md,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.text,
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderRadius: borderRadius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    gap: 4,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.success,
+  },
+  liveText: {
+    fontSize: 10,
+    color: colors.success,
+    fontWeight: '700',
   },
   seeAllText: {
     fontSize: 13,
@@ -375,6 +492,23 @@ const styles = StyleSheet.create({
   loadingBox: {
     padding: spacing.xl,
     alignItems: 'center',
+    gap: spacing.sm,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  errorBox: {
+    backgroundColor: colors.errorLight,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  errorText: {
+    fontSize: 13,
+    color: colors.error,
+    textAlign: 'center',
   },
   emptyCard: {
     backgroundColor: colors.surface,
@@ -416,6 +550,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 2,
   },
+  gigHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   gigCategoryBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     paddingHorizontal: 8,
@@ -438,6 +577,9 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '700',
   },
+  deleteGigBtn: {
+    padding: 4,
+  },
   gigItemTitle: {
     fontSize: 15,
     fontWeight: '700',
@@ -447,6 +589,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     lineHeight: 18,
+  },
+  skillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 2,
+  },
+  skillChip: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  skillChipText: {
+    fontSize: 10,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  moreSkillsText: {
+    fontSize: 10,
+    color: colors.textMuted,
+    alignSelf: 'center',
   },
   gigItemFooter: {
     flexDirection: 'row',

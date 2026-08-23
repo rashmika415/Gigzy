@@ -38,6 +38,8 @@ export interface Gig {
     email: string;
   };
   applicantsCount: number;
+  viewsCount?: number;
+  searchKeywords?: string[];
   createdAt: any;
   updatedAt?: any;
 }
@@ -66,4 +68,10 @@ export interface GigValidationErrors {
   skills?: string;
   general?: string;
   [key: string]: string | undefined;
+}
+
+export interface GigCreationResult {
+  success: boolean;
+  gigId?: string;
+  error?: string;
 }

@@ -8,14 +8,62 @@ import {
   limit,
   serverTimestamp,
   doc,
-  getDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  increment,
 } from 'firebase/firestore';
 import { db } from '../FirebaseConfig';
-import { Gig, GigInput, GigValidationErrors } from '../types/gig';
+import { Gig, GigInput, GigValidationErrors, GigStatus } from '../types/gig';
 
 /**
- * Validates all fields of a gig form.
- * Returns an object with `isValid` boolean and a mapping of field error messages.
+ * Translates Firebase / Firestore error codes into human-readable messages.
+ */
+export function parseFirebaseError(error: any): string {
+  if (!error) return 'An unexpected error occurred. Please try again.';
+
+  const code = error.code || '';
+  const message = error.message || '';
+
+  if (code.includes('permission-denied') || message.includes('Missing or insufficient permissions')) {
+    return 'Permission denied. Please ensure you are logged in to create or view gigs.';
+  }
+  if (code.includes('unavailable') || message.includes('Failed to get document because the client is offline')) {
+    return 'Unable to reach Firestore. Please check your internet connection and try again.';
+  }
+  if (code.includes('unauthenticated')) {
+    return 'Your session has expired. Please log in again.';
+  }
+  if (code.includes('deadline-exceeded')) {
+    return 'The request timed out. Please check your network and try again.';
+  }
+  if (code.includes('resource-exhausted')) {
+    return 'Daily quota limit reached. Please try again later.';
+  }
+  if (code.includes('failed-precondition')) {
+    return 'Database query pre-condition missing. Retrying with fallback query...';
+  }
+  if (code.includes('invalid-argument')) {
+    return 'Invalid gig data format. Please verify your form inputs.';
+  }
+
+  return message || 'Failed to complete database operation. Please try again.';
+}
+
+/**
+ * Generates an array of unique search keywords for client/database querying.
+ */
+function generateSearchKeywords(title: string, category: string, skills: string[], location: string): string[] {
+  const text = `${title} ${category} ${skills.join(' ')} ${location}`.toLowerCase();
+  const words = text
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 1);
+  return Array.from(new Set(words));
+}
+
+/**
+ * Validates all fields of a gig form with timezone-safe date checking.
  */
 export function validateGigForm(form: GigInput): { isValid: boolean; errors: GigValidationErrors } {
   const errors: GigValidationErrors = {};
@@ -50,7 +98,8 @@ export function validateGigForm(form: GigInput): { isValid: boolean; errors: Gig
   if (!trimmedPay) {
     errors.pay = 'Please specify the pay amount.';
   } else {
-    const numericPay = parseFloat(trimmedPay.replace(/[^0-9.]/g, ''));
+    const cleanPayStr = trimmedPay.replace(/[^0-9.]/g, '');
+    const numericPay = parseFloat(cleanPayStr);
     if (isNaN(numericPay) || numericPay <= 0) {
       errors.pay = 'Pay amount must be a positive number greater than 0.';
     } else if (numericPay > 1000000) {
@@ -58,31 +107,35 @@ export function validateGigForm(form: GigInput): { isValid: boolean; errors: Gig
     }
   }
 
-  // Date validation
+  // Date validation (Timezone-safe YYYY-MM-DD parsing)
   const trimmedDate = form.date?.trim() || '';
   if (!trimmedDate) {
     errors.date = 'Date or deadline is required.';
   } else {
-    // Check if valid date format (e.g. YYYY-MM-DD)
-    const parsedDate = new Date(trimmedDate);
-    if (isNaN(parsedDate.getTime())) {
+    const parts = trimmedDate.split('-');
+    if (parts.length !== 3) {
       errors.date = 'Please provide a valid date (YYYY-MM-DD).';
     } else {
-      // Must be today or future date
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const gigDay = new Date(parsedDate);
-      gigDay.setHours(0, 0, 0, 0);
-      if (gigDay < today) {
-        errors.date = 'Gig date cannot be in the past.';
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10);
+      const day = parseInt(parts[2], 10);
+
+      if (isNaN(year) || isNaN(month) || isNaN(day) || month < 1 || month > 12 || day < 1 || day > 31) {
+        errors.date = 'Please provide a valid date (YYYY-MM-DD).';
+      } else {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const gigDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+
+        if (gigDay < today) {
+          errors.date = 'Gig date cannot be in the past.';
+        }
       }
     }
   }
 
   // Location validation
-  if (form.locationType === 'remote') {
-    // Remote gigs can have default "Remote" or optional country/timezone
-  } else {
+  if (form.locationType !== 'remote') {
     const trimmedLoc = form.location?.trim() || '';
     if (!trimmedLoc) {
       errors.location = `Location is required for ${form.locationType === 'hybrid' ? 'hybrid' : 'on-site'} gigs.`;
@@ -96,7 +149,7 @@ export function validateGigForm(form: GigInput): { isValid: boolean; errors: Gig
 }
 
 /**
- * Creates a new gig in Cloud Firestore.
+ * Creates and persists a new gig document in Cloud Firestore.
  */
 export async function createGig(
   input: GigInput,
@@ -114,6 +167,9 @@ export async function createGig(
       ? input.location.trim() || 'Remote (Work from Anywhere)'
       : input.location.trim();
 
+  const cleanSkills = input.skills.filter((s) => s.trim().length > 0);
+  const keywords = generateSearchKeywords(input.title, input.category, cleanSkills, finalLocation);
+
   const gigDocData = {
     title: input.title.trim(),
     description: input.description.trim(),
@@ -123,37 +179,167 @@ export async function createGig(
     date: input.date.trim(),
     location: finalLocation,
     locationType: input.locationType,
-    skills: input.skills.filter((s) => s.trim().length > 0),
-    status: 'open',
+    skills: cleanSkills,
+    status: 'open' as GigStatus,
     postedBy: {
       uid: user.uid,
       fullName: user.fullName || 'Business Owner',
       email: user.email || '',
     },
     applicantsCount: 0,
+    viewsCount: 0,
+    searchKeywords: keywords,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
 
-  const docRef = await addDoc(collection(db, 'gigs'), gigDocData);
-  return docRef.id;
+  try {
+    // 1. Create gig document in Firestore
+    const docRef = await addDoc(collection(db, 'gigs'), gigDocData);
+
+    // 2. Increment user's total gigs counter (best-effort)
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        totalGigsPosted: increment(1),
+        updatedAt: serverTimestamp(),
+      });
+    } catch {
+      // Non-critical if user counter update fails
+    }
+
+    return docRef.id;
+  } catch (error: any) {
+    console.error('Firestore createGig error:', error);
+    throw new Error(parseFirebaseError(error));
+  }
 }
 
 /**
- * Fetches recent active gigs from Cloud Firestore.
+ * Sorts an array of gigs in memory by createdAt descending with fallback for pending server timestamps.
+ */
+function sortGigsDesc(gigs: Gig[]): Gig[] {
+  return [...gigs].sort((a, b) => {
+    const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt || Date.now()).getTime();
+    const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt || Date.now()).getTime();
+    return timeB - timeA;
+  });
+}
+
+/**
+ * Subscribes to real-time updates for recent gigs with automatic index fallback.
+ */
+export function subscribeToRecentGigs(
+  limitCount = 10,
+  onUpdate: (gigs: Gig[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  try {
+    const q = query(
+      collection(db, 'gigs'),
+      limit(limitCount * 2)
+    );
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const rawGigs = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        })) as Gig[];
+        const sorted = sortGigsDesc(rawGigs).slice(0, limitCount);
+        onUpdate(sorted);
+      },
+      (error) => {
+        console.error('Firestore subscribeToRecentGigs error:', error);
+        if (onError) onError(new Error(parseFirebaseError(error)));
+      }
+    );
+  } catch (e: any) {
+    if (onError) onError(new Error(parseFirebaseError(e)));
+    return () => {};
+  }
+}
+
+/**
+ * Subscribes to real-time updates for gigs posted by a specific business owner.
+ */
+export function subscribeToClientGigs(
+  userId: string,
+  onUpdate: (gigs: Gig[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  try {
+    const q = query(
+      collection(db, 'gigs'),
+      where('postedBy.uid', '==', userId)
+    );
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const rawGigs = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        })) as Gig[];
+        const sorted = sortGigsDesc(rawGigs);
+        onUpdate(sorted);
+      },
+      (error) => {
+        console.error('Firestore subscribeToClientGigs error:', error);
+        if (onError) onError(new Error(parseFirebaseError(error)));
+      }
+    );
+  } catch (e: any) {
+    if (onError) onError(new Error(parseFirebaseError(e)));
+    return () => {};
+  }
+}
+
+/**
+ * Updates the status of a gig (e.g. 'open' -> 'in-progress' -> 'completed').
+ */
+export async function updateGigStatus(gigId: string, status: GigStatus): Promise<void> {
+  try {
+    const docRef = doc(db, 'gigs', gigId);
+    await updateDoc(docRef, {
+      status,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error: any) {
+    console.error('Firestore updateGigStatus error:', error);
+    throw new Error(parseFirebaseError(error));
+  }
+}
+
+/**
+ * Deletes a gig from Cloud Firestore.
+ */
+export async function deleteGig(gigId: string): Promise<void> {
+  try {
+    const docRef = doc(db, 'gigs', gigId);
+    await deleteDoc(docRef);
+  } catch (error: any) {
+    console.error('Firestore deleteGig error:', error);
+    throw new Error(parseFirebaseError(error));
+  }
+}
+
+/**
+ * Fetches recent active gigs once from Cloud Firestore.
  */
 export async function getRecentGigs(limitCount = 10): Promise<Gig[]> {
   try {
     const q = query(
       collection(db, 'gigs'),
-      orderBy('createdAt', 'desc'),
-      limit(limitCount)
+      limit(limitCount * 2)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((d) => ({
+    const rawGigs = snapshot.docs.map((d) => ({
       id: d.id,
       ...d.data(),
     })) as Gig[];
+    return sortGigsDesc(rawGigs).slice(0, limitCount);
   } catch (error) {
     console.error('Error fetching recent gigs:', error);
     return [];
@@ -161,35 +347,22 @@ export async function getRecentGigs(limitCount = 10): Promise<Gig[]> {
 }
 
 /**
- * Fetches gigs posted by a specific business owner / client.
+ * Fetches gigs posted by a specific business owner / client once.
  */
 export async function getGigsByClient(userId: string): Promise<Gig[]> {
   try {
     const q = query(
       collection(db, 'gigs'),
-      where('postedBy.uid', '==', userId),
-      orderBy('createdAt', 'desc')
+      where('postedBy.uid', '==', userId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((d) => ({
+    const rawGigs = snapshot.docs.map((d) => ({
       id: d.id,
       ...d.data(),
     })) as Gig[];
+    return sortGigsDesc(rawGigs);
   } catch (error) {
-    // If composite index is building or missing, fallback to where only
-    try {
-      const fallbackQuery = query(
-        collection(db, 'gigs'),
-        where('postedBy.uid', '==', userId)
-      );
-      const snapshot = await getDocs(fallbackQuery);
-      return snapshot.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      })) as Gig[];
-    } catch (e) {
-      console.error('Error fetching client gigs:', e);
-      return [];
-    }
+    console.error('Error fetching client gigs:', error);
+    return [];
   }
 }
