@@ -142,33 +142,65 @@ export default function Home() {
             Post a new gig in minutes and connect with local skilled youth and talented freelancers.
           </Text>
 
-          <TouchableOpacity
-            style={styles.postGigButton}
-            onPress={() => {
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              } catch {}
-              router.push('/(app)/post-gig' as any);
-            }}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="add-circle-outline" size={20} color="#080B14" />
-            <Text style={styles.postGigButtonText}>Post a New Gig</Text>
-          </TouchableOpacity>
+          <View style={styles.ctaButtonsRow}>
+            <TouchableOpacity
+              style={styles.postGigButton}
+              onPress={() => {
+                try {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                } catch {}
+                router.push('/(app)/post-gig' as any);
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add-circle-outline" size={20} color="#080B14" />
+              <Text style={styles.postGigButtonText}>Post New Gig</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.manageGigsButton}
+              onPress={() => {
+                try {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                } catch {}
+                router.push('/(app)/my-gigs' as any);
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="list-outline" size={18} color={colors.primary} />
+              <Text style={styles.manageGigsButtonText}>My Posted Gigs ({gigs.length})</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Quick stats row */}
         <View style={styles.statsRow}>
           {[
-            { label: 'Gigs Active', value: gigs.length.toString(), emoji: '💼' },
-            { label: 'Earnings', value: '$0', emoji: '💰' },
-            { label: 'Rating', value: '5.0', emoji: '⭐' },
+            {
+              label: role === 'client' ? 'Gigs Posted' : 'Gigs Active',
+              value: gigs.length.toString(),
+              emoji: '💼',
+              onPress: role === 'client' ? () => router.push('/(app)/my-gigs' as any) : undefined,
+            },
+            {
+              label: role === 'client' ? 'Total Value' : 'Earnings',
+              value: `$${gigs.reduce((acc, g) => acc + (g.pay || 0), 0).toLocaleString()}`,
+              emoji: '💰',
+              onPress: role === 'client' ? () => router.push('/(app)/my-gigs' as any) : undefined,
+            },
+            { label: 'Rating', value: '5.0', emoji: '⭐', onPress: undefined },
           ].map((stat) => (
-            <View key={stat.label} style={styles.statCard}>
+            <TouchableOpacity
+              key={stat.label}
+              style={styles.statCard}
+              onPress={stat.onPress}
+              disabled={!stat.onPress}
+              activeOpacity={stat.onPress ? 0.75 : 1}
+            >
               <Text style={styles.statEmoji}>{stat.emoji}</Text>
               <Text style={styles.statValue}>{stat.value}</Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
 
@@ -185,12 +217,21 @@ export default function Home() {
               </View>
             </View>
 
-            <TouchableOpacity
-              onPress={() => router.push('/(app)/post-gig' as any)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={styles.seeAllText}>+ Post Gig</Text>
-            </TouchableOpacity>
+            {role === 'client' ? (
+              <TouchableOpacity
+                onPress={() => router.push('/(app)/my-gigs' as any)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.seeAllText}>Manage All ({gigs.length}) →</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={() => router.push('/(app)/post-gig' as any)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.seeAllText}>+ Post Gig</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {loadingGigs ? (
@@ -216,10 +257,44 @@ export default function Home() {
           ) : (
             <View style={styles.gigsList}>
               {gigs.map((gig) => (
-                <View key={gig.id} style={styles.gigItemCard}>
+                <TouchableOpacity
+                  key={gig.id}
+                  style={styles.gigItemCard}
+                  onPress={() => {
+                    if (role === 'client') {
+                      router.push('/(app)/my-gigs' as any);
+                    }
+                  }}
+                  activeOpacity={role === 'client' ? 0.85 : 1}
+                >
                   <View style={styles.gigItemHeader}>
-                    <View style={styles.gigCategoryBadge}>
-                      <Text style={styles.gigCategoryBadgeText}>{gig.category}</Text>
+                    <View style={styles.gigHeaderBadges}>
+                      <View style={styles.gigCategoryBadge}>
+                        <Text style={styles.gigCategoryBadgeText}>{gig.category}</Text>
+                      </View>
+                      {gig.status && (
+                        <View
+                          style={[
+                            styles.gigStatusPill,
+                            gig.status === 'open' && styles.gigStatusOpen,
+                            gig.status === 'in-progress' && styles.gigStatusProgress,
+                            gig.status === 'completed' && styles.gigStatusCompleted,
+                            gig.status === 'cancelled' && styles.gigStatusCancelled,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.gigStatusPillText,
+                              gig.status === 'open' && { color: '#10B981' },
+                              gig.status === 'in-progress' && { color: '#F59E0B' },
+                              gig.status === 'completed' && { color: '#A78BFA' },
+                              gig.status === 'cancelled' && { color: '#EF4444' },
+                            ]}
+                          >
+                            {gig.status === 'in-progress' ? 'In Progress' : gig.status}
+                          </Text>
+                        </View>
+                      )}
                     </View>
                     <View style={styles.gigHeaderRight}>
                       <View style={styles.gigPayBadge}>
@@ -230,7 +305,10 @@ export default function Home() {
                       {role === 'client' && (
                         <TouchableOpacity
                           style={styles.deleteGigBtn}
-                          onPress={() => handleDeleteGig(gig.id, gig.title)}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleDeleteGig(gig.id, gig.title);
+                          }}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
                           <Ionicons name="trash-outline" size={16} color={colors.error} />
@@ -276,7 +354,7 @@ export default function Home() {
                       <Text style={styles.gigMetaText}>{gig.date}</Text>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           )}
@@ -396,15 +474,20 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: spacing.md,
   },
+  ctaButtonsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
   postGigButton: {
+    flex: 1,
     backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
-    paddingVertical: 13,
-    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -413,8 +496,26 @@ const styles = StyleSheet.create({
   },
   postGigButtonText: {
     color: '#080B14',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
+  },
+  manageGigsButton: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    borderRadius: borderRadius.md,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  manageGigsButtonText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   // Stats
@@ -549,6 +650,38 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 2,
+  },
+  gigHeaderBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  gigStatusPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+  },
+  gigStatusOpen: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  gigStatusProgress: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  gigStatusCompleted: {
+    backgroundColor: 'rgba(124, 58, 237, 0.15)',
+    borderColor: 'rgba(124, 58, 237, 0.3)',
+  },
+  gigStatusCancelled: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  gigStatusPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'capitalize',
   },
   gigHeaderRight: {
     flexDirection: 'row',

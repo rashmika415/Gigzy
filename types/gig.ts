@@ -75,3 +75,23 @@ export interface GigCreationResult {
   gigId?: string;
   error?: string;
 }
+
+export type GigSortOption = 'newest' | 'oldest' | 'pay-high' | 'pay-low' | 'applicants';
+
+export interface BusinessGigStats {
+  total: number;
+  open: number;
+  inProgress: number;
+  completed: number;
+  cancelled: number;
+  totalBudget: number;
+  totalApplicants: number;
+}
+
+export interface GigFilterOptions {
+  status?: GigStatus | 'all';
+  category?: string;
+  searchQuery?: string;
+  sortBy?: GigSortOption;
+}
+

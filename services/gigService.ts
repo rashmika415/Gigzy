@@ -2,6 +2,7 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDoc,
   query,
   where,
   orderBy,
@@ -14,7 +15,14 @@ import {
   increment,
 } from 'firebase/firestore';
 import { db } from '../FirebaseConfig';
-import { Gig, GigInput, GigValidationErrors, GigStatus } from '../types/gig';
+import {
+  Gig,
+  GigInput,
+  GigValidationErrors,
+  GigStatus,
+  BusinessGigStats,
+  GigFilterOptions,
+} from '../types/gig';
 
 /**
  * Translates Firebase / Firestore error codes into human-readable messages.
@@ -297,7 +305,94 @@ export function subscribeToClientGigs(
 }
 
 /**
- * Updates the status of a gig (e.g. 'open' -> 'in-progress' -> 'completed').
+ * Calculates summary metrics and performance stats for a business owner's gigs.
+ */
+export function calculateBusinessGigStats(gigs: Gig[]): BusinessGigStats {
+  const stats: BusinessGigStats = {
+    total: gigs.length,
+    open: 0,
+    inProgress: 0,
+    completed: 0,
+    cancelled: 0,
+    totalBudget: 0,
+    totalApplicants: 0,
+  };
+
+  for (const gig of gigs) {
+    if (gig.status === 'open') stats.open += 1;
+    else if (gig.status === 'in-progress') stats.inProgress += 1;
+    else if (gig.status === 'completed') stats.completed += 1;
+    else if (gig.status === 'cancelled') stats.cancelled += 1;
+
+    if (gig.pay && typeof gig.pay === 'number') {
+      stats.totalBudget += gig.pay;
+    }
+    if (gig.applicantsCount && typeof gig.applicantsCount === 'number') {
+      stats.totalApplicants += gig.applicantsCount;
+    }
+  }
+
+  return stats;
+}
+
+/**
+ * Filters and sorts an array of gigs in memory according to specified filter criteria.
+ */
+export function filterAndSortGigs(gigs: Gig[], options: GigFilterOptions): Gig[] {
+  let result = [...gigs];
+
+  // 1. Filter by Status
+  if (options.status && options.status !== 'all') {
+    result = result.filter((g) => g.status === options.status);
+  }
+
+  // 2. Filter by Category
+  if (options.category && options.category !== 'all') {
+    result = result.filter(
+      (g) => g.category?.toLowerCase() === options.category?.toLowerCase()
+    );
+  }
+
+  // 3. Filter by Search Query
+  if (options.searchQuery && options.searchQuery.trim().length > 0) {
+    const query = options.searchQuery.trim().toLowerCase();
+    result = result.filter((g) => {
+      const matchTitle = g.title?.toLowerCase().includes(query);
+      const matchDesc = g.description?.toLowerCase().includes(query);
+      const matchCategory = g.category?.toLowerCase().includes(query);
+      const matchLocation = g.location?.toLowerCase().includes(query);
+      const matchSkills = g.skills?.some((s) => s.toLowerCase().includes(query));
+      return matchTitle || matchDesc || matchCategory || matchLocation || matchSkills;
+    });
+  }
+
+  // 4. Sort
+  const sortBy = options.sortBy || 'newest';
+  result.sort((a, b) => {
+    const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt || 0).getTime();
+    const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt || 0).getTime();
+
+    switch (sortBy) {
+      case 'newest':
+        return timeB - timeA;
+      case 'oldest':
+        return timeA - timeB;
+      case 'pay-high':
+        return (b.pay || 0) - (a.pay || 0);
+      case 'pay-low':
+        return (a.pay || 0) - (b.pay || 0);
+      case 'applicants':
+        return (b.applicantsCount || 0) - (a.applicantsCount || 0);
+      default:
+        return timeB - timeA;
+    }
+  });
+
+  return result;
+}
+
+/**
+ * Updates the status of a gig (e.g. 'open' -> 'in-progress' -> 'completed' -> 'cancelled').
  */
 export async function updateGigStatus(gigId: string, status: GigStatus): Promise<void> {
   try {
@@ -313,14 +408,45 @@ export async function updateGigStatus(gigId: string, status: GigStatus): Promise
 }
 
 /**
- * Deletes a gig from Cloud Firestore.
+ * Deletes a gig from Cloud Firestore and decrements the user's total gigs counter.
  */
-export async function deleteGig(gigId: string): Promise<void> {
+export async function deleteGig(gigId: string, userId?: string): Promise<void> {
   try {
     const docRef = doc(db, 'gigs', gigId);
     await deleteDoc(docRef);
+
+    // Decrement user's total gigs counter if userId provided (best-effort)
+    if (userId) {
+      try {
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, {
+          totalGigsPosted: increment(-1),
+          updatedAt: serverTimestamp(),
+        });
+      } catch {
+        // Non-critical if user counter update fails
+      }
+    }
   } catch (error: any) {
     console.error('Firestore deleteGig error:', error);
+    throw new Error(parseFirebaseError(error));
+  }
+}
+
+/**
+ * Fetches a single gig by its ID from Cloud Firestore.
+ */
+export async function getGigById(gigId: string): Promise<Gig | null> {
+  try {
+    const docRef = doc(db, 'gigs', gigId);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return null;
+    return {
+      id: snap.id,
+      ...snap.data(),
+    } as Gig;
+  } catch (error: any) {
+    console.error('Firestore getGigById error:', error);
     throw new Error(parseFirebaseError(error));
   }
 }
@@ -366,3 +492,4 @@ export async function getGigsByClient(userId: string): Promise<Gig[]> {
     return [];
   }
 }
+

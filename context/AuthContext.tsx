@@ -36,7 +36,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let unsubscribeDoc: (() => void) | undefined;
 
+    // Safety timeout: Ensure loading is never stuck indefinitely on slow/offline networks
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 3500);
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      clearTimeout(safetyTimer);
       setUser(firebaseUser);
       
       if (firebaseUser) {
@@ -67,6 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      clearTimeout(safetyTimer);
       unsubscribeAuth();
       if (unsubscribeDoc) unsubscribeDoc();
     };
