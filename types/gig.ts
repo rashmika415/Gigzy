@@ -38,6 +38,8 @@ export interface Gig {
     email: string;
   };
   applicantsCount: number;
+  viewsCount?: number;
+  searchKeywords?: string[];
   createdAt: any;
   updatedAt?: any;
 }
@@ -67,3 +69,29 @@ export interface GigValidationErrors {
   general?: string;
   [key: string]: string | undefined;
 }
+
+export interface GigCreationResult {
+  success: boolean;
+  gigId?: string;
+  error?: string;
+}
+
+export type GigSortOption = 'newest' | 'oldest' | 'pay-high' | 'pay-low' | 'applicants';
+
+export interface BusinessGigStats {
+  total: number;
+  open: number;
+  inProgress: number;
+  completed: number;
+  cancelled: number;
+  totalBudget: number;
+  totalApplicants: number;
+}
+
+export interface GigFilterOptions {
+  status?: GigStatus | 'all';
+  category?: string;
+  searchQuery?: string;
+  sortBy?: GigSortOption;
+}
+

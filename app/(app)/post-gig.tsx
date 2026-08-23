@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { GIG_CATEGORIES, GigInput, GigValidationErrors, LocationType } from '../../types/gig';
@@ -42,6 +43,8 @@ const SUGGESTED_SKILLS = [
 
 const BUDGET_PRESETS = ['50', '100', '250', '500', '1000'];
 
+type SubmissionStage = 'idle' | 'validating' | 'saving' | 'done';
+
 export default function PostGigScreen() {
   const { user, userData } = useAuth();
 
@@ -62,7 +65,9 @@ export default function PostGigScreen() {
   const [errors, setErrors] = useState<GigValidationErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
+  const [submissionStage, setSubmissionStage] = useState<SubmissionStage>('idle');
   const [submitError, setSubmitError] = useState('');
+  const [createdGigId, setCreatedGigId] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showDatePickerModal, setShowDatePickerModal] = useState(false);
 
@@ -120,12 +125,18 @@ export default function PostGigScreen() {
       setErrors((prev) => ({ ...prev, skills: 'Maximum 8 skills allowed.' }));
       return;
     }
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
     setForm((prev) => ({ ...prev, skills: [...prev.skills, text] }));
     setSkillInput('');
     setErrors((prev) => ({ ...prev, skills: undefined }));
   };
 
   const handleRemoveSkill = (skillToRemove: string) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
     setForm((prev) => ({
       ...prev,
       skills: prev.skills.filter((s) => s !== skillToRemove),
@@ -134,6 +145,9 @@ export default function PostGigScreen() {
 
   // Date selection presets
   const handleSelectDatePreset = (daysOffset: number) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
     const formatted = getFormattedDate(daysOffset);
     handleChange('date', formatted);
     setTouched((prev) => ({ ...prev, date: true }));
@@ -141,6 +155,9 @@ export default function PostGigScreen() {
 
   // Custom date picker apply
   const handleApplyDatePicker = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
     const yyyy = pickerDate.year;
     const mm = String(pickerDate.month).padStart(2, '0');
     const dd = String(pickerDate.day).padStart(2, '0');
@@ -150,7 +167,7 @@ export default function PostGigScreen() {
     setShowDatePickerModal(false);
   };
 
-  // Form Submission
+  // Form Submission & Database Persistence
   const handleSubmit = async () => {
     // Mark all required fields as touched
     setTouched({
@@ -162,33 +179,52 @@ export default function PostGigScreen() {
       location: true,
     });
 
+    setSubmissionStage('validating');
     const { isValid, errors: validationErrors } = validateGigForm(form);
     setErrors(validationErrors);
 
     if (!isValid) {
-      setSubmitError('Please fix the errors in the form before submitting.');
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } catch {}
+      setSubmissionStage('idle');
+      setSubmitError('Please correct the highlighted fields before submitting.');
       return;
     }
 
     if (!user) {
-      setSubmitError('You must be logged in to post a gig.');
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } catch {}
+      setSubmissionStage('idle');
+      setSubmitError('You must be signed in to post a gig. Please log in first.');
       return;
     }
 
     setSubmitError('');
     setLoading(true);
+    setSubmissionStage('saving');
 
     try {
-      await createGig(form, {
+      const gigId = await createGig(form, {
         uid: user.uid,
         fullName: userData?.fullName || user.displayName || 'Business Owner',
         email: userData?.email || user.email || '',
       });
 
+      setCreatedGigId(gigId);
+      setSubmissionStage('done');
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
       setShowSuccessModal(true);
     } catch (err: any) {
       console.error('Error posting gig:', err);
-      setSubmitError(err?.message || 'Failed to post gig. Please try again.');
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } catch {}
+      setSubmissionStage('idle');
+      setSubmitError(err?.message || 'Failed to persist gig in database. Please check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -209,6 +245,8 @@ export default function PostGigScreen() {
     setTouched({});
     setErrors({});
     setSubmitError('');
+    setCreatedGigId('');
+    setSubmissionStage('idle');
     setShowSuccessModal(false);
   };
 
@@ -223,6 +261,7 @@ export default function PostGigScreen() {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
+          disabled={loading}
           activeOpacity={0.7}
         >
           <Ionicons name="arrow-back" size={22} color={colors.text} />
@@ -243,11 +282,21 @@ export default function PostGigScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Submission Error Banner */}
+          {/* Submission Error Banner with Retry Option */}
           {submitError ? (
             <View style={styles.errorBanner}>
               <Ionicons name="alert-circle" size={20} color={colors.error} />
-              <Text style={styles.errorBannerText}>{submitError}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.errorBannerTitle}>Unable to Post Gig</Text>
+                <Text style={styles.errorBannerText}>{submitError}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.retryBannerBtn}
+                onPress={handleSubmit}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.retryBannerBtnText}>Retry</Text>
+              </TouchableOpacity>
             </View>
           ) : null}
 
@@ -280,6 +329,7 @@ export default function PostGigScreen() {
                 value={form.title}
                 onChangeText={(val) => handleChange('title', val)}
                 onBlur={() => handleBlur('title')}
+                editable={!loading}
                 maxLength={100}
               />
               {touched.title && errors.title && (
@@ -306,9 +356,13 @@ export default function PostGigScreen() {
                         isSelected && styles.categoryChipActive,
                       ]}
                       onPress={() => {
+                        try {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        } catch {}
                         handleChange('category', cat.name);
                         setTouched((prev) => ({ ...prev, category: true }));
                       }}
+                      disabled={loading}
                       activeOpacity={0.7}
                     >
                       <Ionicons
@@ -366,6 +420,7 @@ export default function PostGigScreen() {
                 value={form.description}
                 onChangeText={(val) => handleChange('description', val)}
                 onBlur={() => handleBlur('description')}
+                editable={!loading}
                 multiline
                 numberOfLines={5}
                 textAlignVertical="top"
@@ -389,11 +444,13 @@ export default function PostGigScreen() {
                   placeholderTextColor={colors.textMuted}
                   value={skillInput}
                   onChangeText={setSkillInput}
+                  editable={!loading}
                   onSubmitEditing={() => handleAddSkill()}
                 />
                 <TouchableOpacity
                   style={styles.addSkillBtn}
                   onPress={() => handleAddSkill()}
+                  disabled={loading}
                   activeOpacity={0.7}
                 >
                   <Ionicons name="add" size={20} color="#080B14" />
@@ -410,6 +467,7 @@ export default function PostGigScreen() {
                       <TouchableOpacity
                         onPress={() => handleRemoveSkill(skill)}
                         style={styles.removeSkillBtn}
+                        disabled={loading}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
                         <Ionicons name="close" size={14} color={colors.primary} />
@@ -429,6 +487,7 @@ export default function PostGigScreen() {
                         key={skill}
                         style={styles.suggestedChip}
                         onPress={() => handleAddSkill(skill)}
+                        disabled={loading}
                       >
                         <Text style={styles.suggestedChipText}>+ {skill}</Text>
                       </TouchableOpacity>
@@ -457,7 +516,13 @@ export default function PostGigScreen() {
                   styles.payTypeBtn,
                   form.payType === 'fixed' && styles.payTypeBtnActive,
                 ]}
-                onPress={() => handleChange('payType', 'fixed')}
+                onPress={() => {
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  } catch {}
+                  handleChange('payType', 'fixed');
+                }}
+                disabled={loading}
                 activeOpacity={0.8}
               >
                 <Ionicons
@@ -480,7 +545,13 @@ export default function PostGigScreen() {
                   styles.payTypeBtn,
                   form.payType === 'hourly' && styles.payTypeBtnActive,
                 ]}
-                onPress={() => handleChange('payType', 'hourly')}
+                onPress={() => {
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  } catch {}
+                  handleChange('payType', 'hourly');
+                }}
+                disabled={loading}
                 activeOpacity={0.8}
               >
                 <Ionicons
@@ -519,6 +590,7 @@ export default function PostGigScreen() {
                   value={form.pay}
                   onChangeText={(val) => handleChange('pay', val)}
                   onBlur={() => handleBlur('pay')}
+                  editable={!loading}
                   keyboardType="decimal-pad"
                 />
                 <Text style={styles.currencySuffix}>
@@ -543,9 +615,13 @@ export default function PostGigScreen() {
                       form.pay === preset && styles.presetChipActive,
                     ]}
                     onPress={() => {
+                      try {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      } catch {}
                       handleChange('pay', preset);
                       setTouched((prev) => ({ ...prev, pay: true }));
                     }}
+                    disabled={loading}
                   >
                     <Text
                       style={[
@@ -585,6 +661,7 @@ export default function PostGigScreen() {
                     form.date === getFormattedDate(0) && styles.dateChipActive,
                   ]}
                   onPress={() => handleSelectDatePreset(0)}
+                  disabled={loading}
                 >
                   <Text
                     style={[
@@ -602,6 +679,7 @@ export default function PostGigScreen() {
                     form.date === getFormattedDate(1) && styles.dateChipActive,
                   ]}
                   onPress={() => handleSelectDatePreset(1)}
+                  disabled={loading}
                 >
                   <Text
                     style={[
@@ -619,6 +697,7 @@ export default function PostGigScreen() {
                     form.date === getFormattedDate(7) && styles.dateChipActive,
                   ]}
                   onPress={() => handleSelectDatePreset(7)}
+                  disabled={loading}
                 >
                   <Text
                     style={[
@@ -633,6 +712,7 @@ export default function PostGigScreen() {
                 <TouchableOpacity
                   style={styles.customDateBtn}
                   onPress={() => setShowDatePickerModal(true)}
+                  disabled={loading}
                 >
                   <Ionicons name="calendar" size={14} color={colors.primary} />
                   <Text style={styles.customDateBtnText}>Custom</Text>
@@ -646,6 +726,7 @@ export default function PostGigScreen() {
                   touched.date && errors.date ? styles.inputError : null,
                 ]}
                 onPress={() => setShowDatePickerModal(true)}
+                disabled={loading}
                 activeOpacity={0.8}
               >
                 <Ionicons name="calendar-clear-outline" size={18} color={colors.primary} />
@@ -693,11 +774,15 @@ export default function PostGigScreen() {
                         isSelected && styles.locationTypeCardActive,
                       ]}
                       onPress={() => {
+                        try {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        } catch {}
                         handleChange('locationType', item.type);
                         if (item.type === 'remote' && !form.location) {
                           handleChange('location', 'Remote');
                         }
                       }}
+                      disabled={loading}
                       activeOpacity={0.7}
                     >
                       <Ionicons
@@ -751,6 +836,7 @@ export default function PostGigScreen() {
                   value={form.location}
                   onChangeText={(val) => handleChange('location', val)}
                   onBlur={() => handleBlur('location')}
+                  editable={!loading}
                 />
               </View>
               {touched.location && errors.location && (
@@ -777,7 +863,9 @@ export default function PostGigScreen() {
               {loading ? (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator color="#080B14" size="small" />
-                  <Text style={styles.submitButtonText}>Publishing Gig...</Text>
+                  <Text style={styles.submitButtonText}>
+                    {submissionStage === 'saving' ? 'Persisting to Firestore...' : 'Validating Gig...'}
+                  </Text>
                 </View>
               ) : (
                 <View style={styles.loadingRow}>
@@ -937,15 +1025,27 @@ export default function PostGigScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.successModalCard}>
             <View style={styles.successIconCircle}>
-              <Ionicons name="checkmark-circle" size={48} color={colors.primary} />
+              <Ionicons name="checkmark-circle" size={54} color={colors.primary} />
             </View>
 
-            <Text style={styles.successTitle}>Gig Posted Successfully! 🎉</Text>
+            <Text style={styles.successTitle}>Gig Published! 🎉</Text>
             <Text style={styles.successSubtitle}>
-              {`"${form.title}" is now live on the Gigzy marketplace. Freelancers can now view and apply.`}
+              {`"${form.title}" has been saved to Cloud Firestore and is now active on the marketplace.`}
             </Text>
 
+            {/* Assigned Gig ID Badge */}
+            {createdGigId ? (
+              <View style={styles.gigIdBadge}>
+                <Ionicons name="key-outline" size={13} color={colors.primary} />
+                <Text style={styles.gigIdBadgeText}>ID: {createdGigId}</Text>
+              </View>
+            ) : null}
+
             <View style={styles.successSummaryBox}>
+              <View style={styles.successSummaryRow}>
+                <Text style={styles.summaryLabel}>Status:</Text>
+                <Text style={styles.summaryStatusText}>🟢 Open for applications</Text>
+              </View>
               <View style={styles.successSummaryRow}>
                 <Text style={styles.summaryLabel}>Category:</Text>
                 <Text style={styles.summaryValue}>{form.category}</Text>
@@ -1076,11 +1176,27 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     gap: spacing.sm,
   },
-  errorBannerText: {
-    flex: 1,
+  errorBannerTitle: {
     fontSize: 13,
     color: colors.error,
-    fontWeight: '600',
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  errorBannerText: {
+    fontSize: 12,
+    color: colors.error,
+    lineHeight: 16,
+  },
+  retryBannerBtn: {
+    backgroundColor: colors.error,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: borderRadius.sm,
+  },
+  retryBannerBtnText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   // Section Cards
@@ -1660,7 +1776,24 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 18,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  gigIdBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    gap: 6,
+    marginBottom: spacing.md,
+  },
+  gigIdBadgeText: {
+    fontSize: 11,
+    color: colors.primary,
+    fontWeight: '700',
   },
   successSummaryBox: {
     width: '100%',
@@ -1684,6 +1817,11 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 12,
     color: colors.text,
+    fontWeight: '700',
+  },
+  summaryStatusText: {
+    fontSize: 12,
+    color: colors.success,
     fontWeight: '700',
   },
   successBtnStack: {
