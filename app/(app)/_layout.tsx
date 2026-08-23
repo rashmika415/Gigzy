@@ -11,7 +11,7 @@ export default function AppLayout() {
     if (!loading && !user) {
       router.replace('/(auth)/login');
     }
-  }, [user, loading]);
+  }, [user, loading, router]);
 
   return (
     <Stack
