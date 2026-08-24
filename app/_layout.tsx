@@ -9,7 +9,7 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -25,10 +25,10 @@ function RootLayoutNav() {
       // Not logged in → send to welcome screen
       router.replace('/(auth)/welcome');
     } else if (user && inAuthGroup) {
-      // Logged in → send to app home
-      router.replace('/(app)/home');
+      // Logged in → send to the persona's home based on their role
+      router.replace(profile?.role === 'business' ? '/business' : '/youth');
     }
-  }, [user, loading, segments]);
+  }, [user, profile, loading, segments]);
 
   return (
     <>

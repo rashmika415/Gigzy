@@ -31,6 +31,14 @@ export const colors = {
   success: '#10B981',
   successLight: 'rgba(16, 185, 129, 0.12)',
 
+  warning: '#F5A623',
+  warningLight: 'rgba(245, 166, 35, 0.14)',
+
+  chipBg: '#192121',
+  chipBorder: 'rgba(135, 147, 144, 0.25)',
+  chipActiveBg: '#6FD8C7',
+  chipActiveText: '#003731',
+
   inputBg: '#151D1D',
   inputBorder: 'rgba(135, 147, 144, 0.2)',
   inputBorderFocus: '#6FD8C7',
