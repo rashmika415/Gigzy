@@ -20,7 +20,7 @@ import { colors, spacing, borderRadius } from '../../constants/theme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-type Role = 'freelancer' | 'client';
+type Role = 'freelancer' | 'client' | 'admin';
 
 const FIREBASE_ERRORS: Record<string, string> = {
   'auth/email-already-in-use': 'An account with this email already exists.',
@@ -153,7 +153,7 @@ export default function Register() {
                 <Text
                   style={[styles.roleText, role === 'freelancer' && styles.roleTextActive]}
                 >
-                  Freelancer
+                  Youth
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -165,7 +165,19 @@ export default function Register() {
                 <Text
                   style={[styles.roleText, role === 'client' && styles.roleTextActive]}
                 >
-                  Client
+                  Business
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.roleOption, role === 'admin' && styles.roleOptionActive]}
+                onPress={() => setRole('admin')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.roleEmoji}>⚡</Text>
+                <Text
+                  style={[styles.roleText, role === 'admin' && styles.roleTextActive]}
+                >
+                  Admin
                 </Text>
               </TouchableOpacity>
             </View>
@@ -272,7 +284,7 @@ export default function Register() {
               </TouchableOpacity>
             </View>
             {confirmPassword.length > 0 && password !== confirmPassword && (
-              <Text style={styles.matchError}>Passwords don't match</Text>
+              <Text style={styles.matchError}>{"Passwords don't match"}</Text>
             )}
           </View>
 

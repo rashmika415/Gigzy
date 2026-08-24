@@ -195,7 +195,7 @@ export default function Login() {
             style={styles.registerLink}
           >
             <Text style={styles.registerText}>
-              Don't have an account?{' '}
+              {"Don't have an account? "}
               <Text style={styles.registerAccent}>Create one</Text>
             </Text>
           </TouchableOpacity>
