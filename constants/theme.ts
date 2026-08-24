@@ -1,38 +1,47 @@
-// Design tokens for the Gigzy app
-// Dark-mode gig marketplace aesthetic
+// Design tokens for the LocalWorks app
+// Dark, teal-accented youth gig-marketplace aesthetic
 
 export const colors = {
-  background: '#080B14',
-  surface: 'rgba(255, 255, 255, 0.05)',
-  surfaceBorder: 'rgba(255, 255, 255, 0.1)',
-  surfaceHover: 'rgba(255, 255, 255, 0.08)',
+  background: '#0D1515',
+  surface: '#151D1D',
+  surfaceElevated: '#192121',
+  surfaceBorder: 'rgba(135, 147, 144, 0.2)',
+  surfaceBorderSubtle: 'rgba(61, 73, 70, 0.3)',
+  surfaceHover: 'rgba(111, 216, 199, 0.08)',
 
-  primary: '#F59E0B',
-  primaryDark: '#D97706',
-  primaryLight: 'rgba(245, 158, 11, 0.15)',
-  primaryGlow: 'rgba(245, 158, 11, 0.25)',
+  primary: '#6FD8C7',
+  primaryDark: '#2B9E8F',
+  primaryLight: 'rgba(111, 216, 199, 0.15)',
+  primaryGlow: 'rgba(111, 216, 199, 0.25)',
+  primaryOnColor: '#003731',
 
-  accent: '#7C3AED',
-  accentLight: 'rgba(124, 58, 237, 0.15)',
+  accent: '#2C4968',
+  accentLight: 'rgba(44, 73, 104, 0.15)',
 
-  text: '#F1F5F9',
-  textSecondary: '#94A3B8',
-  textMuted: '#475569',
+  text: '#DCE4E4',
+  textSecondary: '#BCC9C5',
+  textMuted: '#879390',
+  placeholder: '#6B7280',
 
-  error: '#EF4444',
-  errorLight: 'rgba(239, 68, 68, 0.12)',
+  error: '#FFB4AB',
+  errorText: '#FFDAD6',
+  errorLight: 'rgba(147, 0, 10, 0.2)',
+  errorBorder: 'rgba(255, 180, 171, 0.5)',
 
   success: '#10B981',
   successLight: 'rgba(16, 185, 129, 0.12)',
 
-  inputBg: 'rgba(255, 255, 255, 0.06)',
-  inputBorder: 'rgba(255, 255, 255, 0.12)',
-  inputBorderFocus: '#F59E0B',
+  inputBg: '#151D1D',
+  inputBorder: 'rgba(135, 147, 144, 0.2)',
+  inputBorderFocus: '#6FD8C7',
+};
 
-  // Slide accent colors (onboarding)
-  slide1: '#F59E0B',
-  slide2: '#7C3AED',
-  slide3: '#10B981',
+export const fonts = {
+  display: 'Syne_800ExtraBold',
+  heading: 'Syne_700Bold',
+  headingSemiBold: 'Syne_600SemiBold',
+  body: 'HankenGrotesk_400Regular',
+  bodyMedium: 'HankenGrotesk_500Medium',
 };
 
 export const spacing = {
@@ -45,26 +54,9 @@ export const spacing = {
 };
 
 export const borderRadius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
+  sm: 4,
+  md: 8,
+  lg: 12,
+  xl: 16,
   full: 9999,
-};
-
-export const shadows = {
-  primaryGlow: {
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  card: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 24,
-    elevation: 12,
-  },
 };

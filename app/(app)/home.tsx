@@ -21,7 +21,7 @@ export default function Home() {
 
   const handleSignOut = async () => {
     await signOut(auth);
-    // Root layout useEffect will redirect to onboarding
+    // Root layout useEffect will redirect to the welcome screen
   };
 
   return (
