@@ -2,11 +2,12 @@ import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useFonts as useSyneFonts, Syne_600SemiBold, Syne_700Bold, Syne_800ExtraBold } from '@expo-google-fonts/syne';
-import { useFonts as useHankenFonts, HankenGrotesk_400Regular, HankenGrotesk_500Medium } from '@expo-google-fonts/hanken-grotesk';
+import { Platform } from 'react-native';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 
-SplashScreen.preventAutoHideAsync();
+if (Platform.OS !== 'web') {
+  SplashScreen.preventAutoHideAsync().catch(() => {});
+}
 
 function RootLayoutNav() {
   const { user, loading } = useAuth();
@@ -17,7 +18,9 @@ function RootLayoutNav() {
     if (loading) return;
 
     // Hide splash screen once auth state is resolved
-    SplashScreen.hideAsync();
+    if (Platform.OS !== 'web') {
+      SplashScreen.hideAsync().catch(() => {});
+    }
 
     const inAuthGroup = segments[0] === '(auth)';
 
@@ -28,7 +31,7 @@ function RootLayoutNav() {
       // Logged in → send to app home
       router.replace('/(app)/home');
     }
-  }, [user, loading, segments]);
+  }, [user, loading, segments, router]);
 
   return (
     <>

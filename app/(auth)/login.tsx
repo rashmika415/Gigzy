@@ -149,10 +149,16 @@ export default function Login() {
             <Text style={styles.dividerText}>or</Text>
             <View style={styles.dividerLine} />
           </View>
-          <Text style={styles.footerText}>
-            New to LocalWorks?{' '}
-            <Text style={styles.footerLink} onPress={() => router.push('/(auth)/role-select')}>
-              Create an account
+
+          {/* Register Link */}
+          <TouchableOpacity
+            onPress={() => router.push('/(auth)/register')}
+            activeOpacity={0.7}
+            style={styles.registerLink}
+          >
+            <Text style={styles.registerText}>
+              {"Don't have an account? "}
+              <Text style={styles.registerAccent}>Create one</Text>
             </Text>
           </Text>
         </View>
