@@ -25,8 +25,8 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!user && !inAuthGroup) {
-      // Not logged in → send to onboarding
-      router.replace('/(auth)/onboarding');
+      // Not logged in → send to welcome screen
+      router.replace('/(auth)/welcome');
     } else if (user && inAuthGroup) {
       // Logged in → send to app home
       router.replace('/(app)/home');
@@ -42,6 +42,13 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [syneLoaded] = useSyneFonts({ Syne_600SemiBold, Syne_700Bold, Syne_800ExtraBold });
+  const [hankenLoaded] = useHankenFonts({ HankenGrotesk_400Regular, HankenGrotesk_500Medium });
+
+  if (!syneLoaded || !hankenLoaded) {
+    return null;
+  }
+
   return (
     <AuthProvider>
       <RootLayoutNav />
