@@ -151,14 +151,13 @@ export default function Login() {
           </View>
 
           {/* Register Link */}
-          <TouchableOpacity
-            onPress={() => router.push('/(auth)/register')}
-            activeOpacity={0.7}
-            style={styles.registerLink}
-          >
-            <Text style={styles.registerText}>
-              {"Don't have an account? "}
-              <Text style={styles.registerAccent}>Create one</Text>
+          <Text style={styles.footerText}>
+            {"Don't have an account? "}
+            <Text
+              style={styles.footerLink}
+              onPress={() => router.push('/(auth)/role-select')}
+            >
+              Create one
             </Text>
           </Text>
         </View>

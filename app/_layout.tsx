@@ -3,6 +3,17 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
+import {
+  useFonts as useSyneFonts,
+  Syne_600SemiBold,
+  Syne_700Bold,
+  Syne_800ExtraBold,
+} from '@expo-google-fonts/syne';
+import {
+  useFonts as useHankenFonts,
+  HankenGrotesk_400Regular,
+  HankenGrotesk_500Medium,
+} from '@expo-google-fonts/hanken-grotesk';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 
 if (Platform.OS !== 'web') {
