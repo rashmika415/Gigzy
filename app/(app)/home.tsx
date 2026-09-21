@@ -29,7 +29,6 @@ export default function Home() {
   // Real-time Firestore synchronization
   useEffect(() => {
     if (!user) {
-      setLoadingGigs(false);
       return;
     }
 
@@ -234,7 +233,7 @@ export default function Home() {
             )}
           </View>
 
-          {loadingGigs ? (
+          {loadingGigs && user ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator color={colors.primary} size="small" />
               <Text style={styles.loadingText}>Syncing with Cloud Firestore...</Text>

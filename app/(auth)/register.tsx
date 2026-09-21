@@ -19,7 +19,17 @@ import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 
 type Role = 'youth' | 'business';
 
-type Role = 'freelancer' | 'client' | 'admin';
+const ROLE_LABEL: Record<Role, string> = {
+  youth: 'Looking for work',
+  business: 'Hiring',
+};
+
+// The account's stored role uses the app-wide vocabulary consumed by
+// home.tsx / profile.tsx, which differs from the role-select URL param.
+const ROLE_TO_ACCOUNT_ROLE: Record<Role, 'freelancer' | 'client'> = {
+  youth: 'freelancer',
+  business: 'client',
+};
 
 const FIREBASE_ERRORS: Record<string, string> = {
   'auth/email-already-in-use': 'An account with this email already exists.',
@@ -85,7 +95,7 @@ export default function Register() {
         uid: credential.user.uid,
         fullName: fullName.trim(),
         email: email.trim(),
-        role,
+        role: ROLE_TO_ACCOUNT_ROLE[role],
         notifyOnMatch,
         createdAt: serverTimestamp(),
       });
@@ -134,45 +144,16 @@ export default function Register() {
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>I am a</Text>
-            <View style={styles.roleToggle}>
-              <TouchableOpacity
-                style={[styles.roleOption, role === 'freelancer' && styles.roleOptionActive]}
-                onPress={() => setRole('freelancer')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.roleEmoji}>💼</Text>
-                <Text
-                  style={[styles.roleText, role === 'freelancer' && styles.roleTextActive]}
-                >
-                  Youth
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.roleOption, role === 'client' && styles.roleOptionActive]}
-                onPress={() => setRole('client')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.roleEmoji}>🏢</Text>
-                <Text
-                  style={[styles.roleText, role === 'client' && styles.roleTextActive]}
-                >
-                  Business
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.roleOption, role === 'admin' && styles.roleOptionActive]}
-                onPress={() => setRole('admin')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.roleEmoji}>⚡</Text>
-                <Text
-                  style={[styles.roleText, role === 'admin' && styles.roleTextActive]}
-                >
-                  Admin
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.label}>Full name</Text>
+            <TextInput
+              style={styles.input}
+              value={fullName}
+              onChangeText={(t) => { setFullName(t); setError(''); }}
+              placeholder="Your full name"
+              placeholderTextColor={colors.placeholder}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
           </View>
 
           <View style={styles.inputGroup}>
@@ -400,6 +381,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: colors.textSecondary,
+  },
+  matchError: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.errorText,
   },
 
   checkboxes: { gap: spacing.md },

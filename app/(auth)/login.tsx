@@ -160,7 +160,7 @@ export default function Login() {
               {"Don't have an account? "}
               <Text style={styles.registerAccent}>Create one</Text>
             </Text>
-          </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -325,5 +325,17 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     color: colors.primary,
     textDecorationLine: 'underline',
+  },
+  registerLink: { alignItems: 'center' },
+  registerText: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  registerAccent: {
+    fontFamily: fonts.bodyMedium,
+    color: colors.primary,
   },
 });

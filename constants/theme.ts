@@ -60,3 +60,13 @@ export const borderRadius = {
   xl: 16,
   full: 9999,
 };
+
+export const shadows = {
+  card: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+};
