@@ -9,9 +9,16 @@ export interface UserData {
   email: string;
   role: 'freelancer' | 'client' | 'admin';
   phone?: string;
+  photoURL?: string;
   bio?: string;
   skills?: string;
+  availability?: string;
+  businessName?: string;
+  businessCategory?: string;
+  businessDetails?: string;
+  location?: string;
   createdAt?: any;
+  updatedAt?: any;
 }
 
 interface AuthContextType {
