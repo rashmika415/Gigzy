@@ -11,7 +11,6 @@ import {
   Alert,
   Modal,
   RefreshControl,
-  Dimensions,
   Platform,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -34,8 +33,6 @@ import {
   GigSortOption,
   BusinessGigStats,
 } from '../../types/gig';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const STATUS_CONFIG: Record<
   GigStatus,
@@ -72,7 +69,7 @@ const STATUS_CONFIG: Record<
 };
 
 export default function MyGigs() {
-  const { user, userData } = useAuth();
+  const { user } = useAuth();
 
   // Data states
   const [allGigs, setAllGigs] = useState<Gig[]>([]);
@@ -99,7 +96,6 @@ export default function MyGigs() {
   // 1. Subscribe to Firestore real-time client gigs
   useEffect(() => {
     if (!user) {
-      setLoading(false);
       return;
     }
 
@@ -508,7 +504,7 @@ export default function MyGigs() {
             )}
           </View>
 
-          {loading ? (
+          {loading && user ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator color={colors.primary} size="large" />
               <Text style={styles.loadingText}>Syncing your posted gigs from Firestore...</Text>

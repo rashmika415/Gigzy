@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -83,7 +83,7 @@ export default function PostGigScreen() {
   });
 
   // Animation values
-  const buttonScale = useRef(new Animated.Value(1)).current;
+  const [buttonScale] = useState(() => new Animated.Value(1));
 
   const handlePressIn = () =>
     Animated.spring(buttonScale, { toValue: 0.97, useNativeDriver: true, speed: 30 }).start();
