@@ -251,19 +251,35 @@ export default function MyGigs() {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.postNewBtn}
-          onPress={() => {
-            try {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            } catch {}
-            router.push('/(app)/post-gig' as any);
-          }}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="add" size={18} color="#080B14" />
-          <Text style={styles.postNewBtnText}>Post Gig</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRightActions}>
+          <TouchableOpacity
+            style={styles.headerMessagesBtn}
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              router.push('/(app)/messages' as any);
+            }}
+            activeOpacity={0.8}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons name="chatbubbles-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.postNewBtn}
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              } catch {}
+              router.push('/(app)/post-gig' as any);
+            }}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="add" size={18} color="#080B14" />
+            <Text style={styles.postNewBtnText}>Post Gig</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
