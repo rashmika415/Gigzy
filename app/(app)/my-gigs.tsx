@@ -1,70 +1,76 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
-  Alert,
-  Modal,
-  RefreshControl,
-  Platform,
-} from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { useAuth } from '../../context/AuthContext';
-import { colors, spacing, borderRadius, shadows } from '../../constants/theme';
+    ActivityIndicator,
+    Alert,
+    Modal,
+    Platform,
+    RefreshControl,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { borderRadius, colors, shadows, spacing } from "../../constants/theme";
+import { useAuth } from "../../context/AuthContext";
 import {
-  subscribeToClientGigs,
-  getGigsByClient,
-  updateGigStatus,
-  deleteGig,
-  calculateBusinessGigStats,
-  filterAndSortGigs,
-} from '../../services/gigService';
+    calculateBusinessGigStats,
+    deleteGig,
+    filterAndSortGigs,
+    getGigsByClient,
+    subscribeToClientGigs,
+    updateGigStatus,
+} from "../../services/gigService";
 import {
-  Gig,
-  GigStatus,
-  GIG_CATEGORIES,
-  GigSortOption,
-  BusinessGigStats,
-} from '../../types/gig';
+    BusinessGigStats,
+    Gig,
+    GIG_CATEGORIES,
+    GigSortOption,
+    GigStatus,
+} from "../../types/gig";
 
 const STATUS_CONFIG: Record<
   GigStatus,
-  { label: string; bg: string; text: string; border: string; icon: keyof typeof Ionicons.glyphMap }
+  {
+    label: string;
+    bg: string;
+    text: string;
+    border: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  }
 > = {
   open: {
-    label: 'Open & Active',
-    bg: 'rgba(16, 185, 129, 0.12)',
-    text: '#10B981',
-    border: 'rgba(16, 185, 129, 0.3)',
-    icon: 'radio-button-on',
+    label: "Open & Active",
+    bg: "rgba(16, 185, 129, 0.12)",
+    text: "#10B981",
+    border: "rgba(16, 185, 129, 0.3)",
+    icon: "radio-button-on",
   },
-  'in-progress': {
-    label: 'In Progress',
-    bg: 'rgba(245, 158, 11, 0.12)',
-    text: '#F59E0B',
-    border: 'rgba(245, 158, 11, 0.3)',
-    icon: 'time-outline',
+  "in-progress": {
+    label: "In Progress",
+    bg: "rgba(245, 158, 11, 0.12)",
+    text: "#F59E0B",
+    border: "rgba(245, 158, 11, 0.3)",
+    icon: "time-outline",
   },
   completed: {
-    label: 'Completed',
-    bg: 'rgba(124, 58, 237, 0.15)',
-    text: '#A78BFA',
-    border: 'rgba(124, 58, 237, 0.35)',
-    icon: 'checkmark-circle-outline',
+    label: "Completed",
+    bg: "rgba(124, 58, 237, 0.15)",
+    text: "#A78BFA",
+    border: "rgba(124, 58, 237, 0.35)",
+    icon: "checkmark-circle-outline",
   },
   cancelled: {
-    label: 'Cancelled',
-    bg: 'rgba(239, 68, 68, 0.12)',
-    text: '#EF4444',
-    border: 'rgba(239, 68, 68, 0.3)',
-    icon: 'close-circle-outline',
+    label: "Cancelled",
+    bg: "rgba(239, 68, 68, 0.12)",
+    text: "#EF4444",
+    border: "rgba(239, 68, 68, 0.3)",
+    icon: "close-circle-outline",
   },
 };
 
@@ -75,18 +81,22 @@ export default function MyGigs() {
   const [allGigs, setAllGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState('');
+  const [loadError, setLoadError] = useState("");
 
   // Filter & Search states
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<GigStatus | 'all'>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<GigSortOption>('newest');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<GigStatus | "all">(
+    "all",
+  );
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<GigSortOption>("newest");
   const [showSortModal, setShowSortModal] = useState(false);
 
   // Status Change Modal state
   const [statusModalVisible, setStatusModalVisible] = useState(false);
-  const [selectedGigForStatus, setSelectedGigForStatus] = useState<Gig | null>(null);
+  const [selectedGigForStatus, setSelectedGigForStatus] = useState<Gig | null>(
+    null,
+  );
   const [statusUpdating, setStatusUpdating] = useState(false);
 
   // Detail Modal state
@@ -100,7 +110,7 @@ export default function MyGigs() {
     }
 
     setLoading(true);
-    setLoadError('');
+    setLoadError("");
 
     const unsubscribe = subscribeToClientGigs(
       user.uid,
@@ -109,9 +119,9 @@ export default function MyGigs() {
         setLoading(false);
       },
       (err) => {
-        setLoadError(err.message || 'Failed to load your gigs.');
+        setLoadError(err.message || "Failed to load your gigs.");
         setLoading(false);
-      }
+      },
     );
 
     return () => {
@@ -126,9 +136,9 @@ export default function MyGigs() {
     try {
       const freshGigs = await getGigsByClient(user.uid);
       setAllGigs(freshGigs);
-      setLoadError('');
+      setLoadError("");
     } catch (err: any) {
-      setLoadError(err.message || 'Failed to refresh gigs.');
+      setLoadError(err.message || "Failed to refresh gigs.");
     } finally {
       setRefreshing(false);
     }
@@ -166,7 +176,10 @@ export default function MyGigs() {
       setStatusModalVisible(false);
       setSelectedGigForStatus(null);
     } catch (error: any) {
-      Alert.alert('Status Update Failed', error.message || 'Could not update gig status.');
+      Alert.alert(
+        "Status Update Failed",
+        error.message || "Could not update gig status.",
+      );
     } finally {
       setStatusUpdating(false);
     }
@@ -175,25 +188,27 @@ export default function MyGigs() {
   // Delete gig handler
   const handleDeleteGig = (gig: Gig) => {
     Alert.alert(
-      'Delete Gig Listing',
+      "Delete Gig Listing",
       `Are you sure you want to permanently delete "${gig.title}"? This cannot be undone.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
             try {
               await deleteGig(gig.id, user?.uid);
               try {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Haptics.notificationAsync(
+                  Haptics.NotificationFeedbackType.Success,
+                );
               } catch {}
             } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete gig.');
+              Alert.alert("Error", err.message || "Failed to delete gig.");
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -205,18 +220,18 @@ export default function MyGigs() {
 
   const getSortLabel = (sort: GigSortOption) => {
     switch (sort) {
-      case 'newest':
-        return 'Newest First';
-      case 'oldest':
-        return 'Oldest First';
-      case 'pay-high':
-        return 'Highest Pay';
-      case 'pay-low':
-        return 'Lowest Pay';
-      case 'applicants':
-        return 'Most Applicants';
+      case "newest":
+        return "Newest First";
+      case "oldest":
+        return "Oldest First";
+      case "pay-high":
+        return "Highest Pay";
+      case "pay-low":
+        return "Lowest Pay";
+      case "applicants":
+        return "Most Applicants";
       default:
-        return 'Sort';
+        return "Sort";
     }
   };
 
@@ -246,7 +261,8 @@ export default function MyGigs() {
               </View>
             </View>
             <Text style={styles.headerSubtitle}>
-              Manage {allGigs.length} job {allGigs.length === 1 ? 'listing' : 'listings'}
+              Manage {allGigs.length} job{" "}
+              {allGigs.length === 1 ? "listing" : "listings"}
             </Text>
           </View>
         </View>
@@ -258,12 +274,16 @@ export default function MyGigs() {
               try {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               } catch {}
-              router.push('/(app)/messages' as any);
+              router.push("/(app)/messages" as any);
             }}
             activeOpacity={0.8}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
-            <Ionicons name="chatbubbles-outline" size={20} color={colors.primary} />
+            <Ionicons
+              name="chatbubbles-outline"
+              size={20}
+              color={colors.primary}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -272,7 +292,7 @@ export default function MyGigs() {
               try {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               } catch {}
-              router.push('/(app)/post-gig' as any);
+              router.push("/(app)/post-gig" as any);
             }}
             activeOpacity={0.85}
           >
@@ -306,12 +326,19 @@ export default function MyGigs() {
             <TouchableOpacity
               style={[
                 styles.metricCard,
-                selectedStatus === 'open' && styles.metricCardSelected,
+                selectedStatus === "open" && styles.metricCardSelected,
               ]}
-              onPress={() => setSelectedStatus(selectedStatus === 'open' ? 'all' : 'open')}
+              onPress={() =>
+                setSelectedStatus(selectedStatus === "open" ? "all" : "open")
+              }
               activeOpacity={0.8}
             >
-              <View style={[styles.metricIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+              <View
+                style={[
+                  styles.metricIconWrap,
+                  { backgroundColor: "rgba(16, 185, 129, 0.15)" },
+                ]}
+              >
                 <Ionicons name="radio-button-on" size={18} color="#10B981" />
               </View>
               <Text style={styles.metricValue}>{stats.open}</Text>
@@ -322,12 +349,21 @@ export default function MyGigs() {
             <TouchableOpacity
               style={[
                 styles.metricCard,
-                selectedStatus === 'in-progress' && styles.metricCardSelected,
+                selectedStatus === "in-progress" && styles.metricCardSelected,
               ]}
-              onPress={() => setSelectedStatus(selectedStatus === 'in-progress' ? 'all' : 'in-progress')}
+              onPress={() =>
+                setSelectedStatus(
+                  selectedStatus === "in-progress" ? "all" : "in-progress",
+                )
+              }
               activeOpacity={0.8}
             >
-              <View style={[styles.metricIconWrap, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
+              <View
+                style={[
+                  styles.metricIconWrap,
+                  { backgroundColor: "rgba(245, 158, 11, 0.15)" },
+                ]}
+              >
                 <Ionicons name="time-outline" size={18} color="#F59E0B" />
               </View>
               <Text style={styles.metricValue}>{stats.inProgress}</Text>
@@ -336,7 +372,12 @@ export default function MyGigs() {
 
             {/* Total Applicants */}
             <View style={styles.metricCard}>
-              <View style={[styles.metricIconWrap, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
+              <View
+                style={[
+                  styles.metricIconWrap,
+                  { backgroundColor: "rgba(59, 130, 246, 0.15)" },
+                ]}
+              >
                 <Ionicons name="people-outline" size={18} color="#3B82F6" />
               </View>
               <Text style={styles.metricValue}>{stats.totalApplicants}</Text>
@@ -347,13 +388,26 @@ export default function MyGigs() {
             <TouchableOpacity
               style={[
                 styles.metricCard,
-                selectedStatus === 'completed' && styles.metricCardSelected,
+                selectedStatus === "completed" && styles.metricCardSelected,
               ]}
-              onPress={() => setSelectedStatus(selectedStatus === 'completed' ? 'all' : 'completed')}
+              onPress={() =>
+                setSelectedStatus(
+                  selectedStatus === "completed" ? "all" : "completed",
+                )
+              }
               activeOpacity={0.8}
             >
-              <View style={[styles.metricIconWrap, { backgroundColor: 'rgba(124, 58, 237, 0.15)' }]}>
-                <Ionicons name="checkmark-circle-outline" size={18} color="#A78BFA" />
+              <View
+                style={[
+                  styles.metricIconWrap,
+                  { backgroundColor: "rgba(124, 58, 237, 0.15)" },
+                ]}
+              >
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={18}
+                  color="#A78BFA"
+                />
               </View>
               <Text style={styles.metricValue}>{stats.completed}</Text>
               <Text style={styles.metricLabel}>Completed</Text>
@@ -361,10 +415,17 @@ export default function MyGigs() {
 
             {/* Total Budget */}
             <View style={styles.metricCard}>
-              <View style={[styles.metricIconWrap, { backgroundColor: 'rgba(236, 72, 153, 0.15)' }]}>
+              <View
+                style={[
+                  styles.metricIconWrap,
+                  { backgroundColor: "rgba(236, 72, 153, 0.15)" },
+                ]}
+              >
                 <Ionicons name="wallet-outline" size={18} color="#EC4899" />
               </View>
-              <Text style={styles.metricValue}>${stats.totalBudget.toLocaleString()}</Text>
+              <Text style={styles.metricValue}>
+                ${stats.totalBudget.toLocaleString()}
+              </Text>
               <Text style={styles.metricLabel}>Total Budget</Text>
             </View>
           </ScrollView>
@@ -373,7 +434,11 @@ export default function MyGigs() {
         {/* Search and Sort Toolbar */}
         <View style={styles.toolbarSection}>
           <View style={styles.searchBarContainer}>
-            <Ionicons name="search-outline" size={18} color={colors.textMuted} />
+            <Ionicons
+              name="search-outline"
+              size={18}
+              color={colors.textMuted}
+            />
             <TextInput
               style={styles.searchInput}
               placeholder="Search by title, skill, location..."
@@ -385,10 +450,14 @@ export default function MyGigs() {
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity
-                onPress={() => setSearchQuery('')}
+                onPress={() => setSearchQuery("")}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                <Ionicons
+                  name="close-circle"
+                  size={18}
+                  color={colors.textMuted}
+                />
               </TouchableOpacity>
             )}
           </View>
@@ -413,17 +482,24 @@ export default function MyGigs() {
             contentContainerStyle={styles.statusTabsContainer}
           >
             {[
-              { id: 'all', label: 'All Gigs', count: stats.total },
-              { id: 'open', label: 'Open', count: stats.open },
-              { id: 'in-progress', label: 'In Progress', count: stats.inProgress },
-              { id: 'completed', label: 'Completed', count: stats.completed },
-              { id: 'cancelled', label: 'Cancelled', count: stats.cancelled },
+              { id: "all", label: "All Gigs", count: stats.total },
+              { id: "open", label: "Open", count: stats.open },
+              {
+                id: "in-progress",
+                label: "In Progress",
+                count: stats.inProgress,
+              },
+              { id: "completed", label: "Completed", count: stats.completed },
+              { id: "cancelled", label: "Cancelled", count: stats.cancelled },
             ].map((tab) => {
               const isSelected = selectedStatus === tab.id;
               return (
                 <TouchableOpacity
                   key={tab.id}
-                  style={[styles.statusTab, isSelected && styles.statusTabSelected]}
+                  style={[
+                    styles.statusTab,
+                    isSelected && styles.statusTabSelected,
+                  ]}
                   onPress={() => {
                     try {
                       Haptics.selectionAsync();
@@ -432,11 +508,26 @@ export default function MyGigs() {
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.statusTabText, isSelected && styles.statusTabTextSelected]}>
+                  <Text
+                    style={[
+                      styles.statusTabText,
+                      isSelected && styles.statusTabTextSelected,
+                    ]}
+                  >
                     {tab.label}
                   </Text>
-                  <View style={[styles.tabBadge, isSelected && styles.tabBadgeSelected]}>
-                    <Text style={[styles.tabBadgeText, isSelected && styles.tabBadgeTextSelected]}>
+                  <View
+                    style={[
+                      styles.tabBadge,
+                      isSelected && styles.tabBadgeSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.tabBadgeText,
+                        isSelected && styles.tabBadgeTextSelected,
+                      ]}
+                    >
                       {tab.count}
                     </Text>
                   </View>
@@ -456,15 +547,15 @@ export default function MyGigs() {
             <TouchableOpacity
               style={[
                 styles.categoryChip,
-                selectedCategory === 'all' && styles.categoryChipSelected,
+                selectedCategory === "all" && styles.categoryChipSelected,
               ]}
-              onPress={() => setSelectedCategory('all')}
+              onPress={() => setSelectedCategory("all")}
               activeOpacity={0.8}
             >
               <Text
                 style={[
                   styles.categoryChipText,
-                  selectedCategory === 'all' && styles.categoryChipTextSelected,
+                  selectedCategory === "all" && styles.categoryChipTextSelected,
                 ]}
               >
                 All Categories
@@ -472,18 +563,24 @@ export default function MyGigs() {
             </TouchableOpacity>
 
             {GIG_CATEGORIES.map((cat) => {
-              const isSelected = selectedCategory.toLowerCase() === cat.name.toLowerCase();
+              const isSelected =
+                selectedCategory.toLowerCase() === cat.name.toLowerCase();
               return (
                 <TouchableOpacity
                   key={cat.id}
-                  style={[styles.categoryChip, isSelected && styles.categoryChipSelected]}
-                  onPress={() => setSelectedCategory(isSelected ? 'all' : cat.name)}
+                  style={[
+                    styles.categoryChip,
+                    isSelected && styles.categoryChipSelected,
+                  ]}
+                  onPress={() =>
+                    setSelectedCategory(isSelected ? "all" : cat.name)
+                  }
                   activeOpacity={0.8}
                 >
                   <Ionicons
                     name={cat.icon as any}
                     size={14}
-                    color={isSelected ? '#080B14' : colors.textSecondary}
+                    color={isSelected ? "#080B14" : colors.textSecondary}
                     style={{ marginRight: 4 }}
                   />
                   <Text
@@ -504,14 +601,20 @@ export default function MyGigs() {
         <View style={styles.listSection}>
           <View style={styles.listHeaderRow}>
             <Text style={styles.listCountText}>
-              Showing <Text style={styles.listCountHighlight}>{filteredGigs.length}</Text> of {allGigs.length} {allGigs.length === 1 ? 'gig' : 'gigs'}
+              Showing{" "}
+              <Text style={styles.listCountHighlight}>
+                {filteredGigs.length}
+              </Text>{" "}
+              of {allGigs.length} {allGigs.length === 1 ? "gig" : "gigs"}
             </Text>
-            {(searchQuery.length > 0 || selectedStatus !== 'all' || selectedCategory !== 'all') && (
+            {(searchQuery.length > 0 ||
+              selectedStatus !== "all" ||
+              selectedCategory !== "all") && (
               <TouchableOpacity
                 onPress={() => {
-                  setSearchQuery('');
-                  setSelectedStatus('all');
-                  setSelectedCategory('all');
+                  setSearchQuery("");
+                  setSelectedStatus("all");
+                  setSelectedCategory("all");
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
@@ -523,14 +626,20 @@ export default function MyGigs() {
           {loading && user ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator color={colors.primary} size="large" />
-              <Text style={styles.loadingText}>Syncing your posted gigs from Firestore...</Text>
+              <Text style={styles.loadingText}>
+                Syncing your posted gigs from Firestore...
+              </Text>
             </View>
           ) : loadError ? (
             <View style={styles.errorBox}>
               <Ionicons name="alert-circle" size={32} color={colors.error} />
               <Text style={styles.errorTitle}>Failed to Load Gigs</Text>
               <Text style={styles.errorSubtitle}>{loadError}</Text>
-              <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.retryBtn}
+                onPress={handleRefresh}
+                activeOpacity={0.8}
+              >
                 <Text style={styles.retryBtnText}>Retry Connection</Text>
               </TouchableOpacity>
             </View>
@@ -538,47 +647,58 @@ export default function MyGigs() {
             <View style={styles.emptyCard}>
               <View style={styles.emptyIconBg}>
                 <Ionicons
-                  name={allGigs.length === 0 ? 'briefcase-outline' : 'filter-outline'}
+                  name={
+                    allGigs.length === 0
+                      ? "briefcase-outline"
+                      : "filter-outline"
+                  }
                   size={36}
                   color={colors.primary}
                 />
               </View>
               <Text style={styles.emptyTitle}>
-                {allGigs.length === 0 ? 'No Gigs Posted Yet' : 'No Matching Gigs Found'}
+                {allGigs.length === 0
+                  ? "No Gigs Posted Yet"
+                  : "No Matching Gigs Found"}
               </Text>
               <Text style={styles.emptyDesc}>
                 {allGigs.length === 0
-                  ? 'Start by posting your first gig. Reach skilled local youth and top freelancers in minutes.'
-                  : 'Try adjusting your search keywords, status tabs, or category filters.'}
+                  ? "Start by posting your first gig. Reach skilled local youth and top freelancers in minutes."
+                  : "Try adjusting your search keywords, status tabs, or category filters."}
               </Text>
 
               {allGigs.length === 0 ? (
                 <TouchableOpacity
                   style={styles.emptyActionBtn}
-                  onPress={() => router.push('/(app)/post-gig' as any)}
+                  onPress={() => router.push("/(app)/post-gig" as any)}
                   activeOpacity={0.85}
                 >
                   <Ionicons name="add-circle" size={20} color="#080B14" />
-                  <Text style={styles.emptyActionBtnText}>Post Your First Gig</Text>
+                  <Text style={styles.emptyActionBtnText}>
+                    Post Your First Gig
+                  </Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
                   style={styles.clearFilterBtn}
                   onPress={() => {
-                    setSearchQuery('');
-                    setSelectedStatus('all');
-                    setSelectedCategory('all');
+                    setSearchQuery("");
+                    setSelectedStatus("all");
+                    setSelectedCategory("all");
                   }}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.clearFilterBtnText}>Clear All Filters</Text>
+                  <Text style={styles.clearFilterBtnText}>
+                    Clear All Filters
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
           ) : (
             <View style={styles.gigsContainer}>
               {filteredGigs.map((gig) => {
-                const statusCfg = STATUS_CONFIG[gig.status] || STATUS_CONFIG.open;
+                const statusCfg =
+                  STATUS_CONFIG[gig.status] || STATUS_CONFIG.open;
 
                 return (
                   <TouchableOpacity
@@ -590,22 +710,41 @@ export default function MyGigs() {
                     {/* Top Row: Category & Status Badge */}
                     <View style={styles.cardTopRow}>
                       <View style={styles.cardCategoryBadge}>
-                        <Text style={styles.cardCategoryText}>{gig.category}</Text>
+                        <Text style={styles.cardCategoryText}>
+                          {gig.category}
+                        </Text>
                       </View>
 
                       <TouchableOpacity
                         style={[
                           styles.cardStatusBadge,
-                          { backgroundColor: statusCfg.bg, borderColor: statusCfg.border },
+                          {
+                            backgroundColor: statusCfg.bg,
+                            borderColor: statusCfg.border,
+                          },
                         ]}
                         onPress={() => handleOpenStatusModal(gig)}
                         activeOpacity={0.8}
                       >
-                        <Ionicons name={statusCfg.icon} size={12} color={statusCfg.text} />
-                        <Text style={[styles.cardStatusText, { color: statusCfg.text }]}>
+                        <Ionicons
+                          name={statusCfg.icon}
+                          size={12}
+                          color={statusCfg.text}
+                        />
+                        <Text
+                          style={[
+                            styles.cardStatusText,
+                            { color: statusCfg.text },
+                          ]}
+                        >
                           {statusCfg.label}
                         </Text>
-                        <Ionicons name="chevron-down" size={10} color={statusCfg.text} style={{ marginLeft: 2 }} />
+                        <Ionicons
+                          name="chevron-down"
+                          size={10}
+                          color={statusCfg.text}
+                          style={{ marginLeft: 2 }}
+                        />
                       </TouchableOpacity>
                     </View>
 
@@ -617,7 +756,7 @@ export default function MyGigs() {
                       <View style={styles.payPill}>
                         <Text style={styles.payAmount}>${gig.pay}</Text>
                         <Text style={styles.payType}>
-                          {gig.payType === 'hourly' ? '/hr' : ' fixed'}
+                          {gig.payType === "hourly" ? "/hr" : " fixed"}
                         </Text>
                       </View>
                     </View>
@@ -631,13 +770,18 @@ export default function MyGigs() {
                     {gig.skills && gig.skills.length > 0 && (
                       <View style={styles.cardSkillsRow}>
                         {gig.skills.slice(0, 3).map((skill, idx) => (
-                          <View key={`${gig.id}-skill-${idx}`} style={styles.skillTag}>
+                          <View
+                            key={`${gig.id}-skill-${idx}`}
+                            style={styles.skillTag}
+                          >
                             <Text style={styles.skillTagText}>{skill}</Text>
                           </View>
                         ))}
                         {gig.skills.length > 3 && (
                           <View style={styles.skillMoreTag}>
-                            <Text style={styles.skillMoreText}>+{gig.skills.length - 3}</Text>
+                            <Text style={styles.skillMoreText}>
+                              +{gig.skills.length - 3}
+                            </Text>
                           </View>
                         )}
                       </View>
@@ -647,33 +791,57 @@ export default function MyGigs() {
                     <View style={styles.cardMetaRow}>
                       <View style={styles.metaItem}>
                         <Ionicons
-                          name={gig.locationType === 'remote' ? 'globe-outline' : 'location-outline'}
+                          name={
+                            gig.locationType === "remote"
+                              ? "globe-outline"
+                              : "location-outline"
+                          }
                           size={13}
                           color={colors.textSecondary}
                         />
                         <Text style={styles.metaItemText} numberOfLines={1}>
-                          {gig.location || 'Remote'}
+                          {gig.location || "Remote"}
                         </Text>
                       </View>
 
                       <View style={styles.metaItem}>
-                        <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
-                        <Text style={styles.metaItemText}>{gig.date || 'Flexible'}</Text>
+                        <Ionicons
+                          name="calendar-outline"
+                          size={13}
+                          color={colors.textSecondary}
+                        />
+                        <Text style={styles.metaItemText}>
+                          {gig.date || "Flexible"}
+                        </Text>
                       </View>
 
-                      <View style={[styles.applicantsChip, gig.applicantsCount > 0 && styles.applicantsChipActive]}>
+                      <View
+                        style={[
+                          styles.applicantsChip,
+                          gig.applicantsCount > 0 &&
+                            styles.applicantsChipActive,
+                        ]}
+                      >
                         <Ionicons
                           name="people"
                           size={12}
-                          color={gig.applicantsCount > 0 ? '#10B981' : colors.textMuted}
+                          color={
+                            gig.applicantsCount > 0
+                              ? "#10B981"
+                              : colors.textMuted
+                          }
                         />
                         <Text
                           style={[
                             styles.applicantsChipText,
-                            gig.applicantsCount > 0 && styles.applicantsChipTextActive,
+                            gig.applicantsCount > 0 &&
+                              styles.applicantsChipTextActive,
                           ]}
                         >
-                          {gig.applicantsCount || 0} {gig.applicantsCount === 1 ? 'Applicant' : 'Applicants'}
+                          {gig.applicantsCount || 0}{" "}
+                          {gig.applicantsCount === 1
+                            ? "Applicant"
+                            : "Applicants"}
                         </Text>
                       </View>
                     </View>
@@ -685,8 +853,14 @@ export default function MyGigs() {
                         onPress={() => handleOpenStatusModal(gig)}
                         activeOpacity={0.75}
                       >
-                        <Ionicons name="sync-outline" size={14} color={colors.primary} />
-                        <Text style={styles.actionStatusBtnText}>Change Status</Text>
+                        <Ionicons
+                          name="sync-outline"
+                          size={14}
+                          color={colors.primary}
+                        />
+                        <Text style={styles.actionStatusBtnText}>
+                          Change Status
+                        </Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -694,7 +868,11 @@ export default function MyGigs() {
                         onPress={() => handleOpenDetails(gig)}
                         activeOpacity={0.75}
                       >
-                        <Ionicons name="eye-outline" size={14} color={colors.text} />
+                        <Ionicons
+                          name="eye-outline"
+                          size={14}
+                          color={colors.text}
+                        />
                         <Text style={styles.actionDetailsBtnText}>Details</Text>
                       </TouchableOpacity>
 
@@ -704,7 +882,11 @@ export default function MyGigs() {
                         activeOpacity={0.75}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        <Ionicons name="trash-outline" size={15} color={colors.error} />
+                        <Ionicons
+                          name="trash-outline"
+                          size={15}
+                          color={colors.error}
+                        />
                       </TouchableOpacity>
                     </View>
                   </TouchableOpacity>
@@ -743,55 +925,75 @@ export default function MyGigs() {
             {statusUpdating ? (
               <View style={styles.modalLoadingBox}>
                 <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={styles.modalLoadingText}>Updating status in Firestore...</Text>
+                <Text style={styles.modalLoadingText}>
+                  Updating status in Firestore...
+                </Text>
               </View>
             ) : (
               <View style={styles.statusOptionsList}>
-                {(['open', 'in-progress', 'completed', 'cancelled'] as GigStatus[]).map(
-                  (statusKey) => {
-                    const cfg = STATUS_CONFIG[statusKey];
-                    const isCurrent = selectedGigForStatus?.status === statusKey;
+                {(
+                  [
+                    "open",
+                    "in-progress",
+                    "completed",
+                    "cancelled",
+                  ] as GigStatus[]
+                ).map((statusKey) => {
+                  const cfg = STATUS_CONFIG[statusKey];
+                  const isCurrent = selectedGigForStatus?.status === statusKey;
 
-                    return (
-                      <TouchableOpacity
-                        key={statusKey}
-                        style={[
-                          styles.statusOptionRow,
-                          isCurrent && {
-                            backgroundColor: cfg.bg,
-                            borderColor: cfg.border,
-                          },
-                        ]}
-                        onPress={() => handleUpdateStatus(statusKey)}
-                        activeOpacity={0.8}
-                      >
-                        <View style={styles.statusOptionLeft}>
-                          <View
+                  return (
+                    <TouchableOpacity
+                      key={statusKey}
+                      style={[
+                        styles.statusOptionRow,
+                        isCurrent && {
+                          backgroundColor: cfg.bg,
+                          borderColor: cfg.border,
+                        },
+                      ]}
+                      onPress={() => handleUpdateStatus(statusKey)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.statusOptionLeft}>
+                        <View
+                          style={[
+                            styles.statusOptionDot,
+                            { backgroundColor: cfg.text },
+                          ]}
+                        />
+                        <View>
+                          <Text
                             style={[
-                              styles.statusOptionDot,
-                              { backgroundColor: cfg.text },
+                              styles.statusOptionLabel,
+                              { color: isCurrent ? cfg.text : colors.text },
                             ]}
-                          />
-                          <View>
-                            <Text style={[styles.statusOptionLabel, { color: isCurrent ? cfg.text : colors.text }]}>
-                              {cfg.label}
-                            </Text>
-                            <Text style={styles.statusOptionDesc}>
-                              {statusKey === 'open' && 'Accepting proposals & visible to applicants'}
-                              {statusKey === 'in-progress' && 'Work is actively ongoing with a freelancer'}
-                              {statusKey === 'completed' && 'Project completed and delivered'}
-                              {statusKey === 'cancelled' && 'Listing closed and no longer accepting applications'}
-                            </Text>
-                          </View>
+                          >
+                            {cfg.label}
+                          </Text>
+                          <Text style={styles.statusOptionDesc}>
+                            {statusKey === "open" &&
+                              "Accepting proposals & visible to applicants"}
+                            {statusKey === "in-progress" &&
+                              "Work is actively ongoing with a freelancer"}
+                            {statusKey === "completed" &&
+                              "Project completed and delivered"}
+                            {statusKey === "cancelled" &&
+                              "Listing closed and no longer accepting applications"}
+                          </Text>
                         </View>
+                      </View>
 
-                        {isCurrent && (
-                          <Ionicons name="checkmark-circle" size={20} color={cfg.text} />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  }
-                )}
+                      {isCurrent && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={20}
+                          color={cfg.text}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
           </View>
@@ -816,17 +1018,36 @@ export default function MyGigs() {
 
             <View style={styles.sortOptionsList}>
               {[
-                { id: 'newest', label: 'Newest First (Default)', icon: 'calendar-outline' },
-                { id: 'oldest', label: 'Oldest First', icon: 'time-outline' },
-                { id: 'pay-high', label: 'Highest Budget / Pay', icon: 'trending-up-outline' },
-                { id: 'pay-low', label: 'Lowest Budget / Pay', icon: 'trending-down-outline' },
-                { id: 'applicants', label: 'Most Applicants', icon: 'people-outline' },
+                {
+                  id: "newest",
+                  label: "Newest First (Default)",
+                  icon: "calendar-outline",
+                },
+                { id: "oldest", label: "Oldest First", icon: "time-outline" },
+                {
+                  id: "pay-high",
+                  label: "Highest Budget / Pay",
+                  icon: "trending-up-outline",
+                },
+                {
+                  id: "pay-low",
+                  label: "Lowest Budget / Pay",
+                  icon: "trending-down-outline",
+                },
+                {
+                  id: "applicants",
+                  label: "Most Applicants",
+                  icon: "people-outline",
+                },
               ].map((opt) => {
                 const isSelected = sortBy === opt.id;
                 return (
                   <TouchableOpacity
                     key={opt.id}
-                    style={[styles.sortOptionItem, isSelected && styles.sortOptionItemSelected]}
+                    style={[
+                      styles.sortOptionItem,
+                      isSelected && styles.sortOptionItemSelected,
+                    ]}
                     onPress={() => {
                       setSortBy(opt.id as GigSortOption);
                       setShowSortModal(false);
@@ -837,13 +1058,26 @@ export default function MyGigs() {
                       <Ionicons
                         name={opt.icon as any}
                         size={18}
-                        color={isSelected ? colors.primary : colors.textSecondary}
+                        color={
+                          isSelected ? colors.primary : colors.textSecondary
+                        }
                       />
-                      <Text style={[styles.sortOptionItemLabel, isSelected && styles.sortOptionItemLabelSelected]}>
+                      <Text
+                        style={[
+                          styles.sortOptionItemLabel,
+                          isSelected && styles.sortOptionItemLabelSelected,
+                        ]}
+                      >
                         {opt.label}
                       </Text>
                     </View>
-                    {isSelected && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                    {isSelected && (
+                      <Ionicons
+                        name="checkmark"
+                        size={18}
+                        color={colors.primary}
+                      />
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -864,7 +1098,9 @@ export default function MyGigs() {
             <View style={styles.detailModalHeader}>
               <View style={styles.detailHeaderTop}>
                 <View style={styles.cardCategoryBadge}>
-                  <Text style={styles.cardCategoryText}>{selectedGigDetail?.category}</Text>
+                  <Text style={styles.cardCategoryText}>
+                    {selectedGigDetail?.category}
+                  </Text>
                 </View>
                 <TouchableOpacity
                   onPress={() => setDetailModalVisible(false)}
@@ -876,15 +1112,22 @@ export default function MyGigs() {
               <Text style={styles.detailTitle}>{selectedGigDetail?.title}</Text>
             </View>
 
-            <ScrollView style={styles.detailScrollBody} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.detailScrollBody}
+              showsVerticalScrollIndicator={false}
+            >
               {/* Pay & Status Bar */}
               <View style={styles.detailHighlightBox}>
                 <View>
-                  <Text style={styles.detailBoxLabel}>BUDGET / COMPENSATION</Text>
+                  <Text style={styles.detailBoxLabel}>
+                    BUDGET / COMPENSATION
+                  </Text>
                   <Text style={styles.detailPayAmount}>
                     ${selectedGigDetail?.pay}
                     <Text style={styles.detailPayType}>
-                      {selectedGigDetail?.payType === 'hourly' ? ' / hour' : ' Fixed Price'}
+                      {selectedGigDetail?.payType === "hourly"
+                        ? " / hour"
+                        : " Fixed Price"}
                     </Text>
                   </Text>
                 </View>
@@ -894,8 +1137,10 @@ export default function MyGigs() {
                     style={[
                       styles.cardStatusBadge,
                       {
-                        backgroundColor: STATUS_CONFIG[selectedGigDetail.status]?.bg,
-                        borderColor: STATUS_CONFIG[selectedGigDetail.status]?.border,
+                        backgroundColor:
+                          STATUS_CONFIG[selectedGigDetail.status]?.bg,
+                        borderColor:
+                          STATUS_CONFIG[selectedGigDetail.status]?.border,
                       },
                     ]}
                   >
@@ -907,7 +1152,9 @@ export default function MyGigs() {
                     <Text
                       style={[
                         styles.cardStatusText,
-                        { color: STATUS_CONFIG[selectedGigDetail.status]?.text },
+                        {
+                          color: STATUS_CONFIG[selectedGigDetail.status]?.text,
+                        },
                       ]}
                     >
                       {STATUS_CONFIG[selectedGigDetail.status]?.label}
@@ -919,37 +1166,59 @@ export default function MyGigs() {
               {/* Specs Grid */}
               <View style={styles.detailSpecsGrid}>
                 <View style={styles.detailSpecItem}>
-                  <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-                  <View>
-                    <Text style={styles.specLabel}>Date / Deadline</Text>
-                    <Text style={styles.specVal}>{selectedGigDetail?.date || 'Flexible'}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.detailSpecItem}>
                   <Ionicons
-                    name={selectedGigDetail?.locationType === 'remote' ? 'globe-outline' : 'location-outline'}
+                    name="calendar-outline"
                     size={16}
                     color={colors.primary}
                   />
                   <View>
-                    <Text style={styles.specLabel}>Location ({selectedGigDetail?.locationType})</Text>
-                    <Text style={styles.specVal} numberOfLines={1}>
-                      {selectedGigDetail?.location || 'Remote'}
+                    <Text style={styles.specLabel}>Date / Deadline</Text>
+                    <Text style={styles.specVal}>
+                      {selectedGigDetail?.date || "Flexible"}
                     </Text>
                   </View>
                 </View>
 
                 <View style={styles.detailSpecItem}>
-                  <Ionicons name="people-outline" size={16} color={colors.primary} />
+                  <Ionicons
+                    name={
+                      selectedGigDetail?.locationType === "remote"
+                        ? "globe-outline"
+                        : "location-outline"
+                    }
+                    size={16}
+                    color={colors.primary}
+                  />
                   <View>
-                    <Text style={styles.specLabel}>Total Applicants</Text>
-                    <Text style={styles.specVal}>{selectedGigDetail?.applicantsCount || 0} applicants</Text>
+                    <Text style={styles.specLabel}>
+                      Location ({selectedGigDetail?.locationType})
+                    </Text>
+                    <Text style={styles.specVal} numberOfLines={1}>
+                      {selectedGigDetail?.location || "Remote"}
+                    </Text>
                   </View>
                 </View>
 
                 <View style={styles.detailSpecItem}>
-                  <Ionicons name="document-text-outline" size={16} color={colors.primary} />
+                  <Ionicons
+                    name="people-outline"
+                    size={16}
+                    color={colors.primary}
+                  />
+                  <View>
+                    <Text style={styles.specLabel}>Total Applicants</Text>
+                    <Text style={styles.specVal}>
+                      {selectedGigDetail?.applicantsCount || 0} applicants
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.detailSpecItem}>
+                  <Ionicons
+                    name="document-text-outline"
+                    size={16}
+                    color={colors.primary}
+                  />
                   <View>
                     <Text style={styles.specLabel}>Gig ID</Text>
                     <Text style={styles.specVal} numberOfLines={1}>
@@ -961,21 +1230,28 @@ export default function MyGigs() {
 
               {/* Description */}
               <Text style={styles.detailSectionHeading}>Job Description</Text>
-              <Text style={styles.detailDescriptionText}>{selectedGigDetail?.description}</Text>
+              <Text style={styles.detailDescriptionText}>
+                {selectedGigDetail?.description}
+              </Text>
 
               {/* Required Skills */}
-              {selectedGigDetail?.skills && selectedGigDetail.skills.length > 0 && (
-                <>
-                  <Text style={styles.detailSectionHeading}>Required Skills</Text>
-                  <View style={styles.detailSkillsWrap}>
-                    {selectedGigDetail.skills.map((skill, i) => (
-                      <View key={i} style={styles.detailSkillChip}>
-                        <Text style={styles.detailSkillChipText}>{skill}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </>
-              )}
+              {selectedGigDetail?.skills &&
+                selectedGigDetail.skills.length > 0 && (
+                  <>
+                    <Text style={styles.detailSectionHeading}>
+                      Required Skills
+                    </Text>
+                    <View style={styles.detailSkillsWrap}>
+                      {selectedGigDetail.skills.map((skill, i) => (
+                        <View key={i} style={styles.detailSkillChip}>
+                          <Text style={styles.detailSkillChipText}>
+                            {skill}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                )}
             </ScrollView>
 
             <View style={styles.detailModalFooter}>
@@ -983,12 +1259,15 @@ export default function MyGigs() {
                 style={styles.detailChangeStatusBtn}
                 onPress={() => {
                   setDetailModalVisible(false);
-                  if (selectedGigDetail) handleOpenStatusModal(selectedGigDetail);
+                  if (selectedGigDetail)
+                    handleOpenStatusModal(selectedGigDetail);
                 }}
                 activeOpacity={0.85}
               >
                 <Ionicons name="sync" size={16} color="#080B14" />
-                <Text style={styles.detailChangeStatusBtnText}>Update Status</Text>
+                <Text style={styles.detailChangeStatusBtnText}>
+                  Update Status
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1010,7 +1289,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   blobTop: {
-    position: 'absolute',
+    position: "absolute",
     top: -80,
     right: -60,
     width: 260,
@@ -1020,7 +1299,7 @@ const styles = StyleSheet.create({
     opacity: 0.25,
   },
   blobBottom: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 40,
     left: -80,
     width: 240,
@@ -1032,19 +1311,19 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.surfaceBorder,
-    backgroundColor: 'rgba(8, 11, 20, 0.85)',
+    backgroundColor: "rgba(8, 11, 20, 0.85)",
   },
   headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
   backButton: {
@@ -1054,17 +1333,32 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerRightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  headerMessagesBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    alignItems: "center",
+    justifyContent: "center",
   },
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.3,
   },
@@ -1074,11 +1368,11 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: "rgba(16, 185, 129, 0.3)",
     borderRadius: borderRadius.full,
     paddingHorizontal: 7,
     paddingVertical: 2,
@@ -1088,17 +1382,17 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#10B981',
+    backgroundColor: "#10B981",
   },
   liveBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
-    color: '#10B981',
+    fontWeight: "700",
+    color: "#10B981",
   },
   postNewBtn: {
     backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: borderRadius.full,
@@ -1110,9 +1404,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   postNewBtnText: {
-    color: '#080B14',
+    color: "#080B14",
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: "800",
   },
 
   // Metrics
@@ -1131,7 +1425,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     minWidth: 110,
-    alignItems: 'center',
+    alignItems: "center",
     gap: 4,
   },
   metricCardSelected: {
@@ -1142,38 +1436,38 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 2,
   },
   metricValue: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: "800",
     color: colors.text,
   },
   metricLabel: {
     fontSize: 11,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 
   // Toolbar
   toolbarSection: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
     marginBottom: spacing.sm,
   },
   searchBarContainer: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.inputBg,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.inputBorder,
     paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 6,
+    paddingVertical: Platform.OS === "ios" ? 10 : 6,
     gap: 8,
   },
   searchInput: {
@@ -1183,8 +1477,8 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   sortButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     borderWidth: 1,
@@ -1195,7 +1489,7 @@ const styles = StyleSheet.create({
   sortButtonText: {
     color: colors.primary,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   // Status Tabs
@@ -1208,8 +1502,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statusTab: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderRadius: borderRadius.full,
     borderWidth: 1,
@@ -1224,25 +1518,25 @@ const styles = StyleSheet.create({
   },
   statusTabText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.textSecondary,
   },
   statusTabTextSelected: {
-    color: '#080B14',
-    fontWeight: '800',
+    color: "#080B14",
+    fontWeight: "800",
   },
   tabBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: borderRadius.full,
     paddingHorizontal: 6,
     paddingVertical: 1,
   },
   tabBadgeSelected: {
-    backgroundColor: '#080B14',
+    backgroundColor: "#080B14",
   },
   tabBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.textSecondary,
   },
   tabBadgeTextSelected: {
@@ -1259,9 +1553,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderRadius: borderRadius.full,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -1275,11 +1569,11 @@ const styles = StyleSheet.create({
   categoryChipText: {
     fontSize: 12,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   categoryChipTextSelected: {
-    color: '#080B14',
-    fontWeight: '700',
+    color: "#080B14",
+    fontWeight: "700",
   },
 
   // List Section
@@ -1288,24 +1582,24 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   listHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: spacing.sm,
   },
   listCountText: {
     fontSize: 13,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   listCountHighlight: {
     color: colors.text,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   resetFiltersText: {
     fontSize: 12,
     color: colors.primary,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   // Loading & Error
@@ -1315,14 +1609,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     padding: spacing.xl,
-    alignItems: 'center',
+    alignItems: "center",
     gap: spacing.md,
     marginTop: spacing.md,
   },
   loadingText: {
     color: colors.textSecondary,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   errorBox: {
     backgroundColor: colors.errorLight,
@@ -1330,19 +1624,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.error,
     padding: spacing.xl,
-    alignItems: 'center',
+    alignItems: "center",
     gap: spacing.sm,
     marginTop: spacing.md,
   },
   errorTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: "800",
     color: colors.text,
   },
   errorSubtitle: {
     fontSize: 13,
     color: colors.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 18,
   },
   retryBtn: {
@@ -1353,9 +1647,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   retryBtnText: {
-    color: '#FFF',
+    color: "#FFF",
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   // Empty State
@@ -1365,7 +1659,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     padding: spacing.xl,
-    alignItems: 'center',
+    alignItems: "center",
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
@@ -1376,26 +1670,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight,
     borderWidth: 1,
     borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: spacing.xs,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: "800",
     color: colors.text,
   },
   emptyDesc: {
     fontSize: 13,
     color: colors.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 19,
     maxWidth: 280,
   },
   emptyActionBtn: {
     backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: spacing.lg,
     borderRadius: borderRadius.full,
@@ -1408,9 +1702,9 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   emptyActionBtnText: {
-    color: '#080B14',
+    color: "#080B14",
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   clearFilterBtn: {
     borderWidth: 1,
@@ -1423,7 +1717,7 @@ const styles = StyleSheet.create({
   clearFilterBtnText: {
     color: colors.primary,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   // Gig Cards
@@ -1439,12 +1733,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   cardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   cardCategoryBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: "rgba(255, 255, 255, 0.07)",
     borderRadius: borderRadius.sm,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -1452,13 +1746,13 @@ const styles = StyleSheet.create({
   cardCategoryText: {
     color: colors.textSecondary,
     fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    fontWeight: "700",
+    textTransform: "uppercase",
     letterSpacing: 0.4,
   },
   cardStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: borderRadius.full,
     borderWidth: 1,
     paddingHorizontal: 9,
@@ -1467,42 +1761,42 @@ const styles = StyleSheet.create({
   },
   cardStatusText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   // Title and Pay
   titlePayRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     gap: spacing.sm,
   },
   gigCardTitle: {
     flex: 1,
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.2,
     lineHeight: 22,
   },
   payPill: {
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: "rgba(245, 158, 11, 0.3)",
     borderRadius: borderRadius.md,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    flexDirection: 'row',
-    alignItems: 'baseline',
+    flexDirection: "row",
+    alignItems: "baseline",
   },
   payAmount: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: "800",
     color: colors.primary,
   },
   payType: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.primary,
   },
   gigCardDesc: {
@@ -1513,24 +1807,24 @@ const styles = StyleSheet.create({
 
   // Skills
   cardSkillsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 6,
   },
   skillTag: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderRadius: borderRadius.sm,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
   skillTagText: {
     fontSize: 11,
     color: colors.textSecondary,
   },
   skillMoreTag: {
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    backgroundColor: "rgba(245, 158, 11, 0.08)",
     borderRadius: borderRadius.sm,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -1538,21 +1832,21 @@ const styles = StyleSheet.create({
   skillMoreText: {
     fontSize: 11,
     color: colors.primary,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   // Meta
   cardMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    borderTopColor: "rgba(255, 255, 255, 0.06)",
   },
   metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   metaItemText: {
@@ -1560,97 +1854,97 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   applicantsChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderRadius: borderRadius.full,
     paddingHorizontal: 8,
     paddingVertical: 2,
     gap: 4,
   },
   applicantsChipActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: "rgba(16, 185, 129, 0.3)",
   },
   applicantsChipText: {
     fontSize: 11,
     color: colors.textMuted,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   applicantsChipTextActive: {
-    color: '#10B981',
-    fontWeight: '700',
+    color: "#10B981",
+    fontWeight: "700",
   },
 
   // Actions Footer
   cardActionsFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: 8,
     gap: 8,
   },
   actionStatusBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(245, 158, 11, 0.1)",
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: "rgba(245, 158, 11, 0.25)",
     borderRadius: borderRadius.md,
     paddingVertical: 7,
     gap: 4,
   },
   actionStatusBtnText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.primary,
   },
   actionDetailsBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.07)",
     borderRadius: borderRadius.md,
     paddingVertical: 7,
     gap: 4,
   },
   actionDetailsBtnText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.text,
   },
   actionDeleteBtn: {
     width: 34,
     height: 34,
     borderRadius: borderRadius.md,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "rgba(239, 68, 68, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // Modals Overlay & Containers
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    justifyContent: "center",
+    alignItems: "center",
     padding: spacing.lg,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: spacing.md,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: "800",
     color: colors.text,
   },
   modalSubtitle: {
@@ -1664,7 +1958,7 @@ const styles = StyleSheet.create({
   },
   modalLoadingBox: {
     padding: spacing.xl,
-    alignItems: 'center',
+    alignItems: "center",
     gap: spacing.sm,
   },
   modalLoadingText: {
@@ -1674,9 +1968,9 @@ const styles = StyleSheet.create({
 
   // Status Modal
   statusModalCard: {
-    width: '100%',
+    width: "100%",
     maxWidth: 420,
-    backgroundColor: '#0F1423',
+    backgroundColor: "#0F1423",
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -1687,9 +1981,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   statusOptionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
@@ -1697,8 +1991,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   statusOptionLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 12,
     flex: 1,
     paddingRight: 8,
@@ -1711,7 +2005,7 @@ const styles = StyleSheet.create({
   },
   statusOptionLabel: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 2,
   },
   statusOptionDesc: {
@@ -1722,9 +2016,9 @@ const styles = StyleSheet.create({
 
   // Sort Modal
   sortModalCard: {
-    width: '100%',
+    width: "100%",
     maxWidth: 360,
-    backgroundColor: '#0F1423',
+    backgroundColor: "#0F1423",
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -1735,9 +2029,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   sortOptionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: borderRadius.md,
@@ -1749,47 +2043,47 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   sortOptionItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   sortOptionItemLabel: {
     fontSize: 14,
     color: colors.text,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   sortOptionItemLabelSelected: {
     color: colors.primary,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   // Details Modal
   detailModalCard: {
-    width: '100%',
+    width: "100%",
     maxWidth: 500,
-    maxHeight: '85%',
-    backgroundColor: '#0F1423',
+    maxHeight: "85%",
+    backgroundColor: "#0F1423",
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
-    overflow: 'hidden',
+    overflow: "hidden",
     ...shadows.card,
   },
   detailModalHeader: {
     padding: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.surfaceBorder,
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
   },
   detailHeaderTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: spacing.xs,
   },
   detailTitle: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.3,
   },
@@ -1797,9 +2091,9 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   detailHighlightBox: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
@@ -1809,31 +2103,31 @@ const styles = StyleSheet.create({
   },
   detailBoxLabel: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: "800",
     color: colors.textMuted,
     letterSpacing: 0.5,
     marginBottom: 2,
   },
   detailPayAmount: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: "800",
     color: colors.primary,
   },
   detailPayType: {
     fontSize: 13,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   detailSpecsGrid: {
     gap: spacing.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
   detailSpecItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   specLabel: {
@@ -1842,14 +2136,14 @@ const styles = StyleSheet.create({
   },
   specVal: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.text,
   },
   detailSectionHeading: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: "800",
     color: colors.text,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: spacing.xs,
     marginTop: spacing.sm,
@@ -1861,35 +2155,35 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   detailSkillsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginBottom: spacing.xl,
   },
   detailSkillChip: {
     backgroundColor: colors.primaryLight,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: "rgba(245, 158, 11, 0.3)",
     borderRadius: borderRadius.full,
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
   detailSkillChipText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.primary,
   },
   detailModalFooter: {
     padding: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.surfaceBorder,
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
   },
   detailChangeStatusBtn: {
     backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 14,
     borderRadius: borderRadius.full,
     gap: 8,
@@ -1900,8 +2194,8 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   detailChangeStatusBtnText: {
-    color: '#080B14',
+    color: "#080B14",
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: "800",
   },
 });
