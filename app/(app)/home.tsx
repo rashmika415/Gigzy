@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig } from '../../services/gigService';
+import { subscribeToUserChats, getOrCreateChat } from '../../services/chatService';
 import { Gig } from '../../types/gig';
 
 export default function Home() {
@@ -25,6 +26,22 @@ export default function Home() {
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [loadingGigs, setLoadingGigs] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [startingChatGigId, setStartingChatGigId] = useState<string | null>(null);
+
+  // Real-time unread messages listener
+  useEffect(() => {
+    if (!user) return;
+    const unsubChats = subscribeToUserChats(
+      user.uid,
+      (userChats) => {
+        const total = userChats.reduce((acc, c) => acc + (c.unreadCount?.[user.uid] || 0), 0);
+        setUnreadChatCount(total);
+      },
+      () => {}
+    );
+    return () => unsubChats();
+  }, [user]);
 
   // Real-time Firestore synchronization
   useEffect(() => {
@@ -94,6 +111,51 @@ export default function Home() {
     );
   };
 
+  const handleContactBusiness = async (gig: Gig) => {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to contact the gig author.');
+      return;
+    }
+    if (gig.postedBy?.uid === user.uid) {
+      router.push('/(app)/my-gigs' as any);
+      return;
+    }
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    setStartingChatGigId(gig.id);
+
+    try {
+      const currentParticipant = {
+        uid: user.uid,
+        fullName: userData?.fullName || user.displayName || 'Freelancer',
+        photoURL: userData?.photoURL || '',
+        role: (userData?.role as any) || 'freelancer',
+        email: user.email || '',
+      };
+
+      const businessParticipant = {
+        uid: gig.postedBy.uid,
+        fullName: gig.postedBy.fullName || 'Business Owner',
+        photoURL: '',
+        role: 'client' as const,
+        email: gig.postedBy.email || '',
+      };
+
+      const chat = await getOrCreateChat(currentParticipant, businessParticipant, gig);
+      router.push({
+        pathname: '/(app)/chat/[id]',
+        params: { id: chat.id },
+      } as any);
+    } catch (err: any) {
+      Alert.alert('Chat Error', err.message || 'Failed to start conversation.');
+    } finally {
+      setStartingChatGigId(null);
+    }
+  };
+
   const getRoleLabel = () => {
     if (role === 'admin') return 'Platform Admin';
     if (role === 'client') return 'Business Owner';
@@ -113,21 +175,45 @@ export default function Home() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerGreetingBlock}>
             <Text style={styles.greeting}>Hello, {firstName}! 👋</Text>
             <Text style={styles.subtitle}>
               Role Profile: <Text style={styles.roleLabel}>{getRoleLabel()}</Text>
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.avatarCircle}
-            onPress={() => router.push('/(app)/profile' as any)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.avatarText}>
-              {(firstName?.[0] ?? '?').toUpperCase()}
-            </Text>
-          </TouchableOpacity>
+
+          <View style={styles.headerActionsRight}>
+            {/* Messages inbox button */}
+            <TouchableOpacity
+              style={styles.messagesHeaderBtn}
+              onPress={() => {
+                try {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                } catch {}
+                router.push('/(app)/messages' as any);
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubbles-outline" size={22} color={colors.primary} />
+              {unreadChatCount > 0 && (
+                <View style={styles.headerBadgePill}>
+                  <Text style={styles.headerBadgeText}>
+                    {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.avatarCircle}
+              onPress={() => router.push('/(app)/profile' as any)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.avatarText}>
+                {(firstName?.[0] ?? '?').toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Business Owner / Post Gig CTA Banner */}
@@ -352,6 +438,24 @@ export default function Home() {
                       <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
                       <Text style={styles.gigMetaText}>{gig.date}</Text>
                     </View>
+
+                    {role !== 'client' && (
+                      <TouchableOpacity
+                        style={styles.contactEmployerBtn}
+                        onPress={() => handleContactBusiness(gig)}
+                        disabled={startingChatGigId === gig.id}
+                        activeOpacity={0.8}
+                      >
+                        {startingChatGigId === gig.id ? (
+                          <ActivityIndicator size="small" color="#003731" />
+                        ) : (
+                          <>
+                            <Ionicons name="chatbubble-ellipses-outline" size={13} color="#003731" />
+                            <Text style={styles.contactEmployerBtnText}>Chat</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </TouchableOpacity>
               ))}
@@ -404,6 +508,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
+  headerGreetingBlock: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  headerActionsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  messagesHeaderBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  headerBadgePill: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    minWidth: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.primaryOnColor,
+  },
   greeting: {
     fontSize: 24,
     fontWeight: '800',
@@ -433,6 +574,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: colors.primary,
+  },
+  contactEmployerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    marginLeft: 'auto',
+  },
+  contactEmployerBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#003731',
   },
 
   // CTA Card
