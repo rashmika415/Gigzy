@@ -1,55 +1,59 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  FlatList,
-  TouchableOpacity,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  Image,
-  Modal,
-  Alert,
-} from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import * as Haptics from 'expo-haptics';
-import { useAuth } from '../../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../../constants/theme';
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { borderRadius, colors, spacing } from "../../../constants/theme";
+import { useAuth } from "../../../context/AuthContext";
 import {
-  getChatById,
-  subscribeToChatMessages,
-  sendChatMessage,
-  markChatAsRead,
-  uploadChatImage,
-} from '../../../services/chatService';
+    getChatById,
+    markChatAsRead,
+    sendChatMessage,
+    subscribeToChatMessages,
+    uploadChatImage,
+} from "../../../services/chatService";
 import {
-  Chat,
-  ChatMessage,
-  ParticipantDetail,
-  FREELANCER_QUICK_REPLIES,
-  BUSINESS_QUICK_REPLIES,
-} from '../../../types/chat';
+    BUSINESS_QUICK_REPLIES,
+    Chat,
+    ChatMessage,
+    FREELANCER_QUICK_REPLIES,
+    ParticipantDetail,
+} from "../../../types/chat";
 
 function formatMessageTime(timestamp: any): string {
-  if (!timestamp) return '';
+  if (!timestamp) return "";
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function formatDateDivider(timestamp: any): string {
-  if (!timestamp) return '';
+  if (!timestamp) return "";
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
   const now = new Date();
-  if (date.toDateString() === now.toDateString()) return 'Today';
+  if (date.toDateString() === now.toDateString()) return "Today";
   const yesterday = new Date();
   yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 export default function ChatRoomScreen() {
@@ -60,10 +64,12 @@ export default function ChatRoomScreen() {
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState<
+    string | null
+  >(null);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [showGigBanner, setShowGigBanner] = useState(true);
 
@@ -73,6 +79,7 @@ export default function ChatRoomScreen() {
   useEffect(() => {
     if (!chatId || !user) return;
 
+    const currentUser = user;
     let isMounted = true;
 
     async function loadChat() {
@@ -82,9 +89,9 @@ export default function ChatRoomScreen() {
           setChat(fetchedChat);
           setLoading(false);
         }
-        await markChatAsRead(chatId, user.uid);
+        await markChatAsRead(chatId, currentUser.uid);
       } catch (err) {
-        console.error('Error fetching chat:', err);
+        console.error("Error fetching chat:", err);
         if (isMounted) setLoading(false);
       }
     }
@@ -99,12 +106,12 @@ export default function ChatRoomScreen() {
           setMessages(newMessages);
           setLoading(false);
         }
-        markChatAsRead(chatId, user.uid);
+        markChatAsRead(chatId, currentUser.uid);
       },
       (err) => {
-        console.error('Error subscribing to messages:', err);
+        console.error("Error subscribing to messages:", err);
         if (isMounted) setLoading(false);
-      }
+      },
     );
 
     return () => {
@@ -115,35 +122,43 @@ export default function ChatRoomScreen() {
 
   const otherParticipant: ParticipantDetail = useMemo(() => {
     if (!chat || !user) {
-      return { uid: '', fullName: 'User', role: 'freelancer' };
+      return { uid: "", fullName: "User", role: "freelancer" };
     }
-    const otherUid = chat.participants.find((p) => p !== user.uid) || '';
+    const otherUid = chat.participants.find((p) => p !== user.uid) || "";
     return (
       chat.participantDetails?.[otherUid] || {
         uid: otherUid,
-        fullName: 'User',
-        role: 'freelancer',
+        fullName: "User",
+        role: "freelancer",
       }
     );
   }, [chat, user]);
 
-  const isOtherBusiness = otherParticipant.role === 'client';
-  const myRole = userData?.role || 'freelancer';
-  const quickReplies = myRole === 'client' ? BUSINESS_QUICK_REPLIES : FREELANCER_QUICK_REPLIES;
+  const isOtherBusiness = otherParticipant.role === "client";
+  const myRole = userData?.role || "freelancer";
+  const quickReplies =
+    myRole === "client" ? BUSINESS_QUICK_REPLIES : FREELANCER_QUICK_REPLIES;
 
   const currentParticipantDetail: ParticipantDetail = useMemo(() => {
     return {
-      uid: user?.uid || '',
-      fullName: userData?.fullName || user?.displayName || 'User',
-      photoURL: userData?.photoURL || '',
-      role: (userData?.role as any) || 'freelancer',
-      email: user?.email || '',
+      uid: user?.uid || "",
+      fullName: userData?.fullName || user?.displayName || "User",
+      photoURL: userData?.photoURL || "",
+      role: (userData?.role as any) || "freelancer",
+      email: user?.email || "",
     };
   }, [user, userData]);
 
   const handleSend = async (customText?: string) => {
-    const textToSend = (customText !== undefined ? customText : inputText).trim();
-    if ((!textToSend && !selectedImagePreview) || sending || uploadingImage || !user) {
+    const textToSend = (
+      customText !== undefined ? customText : inputText
+    ).trim();
+    if (
+      (!textToSend && !selectedImagePreview) ||
+      sending ||
+      uploadingImage ||
+      !user
+    ) {
       return;
     }
 
@@ -169,11 +184,11 @@ export default function ChatRoomScreen() {
         otherParticipant.uid,
         textToSend,
         uploadedMediaUrl,
-        uploadedMediaUrl ? 'image' : 'text'
+        uploadedMediaUrl ? "image" : "text",
       );
 
       if (customText === undefined) {
-        setInputText('');
+        setInputText("");
       }
 
       // Scroll to bottom
@@ -181,7 +196,7 @@ export default function ChatRoomScreen() {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (err: any) {
-      Alert.alert('Send Error', err.message || 'Failed to send message.');
+      Alert.alert("Send Error", err.message || "Failed to send message.");
     } finally {
       setSending(false);
       setUploadingImage(false);
@@ -190,9 +205,13 @@ export default function ChatRoomScreen() {
 
   const handlePickImage = async () => {
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'Please enable photos permission to send images.');
+        Alert.alert(
+          "Permission Required",
+          "Please enable photos permission to send images.",
+        );
         return;
       }
 
@@ -209,11 +228,17 @@ export default function ChatRoomScreen() {
         } catch {}
       }
     } catch (err) {
-      Alert.alert('Error', 'Unable to pick image.');
+      Alert.alert("Error", "Unable to pick image.");
     }
   };
 
-  const renderMessageItem = ({ item, index }: { item: ChatMessage; index: number }) => {
+  const renderMessageItem = ({
+    item,
+    index,
+  }: {
+    item: ChatMessage;
+    index: number;
+  }) => {
     const isMe = item.senderId === user?.uid;
     const isImage = Boolean(item.mediaUrl);
 
@@ -221,25 +246,41 @@ export default function ChatRoomScreen() {
     const prevMessage = index > 0 ? messages[index - 1] : null;
     const showDateDivider =
       !prevMessage ||
-      formatDateDivider(item.createdAt) !== formatDateDivider(prevMessage.createdAt);
+      formatDateDivider(item.createdAt) !==
+        formatDateDivider(prevMessage.createdAt);
 
     return (
       <View style={styles.messageRowWrapper}>
         {showDateDivider && (
           <View style={styles.dateDivider}>
-            <Text style={styles.dateDividerText}>{formatDateDivider(item.createdAt)}</Text>
+            <Text style={styles.dateDividerText}>
+              {formatDateDivider(item.createdAt)}
+            </Text>
           </View>
         )}
 
-        <View style={[styles.messageBubbleRow, isMe ? styles.bubbleRowMe : styles.bubbleRowOther]}>
+        <View
+          style={[
+            styles.messageBubbleRow,
+            isMe ? styles.bubbleRowMe : styles.bubbleRowOther,
+          ]}
+        >
           {!isMe && (
             <View style={styles.bubbleAvatar}>
               {item.senderPhotoURL ? (
-                <Image source={{ uri: item.senderPhotoURL }} style={styles.bubbleAvatarImg} />
+                <Image
+                  source={{ uri: item.senderPhotoURL }}
+                  style={styles.bubbleAvatarImg}
+                />
               ) : (
-                <View style={[styles.bubbleAvatarPlaceholder, isOtherBusiness && styles.bubbleAvatarBusiness]}>
+                <View
+                  style={[
+                    styles.bubbleAvatarPlaceholder,
+                    isOtherBusiness && styles.bubbleAvatarBusiness,
+                  ]}
+                >
                   <Text style={styles.bubbleAvatarText}>
-                    {(item.senderName?.[0] || 'U').toUpperCase()}
+                    {(item.senderName?.[0] || "U").toUpperCase()}
                   </Text>
                 </View>
               )}
@@ -260,27 +301,52 @@ export default function ChatRoomScreen() {
                 activeOpacity={0.9}
                 style={styles.imageContainer}
               >
-                <Image source={{ uri: item.mediaUrl }} style={styles.messageImage} resizeMode="cover" />
+                <Image
+                  source={{ uri: item.mediaUrl }}
+                  style={styles.messageImage}
+                  resizeMode="cover"
+                />
               </TouchableOpacity>
             )}
 
             {/* Text content */}
             {Boolean(item.text) && (
-              <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextOther]}>
+              <Text
+                style={[
+                  styles.bubbleText,
+                  isMe ? styles.bubbleTextMe : styles.bubbleTextOther,
+                ]}
+              >
                 {item.text}
               </Text>
             )}
 
             {/* Timestamp and Read Status */}
-            <View style={[styles.metaRow, isMe ? styles.metaRowMe : styles.metaRowOther]}>
-              <Text style={[styles.timeText, isMe ? styles.timeTextMe : styles.timeTextOther]}>
+            <View
+              style={[
+                styles.metaRow,
+                isMe ? styles.metaRowMe : styles.metaRowOther,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.timeText,
+                  isMe ? styles.timeTextMe : styles.timeTextOther,
+                ]}
+              >
                 {formatMessageTime(item.createdAt)}
               </Text>
               {isMe && (
                 <Ionicons
-                  name={item.readBy?.length > 1 ? 'checkmark-done' : 'checkmark'}
+                  name={
+                    item.readBy?.length > 1 ? "checkmark-done" : "checkmark"
+                  }
                   size={14}
-                  color={item.readBy?.length > 1 ? colors.primary : 'rgba(0, 55, 49, 0.6)'}
+                  color={
+                    item.readBy?.length > 1
+                      ? colors.primary
+                      : "rgba(0, 55, 49, 0.6)"
+                  }
                   style={styles.checkIcon}
                 />
               )}
@@ -307,11 +373,19 @@ export default function ChatRoomScreen() {
         <View style={styles.headerUserInfo}>
           <View style={styles.headerAvatarWrapper}>
             {otherParticipant.photoURL ? (
-              <Image source={{ uri: otherParticipant.photoURL }} style={styles.headerAvatarImg} />
+              <Image
+                source={{ uri: otherParticipant.photoURL }}
+                style={styles.headerAvatarImg}
+              />
             ) : (
-              <View style={[styles.headerAvatarCircle, isOtherBusiness && styles.headerAvatarBusiness]}>
+              <View
+                style={[
+                  styles.headerAvatarCircle,
+                  isOtherBusiness && styles.headerAvatarBusiness,
+                ]}
+              >
                 <Text style={styles.headerAvatarText}>
-                  {(otherParticipant.fullName?.[0] || 'U').toUpperCase()}
+                  {(otherParticipant.fullName?.[0] || "U").toUpperCase()}
                 </Text>
               </View>
             )}
@@ -320,12 +394,19 @@ export default function ChatRoomScreen() {
 
           <View style={styles.headerNameBlock}>
             <Text style={styles.headerName} numberOfLines={1}>
-              {otherParticipant.fullName || 'User'}
+              {otherParticipant.fullName || "User"}
             </Text>
             <View style={styles.headerRoleRow}>
-              <View style={[styles.roleDot, isOtherBusiness ? styles.roleDotBusiness : styles.roleDotYouth]} />
+              <View
+                style={[
+                  styles.roleDot,
+                  isOtherBusiness
+                    ? styles.roleDotBusiness
+                    : styles.roleDotYouth,
+                ]}
+              />
               <Text style={styles.headerRoleText}>
-                {isOtherBusiness ? 'Business Client' : 'Youth Freelancer'}
+                {isOtherBusiness ? "Business Client" : "Youth Freelancer"}
               </Text>
             </View>
           </View>
@@ -339,7 +420,11 @@ export default function ChatRoomScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Ionicons
-              name={showGigBanner ? 'chevron-up-circle-outline' : 'briefcase-outline'}
+              name={
+                showGigBanner
+                  ? "chevron-up-circle-outline"
+                  : "briefcase-outline"
+              }
               size={22}
               color={colors.primary}
             />
@@ -358,17 +443,19 @@ export default function ChatRoomScreen() {
               {chat.gigTitle}
             </Text>
             <Text style={styles.gigBannerSubtitle}>
-              {chat.gigPay ? `$${chat.gigPay} ${chat.gigPayType === 'hourly' ? '/ hr' : 'Fixed Budget'}` : 'Gig Details'}
-              {chat.gigCategory ? ` • ${chat.gigCategory}` : ''}
+              {chat.gigPay
+                ? `$${chat.gigPay} ${chat.gigPayType === "hourly" ? "/ hr" : "Fixed Budget"}`
+                : "Gig Details"}
+              {chat.gigCategory ? ` • ${chat.gigCategory}` : ""}
             </Text>
           </View>
           <TouchableOpacity
             style={styles.gigBannerAction}
             onPress={() => {
               Alert.alert(
-                'Related Gig',
-                `${chat.gigTitle}\nBudget: $${chat.gigPay || 'N/A'}\nCategory: ${chat.gigCategory || 'General'}`,
-                [{ text: 'Close' }]
+                "Related Gig",
+                `${chat.gigTitle}\nBudget: $${chat.gigPay || "N/A"}\nCategory: ${chat.gigCategory || "General"}`,
+                [{ text: "Close" }],
               );
             }}
           >
@@ -380,8 +467,8 @@ export default function ChatRoomScreen() {
       {/* Main Messages Container */}
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
         {loading ? (
           <View style={styles.centerContainer}>
@@ -395,14 +482,23 @@ export default function ChatRoomScreen() {
             keyExtractor={(item) => item.id}
             renderItem={renderMessageItem}
             contentContainerStyle={styles.messagesList}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-            onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            onContentSizeChange={() =>
+              flatListRef.current?.scrollToEnd({ animated: false })
+            }
+            onLayout={() =>
+              flatListRef.current?.scrollToEnd({ animated: false })
+            }
             ListEmptyComponent={
               <View style={styles.emptyChatBox}>
-                <Ionicons name="chatbubbles-outline" size={48} color={colors.surfaceBorder} />
+                <Ionicons
+                  name="chatbubbles-outline"
+                  size={48}
+                  color={colors.surfaceBorder}
+                />
                 <Text style={styles.emptyChatTitle}>No messages yet</Text>
                 <Text style={styles.emptyChatSub}>
-                  Send a friendly greeting or use one of the quick replies below to get started!
+                  Send a friendly greeting or use one of the quick replies below
+                  to get started!
                 </Text>
               </View>
             }
@@ -412,7 +508,10 @@ export default function ChatRoomScreen() {
         {/* Selected Image Attachment Preview Bar */}
         {selectedImagePreview && (
           <View style={styles.imagePreviewBar}>
-            <Image source={{ uri: selectedImagePreview }} style={styles.previewThumb} />
+            <Image
+              source={{ uri: selectedImagePreview }}
+              style={styles.previewThumb}
+            />
             <View style={styles.previewInfo}>
               <Text style={styles.previewTitle}>Image ready to send</Text>
               <Text style={styles.previewSub}>Add a message or hit send</Text>
@@ -441,7 +540,12 @@ export default function ChatRoomScreen() {
                 onPress={() => handleSend(item.text)}
                 activeOpacity={0.8}
               >
-                <Ionicons name="flash-outline" size={12} color={colors.primary} style={{ marginRight: 4 }} />
+                <Ionicons
+                  name="flash-outline"
+                  size={12}
+                  color={colors.primary}
+                  style={{ marginRight: 4 }}
+                />
                 <Text style={styles.quickReplyText} numberOfLines={1}>
                   {item.text}
                 </Text>
@@ -475,10 +579,16 @@ export default function ChatRoomScreen() {
           <TouchableOpacity
             style={[
               styles.sendBtn,
-              (!inputText.trim() && !selectedImagePreview) && styles.sendBtnDisabled,
+              !inputText.trim() &&
+                !selectedImagePreview &&
+                styles.sendBtnDisabled,
             ]}
             onPress={() => handleSend()}
-            disabled={(!inputText.trim() && !selectedImagePreview) || sending || uploadingImage}
+            disabled={
+              (!inputText.trim() && !selectedImagePreview) ||
+              sending ||
+              uploadingImage
+            }
             activeOpacity={0.85}
           >
             {sending || uploadingImage ? (
@@ -491,7 +601,11 @@ export default function ChatRoomScreen() {
       </KeyboardAvoidingView>
 
       {/* Fullscreen Image Modal */}
-      <Modal visible={Boolean(fullscreenImage)} transparent animationType="fade">
+      <Modal
+        visible={Boolean(fullscreenImage)}
+        transparent
+        animationType="fade"
+      >
         <View style={styles.fullscreenOverlay}>
           <TouchableOpacity
             style={styles.closeModalBtn}
@@ -500,7 +614,11 @@ export default function ChatRoomScreen() {
             <Ionicons name="close" size={28} color="#FFF" />
           </TouchableOpacity>
           {fullscreenImage && (
-            <Image source={{ uri: fullscreenImage }} style={styles.fullscreenImage} resizeMode="contain" />
+            <Image
+              source={{ uri: fullscreenImage }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
+            />
           )}
         </View>
       </Modal>
@@ -518,9 +636,9 @@ const styles = StyleSheet.create({
   },
   header: {
     height: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.surfaceBorderSubtle,
@@ -532,12 +650,12 @@ const styles = StyleSheet.create({
   },
   headerUserInfo: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
   headerAvatarWrapper: {
-    position: 'relative',
+    position: "relative",
   },
   headerAvatarCircle: {
     width: 40,
@@ -546,12 +664,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight,
     borderWidth: 1.5,
     borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerAvatarBusiness: {
-    backgroundColor: 'rgba(44, 73, 104, 0.3)',
-    borderColor: '#7BA6D6',
+    backgroundColor: "rgba(44, 73, 104, 0.3)",
+    borderColor: "#7BA6D6",
   },
   headerAvatarImg: {
     width: 40,
@@ -562,11 +680,11 @@ const styles = StyleSheet.create({
   },
   headerAvatarText: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: "800",
     color: colors.primary,
   },
   headerOnlineDot: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
     width: 10,
@@ -581,12 +699,12 @@ const styles = StyleSheet.create({
   },
   headerName: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.text,
   },
   headerRoleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     marginTop: 1,
   },
@@ -599,22 +717,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   roleDotBusiness: {
-    backgroundColor: '#7BA6D6',
+    backgroundColor: "#7BA6D6",
   },
   headerRoleText: {
     fontSize: 11,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   gigToggleBtn: {
     padding: spacing.xs,
   },
   gigBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(111, 216, 199, 0.08)',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(111, 216, 199, 0.08)",
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(111, 216, 199, 0.2)',
+    borderBottomColor: "rgba(111, 216, 199, 0.2)",
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     gap: spacing.sm,
@@ -624,21 +742,21 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   gigBannerInfo: {
     flex: 1,
   },
   gigBannerTitle: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.text,
   },
   gigBannerSubtitle: {
     fontSize: 11,
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: 1,
   },
   gigBannerAction: {
@@ -647,17 +765,17 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: borderRadius.sm,
     borderWidth: 1,
-    borderColor: 'rgba(111, 216, 199, 0.3)',
+    borderColor: "rgba(111, 216, 199, 0.3)",
   },
   gigBannerActionText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.primary,
   },
   centerContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: spacing.md,
   },
   loadingSubtext: {
@@ -670,29 +788,29 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   emptyChatBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: spacing.xxl * 1.5,
     paddingHorizontal: spacing.xl,
     gap: spacing.sm,
   },
   emptyChatTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.text,
   },
   emptyChatSub: {
     fontSize: 13,
     color: colors.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 18,
   },
   messageRowWrapper: {
-    width: '100%',
+    width: "100%",
     marginVertical: 2,
   },
   dateDivider: {
-    alignSelf: 'center',
+    alignSelf: "center",
     backgroundColor: colors.surfaceElevated,
     paddingHorizontal: 12,
     paddingVertical: 4,
@@ -703,20 +821,20 @@ const styles = StyleSheet.create({
   },
   dateDividerText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.textMuted,
   },
   messageBubbleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    alignItems: "flex-end",
     gap: spacing.xs,
-    maxWidth: '85%',
+    maxWidth: "85%",
   },
   bubbleRowMe: {
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
   },
   bubbleRowOther: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   bubbleAvatar: {
     marginRight: 4,
@@ -732,22 +850,22 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   bubbleAvatarBusiness: {
-    backgroundColor: 'rgba(44, 73, 104, 0.3)',
+    backgroundColor: "rgba(44, 73, 104, 0.3)",
   },
   bubbleAvatarText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.primary,
   },
   bubble: {
     borderRadius: borderRadius.lg,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    maxWidth: '100%',
+    maxWidth: "100%",
   },
   bubbleWithImage: {
     padding: 6,
@@ -764,7 +882,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     borderRadius: borderRadius.md,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginBottom: 4,
   },
   messageImage: {
@@ -778,16 +896,16 @@ const styles = StyleSheet.create({
   },
   bubbleTextMe: {
     color: colors.primaryOnColor,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   bubbleTextOther: {
     color: colors.text,
   },
   metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
     marginTop: 4,
   },
   metaRowMe: {},
@@ -796,7 +914,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   timeTextMe: {
-    color: 'rgba(0, 55, 49, 0.75)',
+    color: "rgba(0, 55, 49, 0.75)",
   },
   timeTextOther: {
     color: colors.textMuted,
@@ -805,8 +923,8 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   imagePreviewBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surfaceElevated,
     borderTopWidth: 1,
     borderTopColor: colors.surfaceBorder,
@@ -824,7 +942,7 @@ const styles = StyleSheet.create({
   },
   previewTitle: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.text,
   },
   previewSub: {
@@ -845,10 +963,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   quickReplyChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surfaceElevated,
-    borderColor: 'rgba(111, 216, 199, 0.25)',
+    borderColor: "rgba(111, 216, 199, 0.25)",
     borderWidth: 1,
     borderRadius: borderRadius.full,
     paddingHorizontal: 12,
@@ -856,13 +974,13 @@ const styles = StyleSheet.create({
   },
   quickReplyText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.textSecondary,
     maxWidth: 240,
   },
   inputBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -877,8 +995,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   textInput: {
     flex: 1,
@@ -898,8 +1016,8 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -911,19 +1029,19 @@ const styles = StyleSheet.create({
   },
   fullscreenOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.95)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   closeModalBtn: {
-    position: 'absolute',
+    position: "absolute",
     top: 50,
     right: 20,
     zIndex: 10,
     padding: spacing.sm,
   },
   fullscreenImage: {
-    width: '100%',
-    height: '80%',
+    width: "100%",
+    height: "80%",
   },
 });
