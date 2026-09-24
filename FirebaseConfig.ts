@@ -1,9 +1,11 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAuth, initializeAuth } from "firebase/auth";
+// @ts-expect-error getReactNativePersistence ships in the RN build of firebase/auth
+// (resolved by Metro's "react-native" export condition) but isn't in the package's public types.
+import { initializeAuth, getReactNativePersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -19,7 +21,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Firebase services
-export const auth = Platform.OS === "web" ? getAuth(app) : initializeAuth(app);
+export const auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+});
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 

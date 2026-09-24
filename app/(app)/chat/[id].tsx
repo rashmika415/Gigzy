@@ -79,7 +79,6 @@ export default function ChatRoomScreen() {
   useEffect(() => {
     if (!chatId || !user) return;
 
-    const currentUser = user;
     let isMounted = true;
 
     async function loadChat() {
@@ -89,7 +88,7 @@ export default function ChatRoomScreen() {
           setChat(fetchedChat);
           setLoading(false);
         }
-        await markChatAsRead(chatId, currentUser.uid);
+        await markChatAsRead(chatId, user.uid);
       } catch (err) {
         console.error("Error fetching chat:", err);
         if (isMounted) setLoading(false);
@@ -106,7 +105,7 @@ export default function ChatRoomScreen() {
           setMessages(newMessages);
           setLoading(false);
         }
-        markChatAsRead(chatId, currentUser.uid);
+        markChatAsRead(chatId, user.uid);
       },
       (err) => {
         console.error("Error subscribing to messages:", err);
