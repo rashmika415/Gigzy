@@ -81,6 +81,7 @@ export default function ChatRoomScreen() {
 
     let isMounted = true;
 
+    const userId = user.uid;
     async function loadChat() {
       try {
         const fetchedChat = await getChatById(chatId);
@@ -88,7 +89,7 @@ export default function ChatRoomScreen() {
           setChat(fetchedChat);
           setLoading(false);
         }
-        await markChatAsRead(chatId, user.uid);
+        await markChatAsRead(chatId, userId);
       } catch (err) {
         console.error("Error fetching chat:", err);
         if (isMounted) setLoading(false);

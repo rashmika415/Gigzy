@@ -44,18 +44,20 @@ export default function EditProfile() {
   // Profile Form States
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [age, setAge] = useState('');
   const [photoURL, setPhotoURL] = useState('');
   
   // Youth specific
   const [bio, setBio] = useState('');
   const [skills, setSkills] = useState('');
   const [availability, setAvailability] = useState('');
+  const [location, setLocation] = useState('');
 
   // Business specific
   const [businessName, setBusinessName] = useState('');
   const [businessCategory, setBusinessCategory] = useState('');
   const [businessDetails, setBusinessDetails] = useState('');
-  const [location, setLocation] = useState('');
+  const [address, setAddress] = useState('');
 
   // UI Flow States
   const [saving, setSaving] = useState(false);
@@ -72,14 +74,16 @@ export default function EditProfile() {
     if (userData && !isInitialized) {
       setFullName(userData.fullName || '');
       setPhone(userData.phone || '');
+      setAge(userData.age?.toString() || '');
       setPhotoURL(userData.photoURL || '');
       setBio(userData.bio || '');
       setSkills(userData.skills || '');
       setAvailability(userData.availability || '');
+      setLocation(userData.location || '');
       setBusinessName(userData.businessName || '');
       setBusinessCategory(userData.businessCategory || '');
       setBusinessDetails(userData.businessDetails || '');
-      setLocation(userData.location || '');
+      setAddress(userData.address || '');
       setIsInitialized(true);
     }
   }, [userData, isInitialized]);
@@ -89,26 +93,30 @@ export default function EditProfile() {
     if (!userData) return false;
     const initialFullName = userData.fullName || '';
     const initialPhone = userData.phone || '';
+    const initialAge = userData.age?.toString() || '';
     const initialPhotoURL = userData.photoURL || '';
     const initialBio = userData.bio || '';
     const initialSkills = userData.skills || '';
     const initialAvailability = userData.availability || '';
+    const initialLocation = userData.location || '';
     const initialBusinessName = userData.businessName || '';
     const initialBusinessCategory = userData.businessCategory || '';
     const initialBusinessDetails = userData.businessDetails || '';
-    const initialLocation = userData.location || '';
+    const initialAddress = userData.address || '';
 
     return (
       fullName !== initialFullName ||
       phone !== initialPhone ||
+      age !== initialAge ||
       photoURL !== initialPhotoURL ||
       bio !== initialBio ||
       skills !== initialSkills ||
       availability !== initialAvailability ||
+      location !== initialLocation ||
       businessName !== initialBusinessName ||
       businessCategory !== initialBusinessCategory ||
       businessDetails !== initialBusinessDetails ||
-      location !== initialLocation
+      address !== initialAddress
     );
   };
 
@@ -223,6 +231,10 @@ export default function EditProfile() {
       if (!fullName.trim()) {
         newErrors.fullName = 'Full Name is required.';
       }
+      const numericAge = Number(age);
+      if (!Number.isInteger(numericAge) || numericAge < 16 || numericAge > 35) {
+        newErrors.age = 'Enter an age between 16 and 35.';
+      }
       
       const trimmedBio = bio.trim();
       if (trimmedBio.length > 0 && trimmedBio.length < 10) {
@@ -238,6 +250,7 @@ export default function EditProfile() {
       if (!availability.trim()) {
         newErrors.availability = 'Please select your availability.';
       }
+      if (!location.trim()) newErrors.location = 'Location is required.';
     } else {
       // Business validation
       if (!businessName.trim()) {
@@ -257,8 +270,8 @@ export default function EditProfile() {
         newErrors.businessDetails = 'Business details cannot exceed 1,000 characters.';
       }
 
-      if (!location.trim()) {
-        newErrors.location = 'Contact/Location details are required.';
+      if (!address.trim()) {
+        newErrors.address = 'Business address is required.';
       }
     }
 
@@ -296,9 +309,11 @@ export default function EditProfile() {
         profileData = {
           ...profileData,
           fullName: fullName.trim(),
+          age: Number(age),
           bio: bio.trim(),
           skills: skills.trim(),
           availability: availability.trim(),
+          location: location.trim(),
         };
       } else {
         profileData = {
@@ -307,7 +322,7 @@ export default function EditProfile() {
           businessName: businessName.trim(),
           businessCategory: businessCategory.trim(),
           businessDetails: businessDetails.trim(),
-          location: location.trim(),
+          address: address.trim(),
         };
       }
 
@@ -435,6 +450,20 @@ export default function EditProfile() {
                   {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
                 </View>
 
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Age *</Text>
+                  <TextInput
+                    style={[styles.input, errors.age && styles.inputErrorBorder]}
+                    value={age}
+                    onChangeText={(text) => { setAge(text.replace(/[^0-9]/g, '')); setErrors((prev) => ({ ...prev, age: undefined })); }}
+                    placeholder="Your age (16–35)"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                  {errors.age && <Text style={styles.errorText}>{errors.age}</Text>}
+                </View>
+
                 {/* Phone Number */}
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Phone Number</Text>
@@ -446,6 +475,18 @@ export default function EditProfile() {
                     placeholderTextColor={colors.textMuted}
                     keyboardType="phone-pad"
                   />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Location *</Text>
+                  <TextInput
+                    style={[styles.input, errors.location && styles.inputErrorBorder]}
+                    value={location}
+                    onChangeText={(text) => { setLocation(text); setErrors((prev) => ({ ...prev, location: undefined })); }}
+                    placeholder="e.g. Colombo, Sri Lanka"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
                 </View>
 
                 {/* Bio */}
@@ -557,18 +598,18 @@ export default function EditProfile() {
 
                 {/* Contact/Location */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Contact & Location *</Text>
+                  <Text style={styles.label}>Business Address *</Text>
                   <TextInput
-                    style={[styles.input, errors.location && styles.inputErrorBorder]}
-                    value={location}
+                    style={[styles.input, errors.address && styles.inputErrorBorder]}
+                    value={address}
                     onChangeText={(text) => {
-                      setLocation(text);
-                      setErrors((prev) => ({ ...prev, location: undefined }));
+                      setAddress(text);
+                      setErrors((prev) => ({ ...prev, address: undefined }));
                     }}
-                    placeholder="e.g. Colombo, Sri Lanka / Remote"
+                    placeholder="Street, city, country"
                     placeholderTextColor={colors.textMuted}
                   />
-                  {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
+                  {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
                 </View>
 
                 {/* Contact Phone */}

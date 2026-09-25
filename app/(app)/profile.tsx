@@ -89,11 +89,16 @@ export default function Profile() {
             )}
             <Text style={styles.profileName}>
               {isYouth ? (userData?.fullName || 'Youth Member') : (userData?.businessName || 'Business Owner')}
+              {!isYouth && userData?.isVerified ? '  ✓' : ''}
             </Text>
             <View style={[styles.roleBadge, { borderColor: isYouth ? 'rgba(245, 158, 11, 0.3)' : 'rgba(124, 58, 237, 0.3)' }]}>
               <Text style={[styles.roleText, { color: isYouth ? colors.primary : colors.accent }]}>{getRoleLabel()}</Text>
             </View>
             <Text style={styles.emailText}>{user?.email}</Text>
+            <View style={styles.ratingRow}>
+              <Ionicons name="star" size={15} color="#FBBF24" />
+              <Text style={styles.emailText}>{(userData?.ratingAverage ?? 0).toFixed(1)} ({userData?.ratingCount ?? 0} reviews)</Text>
+            </View>
           </View>
         </View>
 
@@ -129,6 +134,14 @@ export default function Profile() {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Work & Contact Details</Text>
               <View style={styles.detailRow}>
+                <Ionicons name="location-outline" size={18} color={colors.primary} style={styles.rowIcon} />
+                <View><Text style={styles.detailLabel}>Location</Text><Text style={styles.detailValue}>{userData?.location || 'Not specified'}</Text></View>
+              </View>
+              {userData?.age ? <View style={styles.detailRow}>
+                <Ionicons name="person-outline" size={18} color={colors.primary} style={styles.rowIcon} />
+                <View><Text style={styles.detailLabel}>Age</Text><Text style={styles.detailValue}>{userData.age}</Text></View>
+              </View> : null}
+              <View style={styles.detailRow}>
                 <Ionicons name="calendar-outline" size={18} color={colors.primary} style={styles.rowIcon} />
                 <View>
                   <Text style={styles.detailLabel}>Availability</Text>
@@ -143,6 +156,8 @@ export default function Profile() {
                 </View>
               </View>
             </View>
+            {!!userData?.skillBadges?.length && <View style={styles.card}><Text style={styles.cardTitle}>Earned Skill Badges</Text><View style={styles.skillsContainer}>{userData.skillBadges.map((badge) => <View key={badge.id} style={styles.skillTag}><Text style={styles.skillTagText}>🏅 {badge.label}</Text></View>)}</View></View>}
+            {!!userData?.endorsements?.length && <View style={styles.card}><Text style={styles.cardTitle}>Community Endorsements</Text>{userData.endorsements.map((item) => <Text key={item.id} style={styles.cardContentText}>✓ {item.skill} · {item.endorserName}</Text>)}</View>}
           </View>
         ) : (
           // Business Profile Fields
@@ -168,7 +183,7 @@ export default function Profile() {
                 <Ionicons name="location-outline" size={18} color={colors.accent} style={styles.rowIcon} />
                 <View>
                   <Text style={styles.detailLabel}>Location</Text>
-                  <Text style={styles.detailValue}>{userData?.location || 'Not specified'}</Text>
+                  <Text style={styles.detailValue}>{userData?.address || 'Not specified'}</Text>
                 </View>
               </View>
               <View style={styles.detailRow}>
@@ -192,6 +207,14 @@ export default function Profile() {
 
         {/* Action Buttons */}
         <View style={styles.actionSection}>
+          {user && <TouchableOpacity
+            style={styles.publicButton}
+            onPress={() => router.push({ pathname: '/(app)/profile/[id]', params: { id: user.uid } } as any)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="eye-outline" size={18} color={colors.primary} />
+            <Text style={styles.publicButtonText}>View Public Profile & Reviews</Text>
+          </TouchableOpacity>}
           <TouchableOpacity
             style={styles.editButton}
             onPress={() => router.push('/(app)/edit-profile' as any)}
@@ -312,6 +335,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   detailsSection: {
     width: '100%',
   },
@@ -397,6 +421,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
   },
+  publicButton: { borderRadius: borderRadius.full, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.primary },
+  publicButtonText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
   editButtonText: {
     color: '#000',
     fontSize: 15,

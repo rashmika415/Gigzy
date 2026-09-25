@@ -1,0 +1,19 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
+    function owns(userId) { return signedIn() && request.auth.uid == userId; }
+    function imageUnderFiveMb() {
+      return request.resource.size < 5 * 1024 * 1024 && request.resource.contentType.matches('image/.*');
+    }
+    match /profiles/{userId}/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if owns(userId) && imageUnderFiveMb();
+      allow delete: if owns(userId);
+    }
+    match /chat_attachments/{chatId}/{fileName} {
+      allow read: if signedIn();
+      allow write: if signedIn() && imageUnderFiveMb();
+    }
+  }
+}
