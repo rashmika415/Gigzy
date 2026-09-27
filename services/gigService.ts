@@ -1,6 +1,5 @@
 import {
   collection,
-  addDoc,
   getDocs,
   getDoc,
   query,
@@ -13,6 +12,7 @@ import {
   deleteDoc,
   onSnapshot,
   increment,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from '../FirebaseConfig';
 import {
@@ -49,7 +49,7 @@ export function parseFirebaseError(error: any): string {
     return 'Daily quota limit reached. Please try again later.';
   }
   if (code.includes('failed-precondition')) {
-    return 'Database query pre-condition missing. Retrying with fallback query...';
+    return 'Unable to load gigs because the database query is not configured. Please contact support.';
   }
   if (code.includes('invalid-argument')) {
     return 'Invalid gig data format. Please verify your form inputs.';
@@ -68,6 +68,21 @@ function generateSearchKeywords(title: string, category: string, skills: string[
     .split(/\s+/)
     .filter((w) => w.length > 1);
   return Array.from(new Set(words));
+}
+
+function waitForWrite<T>(promise: Promise<T>, timeoutMs: number): Promise<'synced' | 'pending'> {
+  return new Promise<'synced' | 'pending'>((resolve, reject) => {
+    const timer = setTimeout(() => resolve('pending'), timeoutMs);
+    promise.then(
+      () => { clearTimeout(timer); resolve('synced'); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
+export interface CreateGigResult {
+  id: string;
+  syncStatus: 'synced' | 'pending';
 }
 
 /**
@@ -161,8 +176,9 @@ export function validateGigForm(form: GigInput): { isValid: boolean; errors: Gig
  */
 export async function createGig(
   input: GigInput,
-  user: { uid: string; fullName?: string; email?: string }
-): Promise<string> {
+  user: { uid: string; fullName?: string; email?: string },
+  requestId?: string,
+): Promise<CreateGigResult> {
   const { isValid, errors } = validateGigForm(input);
   if (!isValid) {
     const firstError = Object.values(errors)[0];
@@ -202,21 +218,28 @@ export async function createGig(
   };
 
   try {
-    // 1. Create gig document in Firestore
-    const docRef = await addDoc(collection(db, 'gigs'), gigDocData);
+    // Reuse the same ID when a timed-out request is retried. Firestore may still
+    // deliver a queued write after the UI timeout, so this prevents duplicates.
+    const docRef = requestId
+      ? doc(db, 'gigs', requestId)
+      : doc(collection(db, 'gigs'));
+    const write = setDoc(docRef, gigDocData);
+    const syncStatus = await waitForWrite(write, 20000);
 
     // 2. Increment user's total gigs counter (best-effort)
     try {
       const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
+      const counterUpdate = updateDoc(userRef, {
         totalGigsPosted: increment(1),
         updatedAt: serverTimestamp(),
       });
+      if (syncStatus === 'synced') await counterUpdate;
+      else counterUpdate.catch(() => {});
     } catch {
       // Non-critical if user counter update fails
     }
 
-    return docRef.id;
+    return { id: docRef.id, syncStatus };
   } catch (error: any) {
     console.error('Firestore createGig error:', error);
     throw new Error(parseFirebaseError(error));
@@ -235,7 +258,8 @@ function sortGigsDesc(gigs: Gig[]): Gig[] {
 }
 
 /**
- * Subscribes to real-time updates for recent gigs with automatic index fallback.
+ * Subscribes to the newest gigs. Order on the server before limiting results;
+ * sorting a limited, unordered snapshot can permanently exclude new gigs.
  */
 export function subscribeToRecentGigs(
   limitCount = 10,
@@ -245,7 +269,8 @@ export function subscribeToRecentGigs(
   try {
     const q = query(
       collection(db, 'gigs'),
-      limit(limitCount * 2)
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
     );
 
     return onSnapshot(
@@ -452,13 +477,14 @@ export async function getGigById(gigId: string): Promise<Gig | null> {
 }
 
 /**
- * Fetches recent active gigs once from Cloud Firestore.
+ * Fetches the newest gigs once, using the same ordering as the live feed.
  */
 export async function getRecentGigs(limitCount = 10): Promise<Gig[]> {
   try {
     const q = query(
       collection(db, 'gigs'),
-      limit(limitCount * 2)
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
     );
     const snapshot = await getDocs(q);
     const rawGigs = snapshot.docs.map((d) => ({
@@ -468,7 +494,7 @@ export async function getRecentGigs(limitCount = 10): Promise<Gig[]> {
     return sortGigsDesc(rawGigs).slice(0, limitCount);
   } catch (error) {
     console.error('Error fetching recent gigs:', error);
-    return [];
+    throw new Error(parseFirebaseError(error));
   }
 }
 
@@ -489,7 +515,7 @@ export async function getGigsByClient(userId: string): Promise<Gig[]> {
     return sortGigsDesc(rawGigs);
   } catch (error) {
     console.error('Error fetching client gigs:', error);
-    return [];
+    throw new Error(parseFirebaseError(error));
   }
 }
 

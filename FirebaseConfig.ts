@@ -3,9 +3,10 @@ import { initializeApp } from "firebase/app";
 // @ts-expect-error getReactNativePersistence ships in the RN build of firebase/auth
 // (resolved by Metro's "react-native" export condition) but isn't in the package's public types.
 import { initializeAuth, getReactNativePersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -24,7 +25,12 @@ const app = initializeApp(firebaseConfig);
 export const auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage),
 });
-export const db = getFirestore(app);
+// Firestore's streaming transport can be buffered indefinitely by some mobile
+// networks/proxies. Native builds use long polling so writes either complete or
+// surface an error instead of leaving the UI stuck on "Persisting...".
+export const db = initializeFirestore(app, {
+    experimentalForceLongPolling: Platform.OS !== "web",
+});
 export const storage = getStorage(app);
 
 export default app;

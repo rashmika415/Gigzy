@@ -5,7 +5,7 @@ service cloud.firestore {
     function owns(userId) { return signedIn() && request.auth.uid == userId; }
     function currentUser() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
     function isAdmin() { return signedIn() && currentUser().data.role == 'admin'; }
-    function active() { return signedIn() && currentUser().data.suspended != true; }
+    function active() { return signedIn() && currentUser().data.get('suspended', false) != true; }
     function validRole() { return request.resource.data.role in ['freelancer', 'client']; }
     function protectedUserFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
@@ -18,7 +18,8 @@ service cloud.firestore {
       allow create: if owns(userId) && validRole()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
-        && request.resource.data.suspended != true && request.resource.data.isVerified != true;
+        && request.resource.data.get('suspended', false) != true
+        && request.resource.data.get('isVerified', false) != true;
       allow update: if isAdmin() || (owns(userId) && active() && protectedUserFieldsUnchanged());
       allow delete: if false;
       match /notifications/{notificationId} {
