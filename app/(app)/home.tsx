@@ -17,6 +17,7 @@ import { colors, spacing, borderRadius } from '../../constants/theme';
 import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig } from '../../services/gigService';
 import { subscribeToUserChats, getOrCreateChat } from '../../services/chatService';
 import { Gig } from '../../types/gig';
+import { subscribeToNotifications } from '../../services/notificationService';
 
 export default function Home() {
   const { user, userData } = useAuth();
@@ -27,6 +28,7 @@ export default function Home() {
   const [loadingGigs, setLoadingGigs] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [startingChatGigId, setStartingChatGigId] = useState<string | null>(null);
 
   // Real-time unread messages listener
@@ -41,6 +43,13 @@ export default function Home() {
       () => {}
     );
     return () => unsubChats();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    return subscribeToNotifications(user.uid, (items) => {
+      setUnreadNotificationCount(items.filter((item) => !item.read).length);
+    }, () => {});
   }, [user]);
 
   // Real-time Firestore synchronization
@@ -183,6 +192,16 @@ export default function Home() {
           </View>
 
           <View style={styles.headerActionsRight}>
+            <TouchableOpacity
+              style={styles.messagesHeaderBtn}
+              onPress={() => router.push('/(app)/notifications' as any)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="notifications-outline" size={22} color={colors.primary} />
+              {unreadNotificationCount > 0 && (
+                <View style={styles.headerBadgePill}><Text style={styles.headerBadgeText}>{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</Text></View>
+              )}
+            </TouchableOpacity>
             {/* Messages inbox button */}
             <TouchableOpacity
               style={styles.messagesHeaderBtn}
