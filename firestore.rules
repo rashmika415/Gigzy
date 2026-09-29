@@ -5,7 +5,11 @@ service cloud.firestore {
     function owns(userId) { return signedIn() && request.auth.uid == userId; }
     function currentUser() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
     function isAdmin() { return signedIn() && currentUser().data.role == 'admin'; }
-    function active() { return signedIn() && currentUser().data.get('suspended', false) != true; }
+    function active() {
+      return signedIn() &&
+        (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          || currentUser().data.get('suspended', false) != true);
+    }
     function validRole() { return request.resource.data.role in ['freelancer', 'client']; }
     function protectedUserFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
