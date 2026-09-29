@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -68,8 +68,10 @@ export default function PostGigScreen() {
   const [submissionStage, setSubmissionStage] = useState<SubmissionStage>('idle');
   const [submitError, setSubmitError] = useState('');
   const [createdGigId, setCreatedGigId] = useState('');
+  const [syncPending, setSyncPending] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showDatePickerModal, setShowDatePickerModal] = useState(false);
+  const pendingGigId = useRef<string | null>(null);
 
   // Selected date components for picker modal
   const [pickerDate, setPickerDate] = useState(() => {
@@ -206,13 +208,18 @@ export default function PostGigScreen() {
     setSubmissionStage('saving');
 
     try {
-      const gigId = await createGig(form, {
+      if (!pendingGigId.current) {
+        pendingGigId.current = `gig_${user.uid}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      }
+      const result = await createGig(form, {
         uid: user.uid,
         fullName: userData?.fullName || user.displayName || 'Business Owner',
         email: userData?.email || user.email || '',
-      });
+      }, pendingGigId.current);
 
-      setCreatedGigId(gigId);
+      setCreatedGigId(result.id);
+      setSyncPending(result.syncStatus === 'pending');
+      pendingGigId.current = null;
       setSubmissionStage('done');
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -246,7 +253,9 @@ export default function PostGigScreen() {
     setErrors({});
     setSubmitError('');
     setCreatedGigId('');
+    setSyncPending(false);
     setSubmissionStage('idle');
+    pendingGigId.current = null;
     setShowSuccessModal(false);
   };
 
@@ -1028,9 +1037,13 @@ export default function PostGigScreen() {
               <Ionicons name="checkmark-circle" size={54} color={colors.primary} />
             </View>
 
-            <Text style={styles.successTitle}>Gig Published! 🎉</Text>
+            <Text style={styles.successTitle}>
+              {syncPending ? 'Gig queued for publishing' : 'Gig Published! 🎉'}
+            </Text>
             <Text style={styles.successSubtitle}>
-              {`"${form.title}" has been saved to Cloud Firestore and is now active on the marketplace.`}
+              {syncPending
+                ? `"${form.title}" is visible on this device and will sync to Firebase when the connection responds.`
+                : `"${form.title}" has been saved to Cloud Firestore and is now active on the marketplace.`}
             </Text>
 
             {/* Assigned Gig ID Badge */}

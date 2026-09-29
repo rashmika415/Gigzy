@@ -9,6 +9,7 @@ export interface UserData {
   email: string;
   role: 'freelancer' | 'client' | 'admin';
   phone?: string;
+  age?: number;
   photoURL?: string;
   bio?: string;
   skills?: string;
@@ -17,6 +18,15 @@ export interface UserData {
   businessCategory?: string;
   businessDetails?: string;
   location?: string;
+  address?: string;
+  ratingAverage?: number;
+  ratingCount?: number;
+  skillBadges?: import('../types/profile').SkillBadge[];
+  endorsements?: import('../types/profile').CommunityEndorsement[];
+  isVerified?: boolean;
+  suspended?: boolean;
+  suspensionReason?: string;
+  notifyOnMatch?: boolean;
   createdAt?: any;
   updatedAt?: any;
 }
