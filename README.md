@@ -10,7 +10,44 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Set up your environment variables
+
+   This app connects to Firebase (Auth, Firestore, Storage). Credentials are read from
+   `EXPO_PUBLIC_*` env vars, not hardcoded, so each teammate can point at their own project.
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Then open `.env` and fill in the six values from your Firebase project:
+   **Firebase console → Project settings → General → Your apps → SDK setup and configuration.**
+
+   ```
+   EXPO_PUBLIC_FIREBASE_API_KEY=
+   EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=
+   EXPO_PUBLIC_FIREBASE_PROJECT_ID=
+   EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=
+   EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+   EXPO_PUBLIC_FIREBASE_APP_ID=
+   ```
+
+   `.env` is gitignored and never committed — `.env.example` is the template everyone copies.
+   The app will throw a clear error naming any variable you forgot to set.
+
+   > **Current status:** the shared project is `local-workers-74bdd`. Auth (email/password) and
+   > Firestore are provisioned, with `firestore.rules`/`firestore.indexes.json` deployed and
+   > verified working — sign up, sign in, and profile creation all confirmed live. **Cloud
+   > Storage is not enabled yet** (optional — only blocks profile photo/logo upload and chat
+   > image attachments; everything else works without it). To pick up any future rules/index
+   > changes, or to enable Storage later, deploy with:
+   > ```bash
+   > npm install -g firebase-tools
+   > firebase login
+   > firebase deploy --only firestore:rules,firestore:indexes,storage
+   > ```
+   > (drop `,storage` until Cloud Storage is enabled in the console)
+
+3. Start the app
 
    ```bash
    npx expo start

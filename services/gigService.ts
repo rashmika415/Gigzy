@@ -417,6 +417,54 @@ export function filterAndSortGigs(gigs: Gig[], options: GigFilterOptions): Gig[]
 }
 
 /**
+ * Updates all editable fields of an existing gig in Cloud Firestore.
+ */
+export async function updateGig(
+  gigId: string,
+  input: GigInput,
+  user: { uid: string },
+): Promise<{ id: string; syncStatus: 'synced' | 'pending' }> {
+  const { isValid, errors } = validateGigForm(input);
+  if (!isValid) {
+    const firstError = Object.values(errors)[0];
+    throw new Error(firstError || 'Validation failed. Please check form inputs.');
+  }
+
+  const numericPay = parseFloat(input.pay.replace(/[^0-9.]/g, ''));
+  const finalLocation =
+    input.locationType === 'remote'
+      ? input.location.trim() || 'Remote (Work from Anywhere)'
+      : input.location.trim();
+
+  const cleanSkills = input.skills.filter((s) => s.trim().length > 0);
+  const keywords = generateSearchKeywords(input.title, input.category, cleanSkills, finalLocation);
+
+  const gigDocData = {
+    title: input.title.trim(),
+    description: input.description.trim(),
+    category: input.category.trim(),
+    pay: numericPay,
+    payType: input.payType,
+    date: input.date.trim(),
+    location: finalLocation,
+    locationType: input.locationType,
+    skills: cleanSkills,
+    searchKeywords: keywords,
+    updatedAt: serverTimestamp(),
+  };
+
+  try {
+    const docRef = doc(db, 'gigs', gigId);
+    const write = updateDoc(docRef, gigDocData);
+    const syncStatus = await waitForWrite(write, 20000);
+    return { id: gigId, syncStatus };
+  } catch (error: any) {
+    console.error('Firestore updateGig error:', error);
+    throw new Error(parseFirebaseError(error));
+  }
+}
+
+/**
  * Updates the status of a gig (e.g. 'open' -> 'in-progress' -> 'completed' -> 'cancelled').
  */
 export async function updateGigStatus(gigId: string, status: GigStatus): Promise<void> {
