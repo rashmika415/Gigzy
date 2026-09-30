@@ -75,7 +75,27 @@ const STATUS_CONFIG: Record<
 };
 
 export default function MyGigs() {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
+  const role = userData?.role;
+
+  // Role guard: only business owners (clients) can manage gigs
+  useEffect(() => {
+    if (userData && role !== 'client') {
+      Alert.alert(
+        'Access Restricted',
+        'This page is for business owners to manage their posted gigs.',
+        [{ text: 'OK', onPress: () => router.back() }],
+      );
+    }
+  }, [userData, role]);
+
+  if (userData && role !== 'client') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 15 }}>Redirecting...</Text>
+      </SafeAreaView>
+    );
+  }
 
   // Data states
   const [allGigs, setAllGigs] = useState<Gig[]>([]);

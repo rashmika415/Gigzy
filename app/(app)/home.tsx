@@ -235,7 +235,8 @@ export default function Home() {
           </View>
         </View>
 
-        {/* Business Owner / Post Gig CTA Banner */}
+        {/* Business Owner / Post Gig CTA Banner — only visible to clients */}
+        {role === 'client' && (
         <View style={styles.ctaCard}>
           <View style={styles.ctaBadge}>
             <Ionicons name="flash" size={14} color="#080B14" />
@@ -276,6 +277,7 @@ export default function Home() {
             </TouchableOpacity>
           </View>
         </View>
+        )}
 
         {/* Quick stats row */}
         <View style={styles.statsRow}>
@@ -329,12 +331,7 @@ export default function Home() {
                 <Text style={styles.seeAllText}>Manage All ({gigs.length}) →</Text>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/post-gig' as any)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.seeAllText}>+ Post Gig</Text>
-              </TouchableOpacity>
+              <Text style={styles.seeAllText}>Browse All</Text>
             )}
           </View>
 
