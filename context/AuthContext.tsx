@@ -69,12 +69,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (snapshot.exists()) {
             setUserData(snapshot.data() as UserData);
           } else {
-            // Fallback profile if Firestore doc hasn't been written yet
+            // Fallback profile if Firestore doc hasn't been written yet.
+            // NOTE: This is a temporary state — onSnapshot will deliver the
+            // real document (with the correct role) within milliseconds. The
+            // fallback prevents a null-userData crash in the meantime.
             setUserData({
               uid: firebaseUser.uid,
               fullName: firebaseUser.displayName || 'User',
               email: firebaseUser.email || '',
-              role: 'freelancer', // default fallback
+              role: 'freelancer', // safe default; overwritten once Firestore doc arrives
             });
           }
           setLoading(false);
@@ -97,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setRoleForTesting = (role: 'freelancer' | 'client' | 'admin') => {
+    if (!__DEV__) return; // No-op in production builds
     if (userData) {
       setUserData({
         ...userData,

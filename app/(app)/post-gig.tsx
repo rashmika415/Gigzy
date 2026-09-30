@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Modal,
   Animated,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,6 +48,26 @@ type SubmissionStage = 'idle' | 'validating' | 'saving' | 'done';
 
 export default function PostGigScreen() {
   const { user, userData } = useAuth();
+  const role = userData?.role;
+
+  // Role guard: only business owners (clients) can post gigs
+  useEffect(() => {
+    if (userData && role !== 'client') {
+      Alert.alert(
+        'Access Restricted',
+        'Only business owners can post gigs. Switch to a business account to create listings.',
+        [{ text: 'OK', onPress: () => router.back() }],
+      );
+    }
+  }, [userData, role]);
+
+  if (userData && role !== 'client') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 15 }}>Redirecting...</Text>
+      </SafeAreaView>
+    );
+  }
 
   // Form State
   const [form, setForm] = useState<GigInput>({

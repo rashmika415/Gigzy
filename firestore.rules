@@ -54,7 +54,8 @@ service cloud.firestore {
     }
     match /gigs/{gigId} {
       allow read: if signedIn();
-      allow create: if active() && request.resource.data.postedBy.uid == request.auth.uid
+      allow create: if active() && currentUser().data.role == 'client'
+        && request.resource.data.postedBy.uid == request.auth.uid
         && request.resource.data.title is string && request.resource.data.title.size() >= 5
         && request.resource.data.description is string && request.resource.data.description.size() >= 20
         && request.resource.data.pay is number && request.resource.data.pay > 0
