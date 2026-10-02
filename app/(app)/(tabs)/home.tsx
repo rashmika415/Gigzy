@@ -12,12 +12,12 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useAuth } from '../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../constants/theme';
-import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig } from '../../services/gigService';
-import { subscribeToUserChats, getOrCreateChat } from '../../services/chatService';
-import { Gig } from '../../types/gig';
-import { subscribeToNotifications } from '../../services/notificationService';
+import { useAuth } from '../../../context/AuthContext';
+import { colors, spacing, borderRadius } from '../../../constants/theme';
+import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig } from '../../../services/gigService';
+import { subscribeToUserChats, getOrCreateChat } from '../../../services/chatService';
+import { Gig } from '../../../types/gig';
+import { subscribeToNotifications } from '../../../services/notificationService';
 
 export default function Home() {
   const { user, userData } = useAuth();
@@ -126,7 +126,7 @@ export default function Home() {
       return;
     }
     if (gig.postedBy?.uid === user.uid) {
-      router.push('/(app)/my-gigs' as any);
+      router.push('/(app)/(tabs)/my-gigs' as any);
       return;
     }
 
@@ -209,7 +209,7 @@ export default function Home() {
                 try {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 } catch {}
-                router.push('/(app)/messages' as any);
+                router.push('/(app)/(tabs)/messages' as any);
               }}
               activeOpacity={0.8}
             >
@@ -225,7 +225,7 @@ export default function Home() {
 
             <TouchableOpacity
               style={styles.avatarCircle}
-              onPress={() => router.push('/(app)/profile' as any)}
+              onPress={() => router.push('/(app)/(tabs)/profile' as any)}
               activeOpacity={0.8}
             >
               <Text style={styles.avatarText}>
@@ -268,7 +268,7 @@ export default function Home() {
                 try {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 } catch {}
-                router.push('/(app)/my-gigs' as any);
+                router.push('/(app)/(tabs)/my-gigs' as any);
               }}
               activeOpacity={0.85}
             >
@@ -286,13 +286,13 @@ export default function Home() {
               label: role === 'client' ? 'Gigs Posted' : 'Gigs Active',
               value: gigs.length.toString(),
               emoji: '💼',
-              onPress: role === 'client' ? () => router.push('/(app)/my-gigs' as any) : undefined,
+              onPress: role === 'client' ? () => router.push('/(app)/(tabs)/my-gigs' as any) : undefined,
             },
             {
               label: role === 'client' ? 'Total Value' : 'Earnings',
               value: `$${gigs.reduce((acc, g) => acc + (g.pay || 0), 0).toLocaleString()}`,
               emoji: '💰',
-              onPress: role === 'client' ? () => router.push('/(app)/my-gigs' as any) : undefined,
+              onPress: role === 'client' ? () => router.push('/(app)/(tabs)/my-gigs' as any) : undefined,
             },
             { label: 'Rating', value: '5.0', emoji: '⭐', onPress: undefined },
           ].map((stat) => (
@@ -325,7 +325,7 @@ export default function Home() {
 
             {role === 'client' ? (
               <TouchableOpacity
-                onPress={() => router.push('/(app)/my-gigs' as any)}
+                onPress={() => router.push('/(app)/(tabs)/my-gigs' as any)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Text style={styles.seeAllText}>Manage All ({gigs.length}) →</Text>
@@ -363,7 +363,7 @@ export default function Home() {
                   style={styles.gigItemCard}
                   onPress={() => {
                     if (role === 'client') {
-                      router.push('/(app)/my-gigs' as any);
+                      router.push('/(app)/(tabs)/my-gigs' as any);
                     }
                   }}
                   activeOpacity={role === 'client' ? 0.85 : 1}

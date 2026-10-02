@@ -4,6 +4,19 @@ import { colors } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { registerDeviceForPush } from '../../services/pushNotificationService';
 
+/**
+ * App layout — wraps the tab navigator and all stack-pushed screens.
+ *
+ * Structure:
+ *   Stack
+ *   ├── (tabs)      → Tab navigator (Home, Browse/My Gigs, Messages, Profile)
+ *   ├── post-gig    → Pushes on top of tabs
+ *   ├── edit-profile → Pushes on top of tabs
+ *   ├── notifications → Pushes on top of tabs
+ *   ├── suspended   → Redirect screen
+ *   ├── chat/[id]   → Pushes on top of tabs
+ *   └── profile/[id] → Pushes on top of tabs
+ */
 export default function AppLayout() {
   const { user, userData, loading } = useAuth();
   const router = useRouter();
@@ -18,7 +31,7 @@ export default function AppLayout() {
   useEffect(() => {
     if (loading || !user || !userData) return;
     if (userData.suspended && pathname !== '/suspended') router.replace('/(app)/suspended');
-    if (!userData.suspended && pathname === '/suspended') router.replace('/(app)/home');
+    if (!userData.suspended && pathname === '/suspended') router.replace('/(app)/(tabs)/home');
   }, [loading, pathname, router, user, userData]);
 
   useEffect(() => {
@@ -32,7 +45,19 @@ export default function AppLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
+        animation: 'slide_from_right',
       }}
-    />
+    >
+      {/* Tab navigator — rendered as the initial/default screen */}
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+
+      {/* Stack-pushed screens (slide in from right, cover the tabs) */}
+      <Stack.Screen name="post-gig" options={{ headerShown: false }} />
+      <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
+      <Stack.Screen name="notifications" options={{ headerShown: false }} />
+      <Stack.Screen name="suspended" options={{ headerShown: false }} />
+      <Stack.Screen name="chat" options={{ headerShown: false }} />
+      <Stack.Screen name="profile" options={{ headerShown: false }} />
+    </Stack>
   );
 }
