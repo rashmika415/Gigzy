@@ -12,9 +12,9 @@ import {
 import { router } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import { Ionicons } from '@expo/vector-icons';
-import { auth } from '../../FirebaseConfig';
-import { useAuth } from '../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { auth } from '../../../FirebaseConfig';
+import { useAuth } from '../../../context/AuthContext';
+import { colors, spacing, borderRadius } from '../../../constants/theme';
 
 export default function Profile() {
   const { user, userData, loading } = useAuth();

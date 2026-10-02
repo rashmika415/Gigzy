@@ -14,10 +14,10 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useAuth } from '../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../constants/theme';
-import { subscribeToUserChats } from '../../services/chatService';
-import { Chat, ParticipantDetail } from '../../types/chat';
+import { useAuth } from '../../../context/AuthContext';
+import { colors, spacing, borderRadius } from '../../../constants/theme';
+import { subscribeToUserChats } from '../../../services/chatService';
+import { Chat, ParticipantDetail } from '../../../types/chat';
 
 function formatTimestamp(timestamp: any): string {
   if (!timestamp) return '';
@@ -155,7 +155,7 @@ export default function MessagesScreen() {
 
         <TouchableOpacity
           style={styles.headerActionBtn}
-          onPress={() => router.push('/(app)/home' as any)}
+          onPress={() => router.push('/(app)/(tabs)/home' as any)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons name="compass-outline" size={22} color={colors.primary} />
@@ -255,7 +255,7 @@ export default function MessagesScreen() {
             {!searchQuery && (
               <TouchableOpacity
                 style={styles.exploreButton}
-                onPress={() => router.push('/(app)/home' as any)}
+                onPress={() => router.push('/(app)/(tabs)/home' as any)}
                 activeOpacity={0.85}
               >
                 <Ionicons name="briefcase-outline" size={18} color="#003731" />

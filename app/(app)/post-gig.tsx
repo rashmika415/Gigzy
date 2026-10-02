@@ -1105,7 +1105,7 @@ export default function PostGigScreen() {
                 style={styles.primaryModalBtn}
                 onPress={() => {
                   setShowSuccessModal(false);
-                  router.replace('/(app)/home' as any);
+                  router.replace('/(app)/(tabs)/home' as any);
                 }}
                 activeOpacity={0.8}
               >

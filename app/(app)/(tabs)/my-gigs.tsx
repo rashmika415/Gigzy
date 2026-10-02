@@ -16,8 +16,8 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { borderRadius, colors, shadows, spacing } from "../../constants/theme";
-import { useAuth } from "../../context/AuthContext";
+import { borderRadius, colors, shadows, spacing } from "../../../constants/theme";
+import { useAuth } from "../../../context/AuthContext";
 import {
     calculateBusinessGigStats,
     deleteGig,
@@ -25,14 +25,14 @@ import {
     getGigsByClient,
     subscribeToClientGigs,
     updateGigStatus,
-} from "../../services/gigService";
+} from "../../../services/gigService";
 import {
     BusinessGigStats,
     Gig,
     GIG_CATEGORIES,
     GigSortOption,
     GigStatus,
-} from "../../types/gig";
+} from "../../../types/gig";
 
 const STATUS_CONFIG: Record<
   GigStatus,
@@ -294,7 +294,7 @@ export default function MyGigs() {
               try {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               } catch {}
-              router.push("/(app)/messages" as any);
+              router.push("/(app)/(tabs)/messages" as any);
             }}
             activeOpacity={0.8}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
