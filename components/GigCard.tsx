@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../constants/theme';
 import StatusPill from './StatusPill';
 import Chip from './Chip';
+import { categoryId } from '../services/discoveryFilters';
+import { GIG_CATEGORIES } from '../types/gig';
 import type { Gig } from '../types/gig';
 
 interface GigCardProps {
@@ -43,7 +45,7 @@ export default function GigCard({
       {/* ── Top Row: category & status ── */}
       <View style={styles.topRow}>
         <View style={styles.categoryBadge}>
-          <Text style={styles.categoryText}>{gig.category}</Text>
+          <Text style={styles.categoryText}>{GIG_CATEGORIES.find(category => category.id === categoryId(gig.category))?.name ?? gig.category}</Text>
         </View>
 
         <StatusPill
@@ -92,7 +94,7 @@ export default function GigCard({
         <View style={styles.metaItem}>
           <Ionicons name={locationIcon as any} size={13} color={colors.textSecondary} />
           <Text style={styles.metaText} numberOfLines={1}>
-            {gig.location || 'Remote'}
+            {gig.location || 'Remote'}{gig.distanceKm !== undefined ? ` - ${gig.distanceKm.toFixed(1)} km` : ''}
           </Text>
         </View>
 

@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { GIG_CATEGORIES, GigInput, GigValidationErrors, LocationType } from '../../types/gig';
+import { FormField, GigLocationField } from '../../components';
 import { createGig, validateGigForm } from '../../services/gigService';
 
 // Quick date helper presets
@@ -51,24 +52,6 @@ export default function PostGigScreen() {
   const role = userData?.role;
 
   // Role guard: only business owners (clients) can post gigs
-  useEffect(() => {
-    if (userData && role !== 'client') {
-      Alert.alert(
-        'Access Restricted',
-        'Only business owners can post gigs. Switch to a business account to create listings.',
-        [{ text: 'OK', onPress: () => router.back() }],
-      );
-    }
-  }, [userData, role]);
-
-  if (userData && role !== 'client') {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: colors.textSecondary, fontSize: 15 }}>Redirecting...</Text>
-      </SafeAreaView>
-    );
-  }
-
   // Form State
   const [form, setForm] = useState<GigInput>({
     title: '',
@@ -279,6 +262,24 @@ export default function PostGigScreen() {
     pendingGigId.current = null;
     setShowSuccessModal(false);
   };
+
+  useEffect(() => {
+    if (userData && role !== 'client') {
+      Alert.alert(
+        'Access Restricted',
+        'Only business owners can post gigs. Switch to a business account to create listings.',
+        [{ text: 'OK', onPress: () => router.back() }],
+      );
+    }
+  }, [userData, role]);
+
+  if (userData && role !== 'client') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 15 }}>Redirecting...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -864,7 +865,7 @@ export default function PostGigScreen() {
                   }
                   placeholderTextColor={colors.textMuted}
                   value={form.location}
-                  onChangeText={(val) => handleChange('location', val)}
+                  onChangeText={(val) => setForm(previous => ({ ...previous, location: val, coordinates: undefined }))}
                   onBlur={() => handleBlur('location')}
                   editable={!loading}
                 />
@@ -877,6 +878,15 @@ export default function PostGigScreen() {
               )}
             </View>
           </View>
+
+          <View style={styles.fieldGroup}>
+            <FormField label="Gig start time (optional)" value={form.time ?? ''} placeholder="HH:MM (24-hour)" error={errors.time} editable={!loading}
+              onChangeText={time => handleChange('time', time)} hint="Use the local time at the gig location." />
+          </View>
+          {form.locationType !== 'remote' && <View style={styles.fieldGroup}>
+            <GigLocationField key={form.location} address={form.location} value={form.coordinates} error={errors.coordinates} disabled={loading}
+              onChange={coordinates => { handleChange('coordinates', coordinates); setErrors(previous => ({ ...previous, coordinates: undefined })); }} />
+          </View>}
 
           {/* ============================================================ */}
           {/* SUBMIT BUTTON */}

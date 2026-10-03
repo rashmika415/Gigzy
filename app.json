@@ -55,6 +55,12 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Gigzy to find nearby gigs and set gig locations."
+        }
       ]
     ],
     "experiments": {

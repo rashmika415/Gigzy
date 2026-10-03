@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -41,7 +41,7 @@ export default function FormField({
   onBlur,
   ...inputProps
 }: FormFieldProps) {
-  const borderAnim = useRef(new Animated.Value(0)).current;
+  const borderAnim = useState(() => new Animated.Value(0))[0];
 
   const handleFocus = (e: any) => {
     Animated.timing(borderAnim, {
