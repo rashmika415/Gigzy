@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { colors } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
+import { SavedGigsProvider } from '../../context/SavedGigsContext';
 import { registerDeviceForPush } from '../../services/pushNotificationService';
 
 /**
@@ -41,6 +42,7 @@ export default function AppLayout() {
   }, [loading, user, userData]);
 
   return (
+    <SavedGigsProvider>
     <Stack
       screenOptions={{
         headerShown: false,
@@ -60,5 +62,6 @@ export default function AppLayout() {
       <Stack.Screen name="profile" options={{ headerShown: false }} />
       <Stack.Screen name="gig" options={{ headerShown: false }} />
     </Stack>
+    </SavedGigsProvider>
   );
 }

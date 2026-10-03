@@ -18,6 +18,7 @@ import { colors, spacing, borderRadius } from '../../../constants/theme';
 import { subscribeToGig } from '../../../services/gigService';
 import { getOrCreateChat } from '../../../services/chatService';
 import { StatusPill, Chip, LoadingState, ErrorState } from '../../../components';
+import BookmarkButton from '../../../components/BookmarkButton';
 import { distanceKm, validCoordinates } from '../../../services/discoveryFilters';
 import { getCurrentCoordinates } from '../../../services/locationService';
 import type { Gig } from '../../../types/gig';
@@ -187,6 +188,7 @@ export default function GigDetailScreen() {
 
           {/* Title */}
           <Text style={styles.gigTitle}>{gig.title}</Text>
+          {role === 'freelancer' && <BookmarkButton gigId={gig.id} title={gig.title} showLabel />}
 
           {/* Posted by & time */}
           <View style={styles.postedRow}>

@@ -7,7 +7,7 @@ import type { ComponentProps } from 'react';
 type BottomTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
 const icons: Record<string, ComponentProps<typeof TabBar>['tabs'][number]['icon']> = {
-  home: 'home-outline', browse: 'compass-outline', 'my-gigs': 'briefcase-outline', messages: 'chatbubbles-outline', profile: 'person-outline',
+  home: 'home-outline', browse: 'compass-outline', saved: 'bookmark-outline', 'my-gigs': 'briefcase-outline', messages: 'chatbubbles-outline', profile: 'person-outline',
 };
 function SharedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   return <TabBar activeTab={state.routes[state.index].key}
@@ -27,6 +27,7 @@ export default function TabLayout() {
     <Tabs.Screen name="home" options={{ title: 'Home' }} />
     <Tabs.Protected guard={userData.role === 'freelancer'}>
       <Tabs.Screen name="browse" options={{ title: 'Browse' }} />
+      <Tabs.Screen name="saved" options={{ title: 'Saved' }} />
     </Tabs.Protected>
     <Tabs.Protected guard={userData.role === 'client'}>
       <Tabs.Screen name="my-gigs" options={{ title: 'My Gigs' }} />

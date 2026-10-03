@@ -109,7 +109,7 @@ export default function BrowseScreen() {
   const renderGigItem = useCallback(
     ({ item }: { item: Gig }) => (
       <View style={styles.cardWrapper}>
-        <GigCard gig={item} onPress={handleGigPress} />
+        <GigCard gig={item} onPress={handleGigPress} showBookmark />
       </View>
     ),
     [handleGigPress],
