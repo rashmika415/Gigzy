@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, borderRadius } from '../constants/theme';
@@ -26,8 +27,9 @@ interface TabBarProps {
 }
 
 export default function TabBar({ tabs, activeTab, onTabPress }: TabBarProps) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 12) }]}>
       {tabs.map((tab) => {
         const isActive = tab.key === activeTab;
         const iconName = isActive && tab.activeIcon ? tab.activeIcon : tab.icon;
@@ -37,6 +39,9 @@ export default function TabBar({ tabs, activeTab, onTabPress }: TabBarProps) {
             key={tab.key}
             style={styles.tab}
             onPress={() => onTabPress(tab.key)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
+            accessibilityLabel={tab.label}
             activeOpacity={0.7}
           >
             <View style={styles.iconWrapper}>

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   RefreshControl,
   TouchableOpacity,
@@ -11,12 +10,14 @@ import {
   Modal,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import DiscoveryFilters from '../../../components/DiscoveryFilters';
+import { useGigDiscovery } from '../../../hooks/useGigDiscovery';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../../constants/theme';
-import { subscribeToRecentGigs, filterAndSortGigs } from '../../../services/gigService';
 import {
   GigCard,
   SearchBar,
@@ -24,7 +25,7 @@ import {
   LoadingState,
   ErrorState,
 } from '../../../components';
-import type { Gig, GigSortOption, LocationType } from '../../../types/gig';
+import type { Gig, GigSortOption, LocationType, GigFilterOptions } from '../../../types/gig';
 import { GIG_CATEGORIES } from '../../../types/gig';
 
 // ── Sort options config ──
@@ -45,79 +46,31 @@ const LOCATION_OPTIONS: { key: LocationType | 'all'; label: string; icon: keyof 
 ];
 
 export default function BrowseScreen() {
-  const { user } = useAuth();
-
-  // ── Data state ──
-  const [gigs, setGigs] = useState<Gig[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
-
-  // ── Filter state ──
+  const { user, userData } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [keyword, setKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState<LocationType | 'all'>('all');
   const [selectedSort, setSelectedSort] = useState<GigSortOption>('newest');
   const [sortModalVisible, setSortModalVisible] = useState(false);
-
-  // ── Real-time subscription ──
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState<GigFilterOptions>({});
   useEffect(() => {
-    if (!user) return;
-
-    setLoading(true);
-    setError('');
-
-    const unsubscribe = subscribeToRecentGigs(
-      100,
-      (recentGigs) => {
-        setGigs(recentGigs);
-        setLoading(false);
-        setRefreshing(false);
-      },
-      (err) => {
-        setError(err.message);
-        setLoading(false);
-        setRefreshing(false);
-      },
-    );
-
-    return () => unsubscribe();
-  }, [user]);
-
-  // ── Derived: apply all filters ──
-  const filteredGigs = useMemo(() => {
-    // 1. Only open gigs for the browse feed
-    let result = gigs.filter((g) => g.status === 'open');
-
-    // 2. Use the service-layer filter for category + search + sort
-    result = filterAndSortGigs(result, {
-      status: 'open',
-      category: selectedCategory !== 'all' ? selectedCategory : undefined,
-      searchQuery: searchQuery.trim() || undefined,
-      sortBy: selectedSort,
-    });
-
-    // 3. Location type filter (not in the existing service utility)
-    if (selectedLocation !== 'all') {
-      result = result.filter((g) => g.locationType === selectedLocation);
-    }
-
-    return result;
-  }, [gigs, searchQuery, selectedCategory, selectedLocation, selectedSort]);
-
-  // ── Counts for active filters badge ──
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (selectedCategory !== 'all') count++;
-    if (selectedLocation !== 'all') count++;
-    if (selectedSort !== 'newest') count++;
-    return count;
-  }, [selectedCategory, selectedLocation, selectedSort]);
-
-  const hasAnyFilter = searchQuery.trim().length > 0 || activeFilterCount > 0;
+    const timer = setTimeout(() => setKeyword(searchQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  const options = useMemo(() => ({ ...advancedFilters, status: 'open' as const,
+    category: selectedCategory, locationType: selectedLocation, sortBy: selectedSort, searchQuery: keyword,
+  }), [advancedFilters, selectedCategory, selectedLocation, selectedSort, keyword]);
+  const { gigs: filteredGigs, loading, error, refreshing, loadingMore, hasMore, refresh, loadMore } =
+    useGigDiscovery(options, !!user && userData?.role === 'freelancer' && !userData.suspended);
+  const activeFilterCount = (selectedCategory !== 'all' ? 1 : 0) + (selectedLocation !== 'all' ? 1 : 0)
+    + (selectedSort !== 'newest' ? 1 : 0) + Object.entries(advancedFilters).filter(([key, value]) =>
+      key !== 'origin' && value !== undefined && value !== '' && value !== false && value !== 'all').length;
+  const hasAnyFilter = !!searchQuery.trim() || activeFilterCount > 0;
 
   // ── Handlers ──
-  const handleRefresh = () => setRefreshing(true);
+  const handleRefresh = refresh;
 
   const handleGigPress = useCallback((gig: Gig) => {
     router.push({
@@ -132,6 +85,8 @@ export default function BrowseScreen() {
     setSelectedCategory('all');
     setSelectedLocation('all');
     setSelectedSort('newest');
+    setKeyword('');
+    setAdvancedFilters({});
   };
 
   const handleCategoryPress = (catId: string) => {
@@ -163,7 +118,7 @@ export default function BrowseScreen() {
   const currentSortLabel = SORT_OPTIONS.find((s) => s.key === selectedSort)?.label ?? 'Newest';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
       {/* Background blobs */}
       <View style={styles.blob1} />
       <View style={styles.blob2} />
@@ -174,14 +129,14 @@ export default function BrowseScreen() {
           <Text style={styles.title}>Browse Gigs</Text>
           <Text style={styles.subtitle}>
             {filteredGigs.length} open{' '}
-            {filteredGigs.length === 1 ? 'opportunity' : 'opportunities'}
+            {filteredGigs.length === 1 ? 'opportunity loaded' : 'opportunities loaded'}
             {hasAnyFilter ? ' (filtered)' : ''}
           </Text>
         </View>
-        <View style={styles.liveIndicator}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveText}>Live</Text>
-        </View>
+        <TouchableOpacity style={styles.liveIndicator} onPress={() => setFilterModalVisible(true)} accessibilityLabel="Open gig filters">
+          <Ionicons name="options-outline" size={16} color={colors.primary} />
+          <Text style={styles.liveText}>Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text>
+        </TouchableOpacity>
       </View>
 
       {/* ── Search + Sort button row ── */}
@@ -304,54 +259,31 @@ export default function BrowseScreen() {
         </View>
       )}
 
-      {/* ── Gig Feed ── */}
-      {loading ? (
-        <View style={styles.stateWrapper}>
-          <LoadingState message="Discovering gigs…" size="large" />
-        </View>
-      ) : error ? (
-        <View style={styles.stateWrapper}>
-          <ErrorState
-            title="Failed to load gigs"
-            message={error}
-            onRetry={() => {
-              setError('');
-              setLoading(true);
-            }}
-          />
-        </View>
-      ) : filteredGigs.length === 0 ? (
-        <View style={styles.stateWrapper}>
-          <EmptyState
-            icon={hasAnyFilter ? 'search-outline' : 'briefcase-outline'}
-            title={hasAnyFilter ? 'No matching gigs' : 'No gigs yet'}
-            description={
-              hasAnyFilter
-                ? 'Try adjusting your search or filters to find more opportunities.'
-                : 'New opportunities will appear here in real time.'
-            }
-            actionLabel={hasAnyFilter ? 'Clear All Filters' : undefined}
-            actionIcon={hasAnyFilter ? 'close-circle-outline' : undefined}
-            onAction={hasAnyFilter ? handleClearFilters : undefined}
-          />
-        </View>
-      ) : (
-        <FlatList
-          data={filteredGigs}
-          keyExtractor={(item) => item.id}
-          renderItem={renderGigItem}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          }
-        />
-      )}
+      <FlatList
+        data={filteredGigs}
+        keyExtractor={item => item.id}
+        renderItem={renderGigItem}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+        onEndReached={() => { if (!error && filteredGigs.length > 0) loadMore(); }}
+        onEndReachedThreshold={0.3}
+        ListEmptyComponent={loading ? <LoadingState message="Discovering gigs..." size="large" /> : error ?
+          <ErrorState title="Failed to load gigs" message={error} onRetry={refresh} /> :
+          <EmptyState icon={hasAnyFilter ? 'search-outline' : 'briefcase-outline'}
+            title={hasMore ? 'Still looking for matches' : hasAnyFilter ? 'No matching gigs' : 'No gigs yet'}
+            description={hasMore ? 'Continue searching to check older gigs.' : hasAnyFilter ? 'Try adjusting your search or filters.' : 'Pull down to check for new opportunities.'}
+            actionLabel={hasAnyFilter && !hasMore ? 'Clear All Filters' : undefined} onAction={handleClearFilters} />}
+        ListFooterComponent={<View style={{ paddingVertical: spacing.md, alignItems: 'center' }}>
+          {!!error && filteredGigs.length > 0 && <ErrorState message={error} onRetry={hasMore ? loadMore : refresh} />}
+          {loadingMore ? <LoadingState message="Finding more gigs..." /> : !loading && !refreshing && !error && (
+            hasMore ? <TouchableOpacity onPress={loadMore}><Text style={styles.clearFiltersText}>{filteredGigs.length ? 'Load more gigs' : 'Continue searching'}</Text></TouchableOpacity> :
+              filteredGigs.length > 0 ? <Text style={styles.subtitle}>You have reached the end.</Text> : null
+          )}
+        </View>}
+      />
+      {filterModalVisible && <DiscoveryFilters visible value={advancedFilters} onApply={setAdvancedFilters} onClose={() => setFilterModalVisible(false)} />}
 
       {/* ── Sort Modal ── */}
       <Modal

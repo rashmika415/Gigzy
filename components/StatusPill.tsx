@@ -29,6 +29,8 @@ const STATUS_STYLES: Record<
     border: 'rgba(245, 158, 11, 0.3)',
     icon: 'time-outline',
   },
+  filled: { label: 'Filled', bg: 'rgba(245,158,11,0.12)', text: '#F59E0B', border: 'rgba(245,158,11,0.3)', icon: 'people-outline' },
+  closed: { label: 'Closed', bg: 'rgba(239,68,68,0.12)', text: '#EF4444', border: 'rgba(239,68,68,0.3)', icon: 'lock-closed-outline' },
   completed: {
     label: 'Completed',
     bg: 'rgba(124, 58, 237, 0.15)',

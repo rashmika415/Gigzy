@@ -1,159 +1,37 @@
-import React from 'react';
 import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet } from 'react-native';
 import { useAuth } from '../../../context/AuthContext';
-import { colors, borderRadius } from '../../../constants/theme';
+import { LoadingState, TabBar } from '../../../components';
+import { colors } from '../../../constants/theme';
+import type { ComponentProps } from 'react';
 
-/**
- * Role-based tab layout.
- *
- * Freelancer tabs: Home, Browse, Messages, Profile
- * Business  tabs: Home, My Gigs, Messages, Profile
- *
- * Tabs that don't belong to the current role are hidden via `href: null`.
- */
-export default function TabLayout() {
-  const { userData } = useAuth();
-  const role = userData?.role ?? 'freelancer';
-  const isClient = role === 'client';
+type BottomTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
-  return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: styles.tabLabel,
-        tabBarIconStyle: styles.tabIcon,
-      }}
-    >
-      {/* ── Home — both roles ── */}
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconWrap}>
-              <Ionicons
-                name={focused ? 'home' : 'home-outline'}
-                size={22}
-                color={color}
-              />
-              {focused && <View style={styles.activeIndicator} />}
-            </View>
-          ),
-        }}
-      />
-
-      {/* ── Browse — freelancer only ── */}
-      <Tabs.Screen
-        name="browse"
-        options={{
-          title: 'Browse',
-          href: isClient ? null : '/browse',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconWrap}>
-              <Ionicons
-                name={focused ? 'compass' : 'compass-outline'}
-                size={22}
-                color={color}
-              />
-              {focused && <View style={styles.activeIndicator} />}
-            </View>
-          ),
-        }}
-      />
-
-      {/* ── My Gigs — business only ── */}
-      <Tabs.Screen
-        name="my-gigs"
-        options={{
-          title: 'My Gigs',
-          href: isClient ? '/my-gigs' : null,
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconWrap}>
-              <Ionicons
-                name={focused ? 'briefcase' : 'briefcase-outline'}
-                size={22}
-                color={color}
-              />
-              {focused && <View style={styles.activeIndicator} />}
-            </View>
-          ),
-        }}
-      />
-
-      {/* ── Messages — both roles ── */}
-      <Tabs.Screen
-        name="messages"
-        options={{
-          title: 'Messages',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconWrap}>
-              <Ionicons
-                name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
-                size={22}
-                color={color}
-              />
-              {focused && <View style={styles.activeIndicator} />}
-            </View>
-          ),
-        }}
-      />
-
-      {/* ── Profile — both roles ── */}
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconWrap}>
-              <Ionicons
-                name={focused ? 'person' : 'person-outline'}
-                size={22}
-                color={color}
-              />
-              {focused && <View style={styles.activeIndicator} />}
-            </View>
-          ),
-        }}
-      />
-    </Tabs>
-  );
+const icons: Record<string, ComponentProps<typeof TabBar>['tabs'][number]['icon']> = {
+  home: 'home-outline', browse: 'compass-outline', 'my-gigs': 'briefcase-outline', messages: 'chatbubbles-outline', profile: 'person-outline',
+};
+function SharedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  return <TabBar activeTab={state.routes[state.index].key}
+    tabs={state.routes.map(route => ({ key: route.key, label: descriptors[route.key].options.title ?? route.name,
+      icon: icons[route.name] ?? 'ellipse-outline' }))}
+    onTabPress={key => {
+      const route = state.routes.find(item => item.key === key);
+      if (!route) return;
+      const event = navigation.emit({ type: 'tabPress', target: key, canPreventDefault: true });
+      if (state.routes[state.index].key !== key && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+    }} />;
 }
-
-const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceBorder,
-    height: 70,
-    paddingBottom: 12,
-    paddingTop: 6,
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  tabIcon: {
-    marginBottom: 0,
-  },
-  iconWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  activeIndicator: {
-    position: 'absolute',
-    top: -10,
-    width: 20,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: colors.primary,
-  },
-});
+export default function TabLayout() {
+  const { userData, loading } = useAuth();
+  if (loading || !userData) return <LoadingState message="Loading your account?" />;
+  return <Tabs initialRouteName="home" tabBar={props => <SharedTabBar {...props} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.background } }}>
+    <Tabs.Screen name="home" options={{ title: 'Home' }} />
+    <Tabs.Protected guard={userData.role === 'freelancer'}>
+      <Tabs.Screen name="browse" options={{ title: 'Browse' }} />
+    </Tabs.Protected>
+    <Tabs.Protected guard={userData.role === 'client'}>
+      <Tabs.Screen name="my-gigs" options={{ title: 'My Gigs' }} />
+    </Tabs.Protected>
+    <Tabs.Screen name="messages" options={{ title: 'Messages' }} />
+    <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+  </Tabs>;
+}

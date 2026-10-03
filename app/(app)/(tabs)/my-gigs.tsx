@@ -1,3 +1,4 @@
+import { STATUS_STYLES } from '../../../components/StatusPill';
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
@@ -34,69 +35,13 @@ import {
     GigStatus,
 } from "../../../types/gig";
 
-const STATUS_CONFIG: Record<
-  GigStatus,
-  {
-    label: string;
-    bg: string;
-    text: string;
-    border: string;
-    icon: keyof typeof Ionicons.glyphMap;
-  }
-> = {
-  open: {
-    label: "Open & Active",
-    bg: "rgba(16, 185, 129, 0.12)",
-    text: "#10B981",
-    border: "rgba(16, 185, 129, 0.3)",
-    icon: "radio-button-on",
-  },
-  "in-progress": {
-    label: "In Progress",
-    bg: "rgba(245, 158, 11, 0.12)",
-    text: "#F59E0B",
-    border: "rgba(245, 158, 11, 0.3)",
-    icon: "time-outline",
-  },
-  completed: {
-    label: "Completed",
-    bg: "rgba(124, 58, 237, 0.15)",
-    text: "#A78BFA",
-    border: "rgba(124, 58, 237, 0.35)",
-    icon: "checkmark-circle-outline",
-  },
-  cancelled: {
-    label: "Cancelled",
-    bg: "rgba(239, 68, 68, 0.12)",
-    text: "#EF4444",
-    border: "rgba(239, 68, 68, 0.3)",
-    icon: "close-circle-outline",
-  },
-};
+const STATUS_CONFIG = STATUS_STYLES;
 
 export default function MyGigs() {
   const { user, userData } = useAuth();
   const role = userData?.role;
 
   // Role guard: only business owners (clients) can manage gigs
-  useEffect(() => {
-    if (userData && role !== 'client') {
-      Alert.alert(
-        'Access Restricted',
-        'This page is for business owners to manage their posted gigs.',
-        [{ text: 'OK', onPress: () => router.back() }],
-      );
-    }
-  }, [userData, role]);
-
-  if (userData && role !== 'client') {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: colors.textSecondary, fontSize: 15 }}>Redirecting...</Text>
-      </SafeAreaView>
-    );
-  }
-
   // Data states
   const [allGigs, setAllGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,17 +70,15 @@ export default function MyGigs() {
 
   // 1. Subscribe to Firestore real-time client gigs
   useEffect(() => {
-    if (!user) {
+    if (!user || role !== 'client') {
       return;
     }
-
-    setLoading(true);
-    setLoadError("");
 
     const unsubscribe = subscribeToClientGigs(
       user.uid,
       (clientGigs) => {
         setAllGigs(clientGigs);
+        setLoadError("");
         setLoading(false);
       },
       (err) => {
@@ -147,7 +90,7 @@ export default function MyGigs() {
     return () => {
       unsubscribe();
     };
-  }, [user]);
+  }, [user, role]);
 
   // Manual pull-to-refresh handler
   const handleRefresh = async () => {
@@ -254,6 +197,24 @@ export default function MyGigs() {
         return "Sort";
     }
   };
+
+  useEffect(() => {
+    if (userData && role !== 'client') {
+      Alert.alert(
+        'Access Restricted',
+        'This page is for business owners to manage their posted gigs.',
+        [{ text: 'OK', onPress: () => router.back() }],
+      );
+    }
+  }, [userData, role]);
+
+  if (userData && role !== 'client') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 15 }}>Redirecting...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

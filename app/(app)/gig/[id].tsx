@@ -15,11 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../../constants/theme';
-import { getGigById } from '../../../services/gigService';
+import { subscribeToGig } from '../../../services/gigService';
 import { getOrCreateChat } from '../../../services/chatService';
 import { StatusPill, Chip, LoadingState, ErrorState } from '../../../components';
-import { STATUS_STYLES } from '../../../components/StatusPill';
-import type { Gig, GigStatus } from '../../../types/gig';
+import { distanceKm, validCoordinates } from '../../../services/discoveryFilters';
+import { getCurrentCoordinates } from '../../../services/locationService';
+import type { Gig } from '../../../types/gig';
 import { GIG_CATEGORIES } from '../../../types/gig';
 
 /** Resolve category id or name to the category object */
@@ -53,7 +54,9 @@ export default function GigDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user, userData } = useAuth();
   const role = userData?.role ?? 'freelancer';
-  const isOwner = user?.uid !== undefined && user?.uid === undefined; // computed below
+  const [retry, setRetry] = useState(0);
+  const [distance, setDistance] = useState<number>();
+  const [locating, setLocating] = useState(false);
 
   const [gig, setGig] = useState<Gig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,32 +64,29 @@ export default function GigDetailScreen() {
   const [startingChat, setStartingChat] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
     let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      if (!id) { setError('No gig was selected.'); setLoading(false); return; }
+      setLoading(true); setError(''); setDistance(undefined);
+      unsubscribe = subscribeToGig(id, result => { setGig(result); setLoading(false); setError(''); }, failure => {
+        setError(failure.message); setLoading(false);
+      });
+    });
+    return () => { cancelled = true; unsubscribe?.(); };
+  }, [id, retry]);
 
-    (async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const result = await getGigById(id);
-        if (!cancelled) {
-          setGig(result);
-          setLoading(false);
-        }
-      } catch (err: any) {
-        if (!cancelled) {
-          setError(err.message || 'Failed to load gig details.');
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [id]);
+  const showDistance = async () => {
+    if (!validCoordinates(gig?.coordinates)) return;
+    setLocating(true);
+    try { setDistance(distanceKm(await getCurrentCoordinates(), gig.coordinates)); }
+    catch (failure) { Alert.alert('Location unavailable', failure instanceof Error ? failure.message : 'Try again.'); }
+    finally { setLocating(false); }
+  };
 
   const gigOwner = gig?.postedBy?.uid === user?.uid;
   const cat = gig ? resolveCategory(gig.category) : null;
-  const statusCfg = gig ? STATUS_STYLES[gig.status] ?? STATUS_STYLES.open : STATUS_STYLES.open;
 
   // ── Actions ──
 
@@ -157,7 +157,7 @@ export default function GigDetailScreen() {
           <ErrorState
             title={gig === null && !error ? 'Gig not found' : 'Failed to load gig'}
             message={error || 'This gig may have been removed or does not exist.'}
-            onRetry={error ? () => { setError(''); setLoading(true); } : undefined}
+            onRetry={error ? () => setRetry(value => value + 1) : undefined}
           />
         </View>
       </SafeAreaView>
@@ -229,12 +229,16 @@ export default function GigDetailScreen() {
           {/* Divider */}
           <View style={styles.divider} />
 
+          {gig.locationType !== 'remote' && (validCoordinates(gig.coordinates) ?
+            <TouchableOpacity onPress={showDistance} disabled={locating}><Text style={styles.categoryText}>
+              {locating ? 'Finding your location?' : distance !== undefined ? `${distance.toFixed(1)} km away (straight-line distance)` : 'Show distance from me'}
+            </Text></TouchableOpacity> : <Text style={styles.postedTime}>Distance unavailable for this gig.</Text>)}
           {/* Specs Grid */}
           <View style={styles.specsGrid}>
             <SpecItem
               icon="calendar-outline"
               label="Deadline"
-              value={gig.date || 'Flexible'}
+              value={`${gig.date || 'Flexible'}${gig.time ? ` at ${gig.time}` : ''}`}
             />
             <SpecItem
               icon={gig.locationType === 'remote' ? 'globe-outline' : 'location-outline'}
@@ -291,10 +295,13 @@ export default function GigDetailScreen() {
               </Text>
             </View>
             <View style={styles.posterCardInfo}>
-              <Text style={styles.posterCardName}>{gig.postedBy.fullName}</Text>
+              <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/profile/[id]', params: { id: gig.postedBy.uid } })}>
+                <Text style={styles.posterCardName}>{gig.postedBy.fullName}</Text>
+                <Text style={styles.categoryText}>View business profile</Text>
+              </TouchableOpacity>
               <Text style={styles.posterCardEmail}>{gig.postedBy.email}</Text>
             </View>
-            {!gigOwner && (
+            {!gigOwner && role === 'freelancer' && (
               <TouchableOpacity
                 style={styles.posterChatBtn}
                 onPress={handleContactBusiness}
@@ -314,7 +321,7 @@ export default function GigDetailScreen() {
       </ScrollView>
 
       {/* ── Bottom Action Bar ── */}
-      {!gigOwner && gig.status === 'open' && (
+      {!gigOwner && role === 'freelancer' && gig.status === 'open' && (
         <View style={styles.bottomBar}>
           <View style={styles.bottomPayPreview}>
             <Text style={styles.bottomPayLabel}>Pay</Text>
