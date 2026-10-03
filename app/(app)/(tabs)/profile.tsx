@@ -12,9 +12,9 @@ import {
 import { router } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import { Ionicons } from '@expo/vector-icons';
-import { auth } from '../../FirebaseConfig';
-import { useAuth } from '../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { auth } from '../../../FirebaseConfig';
+import { useAuth } from '../../../context/AuthContext';
+import { colors, spacing, borderRadius } from '../../../constants/theme';
 
 export default function Profile() {
   const { user, userData, loading } = useAuth();
@@ -96,7 +96,7 @@ export default function Profile() {
             </View>
             <Text style={styles.emailText}>{user?.email}</Text>
             <View style={styles.ratingRow}>
-              <Ionicons name="star" size={15} color="#FBBF24" />
+              <Ionicons name="star" size={15} color="#986000" />
               <Text style={styles.emailText}>{(userData?.ratingAverage ?? 0).toFixed(1)} ({userData?.ratingCount ?? 0} reviews)</Text>
             </View>
           </View>
@@ -220,7 +220,7 @@ export default function Profile() {
             onPress={() => router.push('/(app)/edit-profile' as any)}
             activeOpacity={0.8}
           >
-            <Ionicons name="create-outline" size={18} color="#000" style={styles.buttonIcon} />
+            <Ionicons name="create-outline" size={18} color={colors.primaryOnColor} style={styles.buttonIcon} />
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </TouchableOpacity>
 
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
   publicButton: { borderRadius: borderRadius.full, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.primary },
   publicButtonText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
   editButtonText: {
-    color: '#000',
+    color: colors.primaryOnColor,
     fontSize: 15,
     fontWeight: '700',
   },

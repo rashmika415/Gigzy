@@ -1,3 +1,5 @@
+import AppBanner from '../../../components/AppBanner';
+import { STATUS_STYLES } from '../../../components/StatusPill';
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
@@ -16,8 +18,8 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { borderRadius, colors, shadows, spacing } from "../../constants/theme";
-import { useAuth } from "../../context/AuthContext";
+import { borderRadius, colors, shadows, spacing } from "../../../constants/theme";
+import { useAuth } from "../../../context/AuthContext";
 import {
     calculateBusinessGigStats,
     deleteGig,
@@ -25,58 +27,22 @@ import {
     getGigsByClient,
     subscribeToClientGigs,
     updateGigStatus,
-} from "../../services/gigService";
+} from "../../../services/gigService";
 import {
     BusinessGigStats,
     Gig,
     GIG_CATEGORIES,
     GigSortOption,
     GigStatus,
-} from "../../types/gig";
+} from "../../../types/gig";
 
-const STATUS_CONFIG: Record<
-  GigStatus,
-  {
-    label: string;
-    bg: string;
-    text: string;
-    border: string;
-    icon: keyof typeof Ionicons.glyphMap;
-  }
-> = {
-  open: {
-    label: "Open & Active",
-    bg: "rgba(16, 185, 129, 0.12)",
-    text: "#10B981",
-    border: "rgba(16, 185, 129, 0.3)",
-    icon: "radio-button-on",
-  },
-  "in-progress": {
-    label: "In Progress",
-    bg: "rgba(245, 158, 11, 0.12)",
-    text: "#F59E0B",
-    border: "rgba(245, 158, 11, 0.3)",
-    icon: "time-outline",
-  },
-  completed: {
-    label: "Completed",
-    bg: "rgba(124, 58, 237, 0.15)",
-    text: "#A78BFA",
-    border: "rgba(124, 58, 237, 0.35)",
-    icon: "checkmark-circle-outline",
-  },
-  cancelled: {
-    label: "Cancelled",
-    bg: "rgba(239, 68, 68, 0.12)",
-    text: "#EF4444",
-    border: "rgba(239, 68, 68, 0.3)",
-    icon: "close-circle-outline",
-  },
-};
+const STATUS_CONFIG = STATUS_STYLES;
 
 export default function MyGigs() {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
+  const role = userData?.role;
 
+  // Role guard: only business owners (clients) can manage gigs
   // Data states
   const [allGigs, setAllGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,17 +71,15 @@ export default function MyGigs() {
 
   // 1. Subscribe to Firestore real-time client gigs
   useEffect(() => {
-    if (!user) {
+    if (!user || role !== 'client') {
       return;
     }
-
-    setLoading(true);
-    setLoadError("");
 
     const unsubscribe = subscribeToClientGigs(
       user.uid,
       (clientGigs) => {
         setAllGigs(clientGigs);
+        setLoadError("");
         setLoading(false);
       },
       (err) => {
@@ -127,7 +91,7 @@ export default function MyGigs() {
     return () => {
       unsubscribe();
     };
-  }, [user]);
+  }, [user, role]);
 
   // Manual pull-to-refresh handler
   const handleRefresh = async () => {
@@ -235,11 +199,29 @@ export default function MyGigs() {
     }
   };
 
+  useEffect(() => {
+    if (userData && role !== 'client') {
+      Alert.alert(
+        'Access Restricted',
+        'This page is for business owners to manage their posted gigs.',
+        [{ text: 'OK', onPress: () => router.back() }],
+      );
+    }
+  }, [userData, role]);
+
+  if (userData && role !== 'client') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 15 }}>Redirecting...</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Background ambient lighting */}
-      <View style={styles.blobTop} />
-      <View style={styles.blobBottom} />
+
+
 
       {/* Top Navigation Header */}
       <View style={styles.header}>
@@ -274,7 +256,7 @@ export default function MyGigs() {
               try {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               } catch {}
-              router.push("/(app)/messages" as any);
+              router.push("/(app)/(tabs)/messages" as any);
             }}
             activeOpacity={0.8}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -296,7 +278,7 @@ export default function MyGigs() {
             }}
             activeOpacity={0.85}
           >
-            <Ionicons name="add" size={18} color="#080B14" />
+            <Ionicons name="add" size={18} color={colors.primaryOnColor} />
             <Text style={styles.postNewBtnText}>Post Gig</Text>
           </TouchableOpacity>
         </View>
@@ -315,6 +297,7 @@ export default function MyGigs() {
           />
         }
       >
+        <AppBanner compact kind="business" title="Good help, close to home." description="Manage your opportunities and connect with local talent." />
         {/* Business Metrics Carousel / Grid */}
         <View style={styles.metricsSection}>
           <ScrollView
@@ -339,7 +322,7 @@ export default function MyGigs() {
                   { backgroundColor: "rgba(16, 185, 129, 0.15)" },
                 ]}
               >
-                <Ionicons name="radio-button-on" size={18} color="#10B981" />
+                <Ionicons name="radio-button-on" size={18} color="#147D54" />
               </View>
               <Text style={styles.metricValue}>{stats.open}</Text>
               <Text style={styles.metricLabel}>Open & Active</Text>
@@ -364,7 +347,7 @@ export default function MyGigs() {
                   { backgroundColor: "rgba(245, 158, 11, 0.15)" },
                 ]}
               >
-                <Ionicons name="time-outline" size={18} color="#F59E0B" />
+                <Ionicons name="time-outline" size={18} color="#986000" />
               </View>
               <Text style={styles.metricValue}>{stats.inProgress}</Text>
               <Text style={styles.metricLabel}>In Progress</Text>
@@ -378,7 +361,7 @@ export default function MyGigs() {
                   { backgroundColor: "rgba(59, 130, 246, 0.15)" },
                 ]}
               >
-                <Ionicons name="people-outline" size={18} color="#3B82F6" />
+                <Ionicons name="people-outline" size={18} color="#245EAD" />
               </View>
               <Text style={styles.metricValue}>{stats.totalApplicants}</Text>
               <Text style={styles.metricLabel}>Applicants</Text>
@@ -406,7 +389,7 @@ export default function MyGigs() {
                 <Ionicons
                   name="checkmark-circle-outline"
                   size={18}
-                  color="#A78BFA"
+                  color="#6D28D9"
                 />
               </View>
               <Text style={styles.metricValue}>{stats.completed}</Text>
@@ -421,7 +404,7 @@ export default function MyGigs() {
                   { backgroundColor: "rgba(236, 72, 153, 0.15)" },
                 ]}
               >
-                <Ionicons name="wallet-outline" size={18} color="#EC4899" />
+                <Ionicons name="wallet-outline" size={18} color="#A52662" />
               </View>
               <Text style={styles.metricValue}>
                 ${stats.totalBudget.toLocaleString()}
@@ -580,7 +563,7 @@ export default function MyGigs() {
                   <Ionicons
                     name={cat.icon as any}
                     size={14}
-                    color={isSelected ? "#080B14" : colors.textSecondary}
+                    color={isSelected ? colors.primaryOnColor : colors.textSecondary}
                     style={{ marginRight: 4 }}
                   />
                   <Text
@@ -673,7 +656,7 @@ export default function MyGigs() {
                   onPress={() => router.push("/(app)/post-gig" as any)}
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="add-circle" size={20} color="#080B14" />
+                  <Ionicons name="add-circle" size={20} color={colors.primaryOnColor} />
                   <Text style={styles.emptyActionBtnText}>
                     Post Your First Gig
                   </Text>
@@ -827,7 +810,7 @@ export default function MyGigs() {
                           size={12}
                           color={
                             gig.applicantsCount > 0
-                              ? "#10B981"
+                              ? "#147D54"
                               : colors.textMuted
                           }
                         />
@@ -1264,7 +1247,7 @@ export default function MyGigs() {
                 }}
                 activeOpacity={0.85}
               >
-                <Ionicons name="sync" size={16} color="#080B14" />
+                <Ionicons name="sync" size={16} color={colors.primaryOnColor} />
                 <Text style={styles.detailChangeStatusBtnText}>
                   Update Status
                 </Text>
@@ -1288,26 +1271,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
   },
-  blobTop: {
-    position: "absolute",
-    top: -80,
-    right: -60,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: colors.primaryGlow,
-    opacity: 0.25,
-  },
-  blobBottom: {
-    position: "absolute",
-    bottom: 40,
-    left: -80,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: colors.accentLight,
-    opacity: 0.3,
-  },
 
   // Header
   header: {
@@ -1319,7 +1282,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.surfaceBorder,
-    backgroundColor: "rgba(8, 11, 20, 0.85)",
+    backgroundColor: colors.background,
   },
   headerLeft: {
     flexDirection: "row",
@@ -1382,12 +1345,12 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#10B981",
+    backgroundColor: "#147D54",
   },
   liveBadgeText: {
     fontSize: 10,
     fontWeight: "700",
-    color: "#10B981",
+    color: "#147D54",
   },
   postNewBtn: {
     backgroundColor: colors.primary,
@@ -1404,7 +1367,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   postNewBtnText: {
-    color: "#080B14",
+    color: colors.primaryOnColor,
     fontSize: 13,
     fontWeight: "800",
   },
@@ -1522,17 +1485,17 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   statusTabTextSelected: {
-    color: "#080B14",
+    color: colors.primaryOnColor,
     fontWeight: "800",
   },
   tabBadge: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.full,
     paddingHorizontal: 6,
     paddingVertical: 1,
   },
   tabBadgeSelected: {
-    backgroundColor: "#080B14",
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   tabBadgeText: {
     fontSize: 11,
@@ -1540,7 +1503,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   tabBadgeTextSelected: {
-    color: colors.primary,
+    color: colors.primaryOnColor,
   },
 
   // Category Pills
@@ -1555,7 +1518,7 @@ const styles = StyleSheet.create({
   categoryChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.full,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -1572,7 +1535,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   categoryChipTextSelected: {
-    color: "#080B14",
+    color: colors.primaryOnColor,
     fontWeight: "700",
   },
 
@@ -1647,7 +1610,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   retryBtnText: {
-    color: "#FFF",
+    color: colors.primaryOnColor,
     fontSize: 13,
     fontWeight: "700",
   },
@@ -1702,7 +1665,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   emptyActionBtnText: {
-    color: "#080B14",
+    color: colors.primaryOnColor,
     fontSize: 14,
     fontWeight: "800",
   },
@@ -1738,7 +1701,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cardCategoryBadge: {
-    backgroundColor: "rgba(255, 255, 255, 0.07)",
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.sm,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -1812,12 +1775,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   skillTag: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.sm,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: colors.surfaceBorder,
   },
   skillTagText: {
     fontSize: 11,
@@ -1842,7 +1805,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.06)",
+    borderTopColor: colors.surfaceBorder,
   },
   metaItem: {
     flexDirection: "row",
@@ -1856,7 +1819,7 @@ const styles = StyleSheet.create({
   applicantsChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.full,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -1873,7 +1836,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   applicantsChipTextActive: {
-    color: "#10B981",
+    color: "#147D54",
     fontWeight: "700",
   },
 
@@ -1907,7 +1870,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.07)",
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.md,
     paddingVertical: 7,
     gap: 4,
@@ -1931,7 +1894,7 @@ const styles = StyleSheet.create({
   // Modals Overlay & Containers
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    backgroundColor: colors.overlay,
     justifyContent: "center",
     alignItems: "center",
     padding: spacing.lg,
@@ -1970,7 +1933,7 @@ const styles = StyleSheet.create({
   statusModalCard: {
     width: "100%",
     maxWidth: 420,
-    backgroundColor: "#0F1423",
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -2018,7 +1981,7 @@ const styles = StyleSheet.create({
   sortModalCard: {
     width: "100%",
     maxWidth: 360,
-    backgroundColor: "#0F1423",
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -2062,7 +2025,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 500,
     maxHeight: "85%",
-    backgroundColor: "#0F1423",
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -2073,7 +2036,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.surfaceBorder,
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    backgroundColor: colors.surfaceElevated,
   },
   detailHeaderTop: {
     flexDirection: "row",
@@ -2120,7 +2083,7 @@ const styles = StyleSheet.create({
   },
   detailSpecsGrid: {
     gap: spacing.sm,
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.lg,
@@ -2177,7 +2140,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.surfaceBorder,
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    backgroundColor: colors.surfaceElevated,
   },
   detailChangeStatusBtn: {
     backgroundColor: colors.primary,
@@ -2194,7 +2157,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   detailChangeStatusBtnText: {
-    color: "#080B14",
+    color: colors.primaryOnColor,
     fontSize: 15,
     fontWeight: "800",
   },

@@ -13,7 +13,11 @@ import {
   onSnapshot,
   increment,
   setDoc,
+  startAfter,
+  getDocsFromServer,
 } from 'firebase/firestore';
+import type { QueryDocumentSnapshot, QueryConstraint } from 'firebase/firestore';
+import { categoryId, distanceKm, matchesDiscoveryFilters, validCoordinates, validDate, validTime } from './discoveryFilters';
 import { db } from '../FirebaseConfig';
 import {
   Gig,
@@ -167,6 +171,10 @@ export function validateGigForm(form: GigInput): { isValid: boolean; errors: Gig
     }
   }
 
+  if (trimmedDate && !validDate(trimmedDate)) errors.date = 'Please provide a valid calendar date (YYYY-MM-DD).';
+  if (form.time && !validTime(form.time)) errors.time = 'Use a valid time in HH:MM format.';
+  if (form.coordinates && !validCoordinates(form.coordinates)) errors.coordinates = 'Please provide valid latitude and longitude.';
+  if (form.locationType !== 'remote' && !validCoordinates(form.coordinates)) errors.coordinates = 'Set the gig location using address lookup, current location, or valid coordinates.';
   const isValid = Object.keys(errors).length === 0;
   return { isValid, errors };
 }
@@ -201,6 +209,9 @@ export async function createGig(
     pay: numericPay,
     payType: input.payType,
     date: input.date.trim(),
+    ...(input.time ? { time: input.time } : {}),
+    ...(input.locationType !== 'remote' && input.coordinates ? { coordinates: input.coordinates } : {}),
+    categoryId: categoryId(input.category),
     location: finalLocation,
     locationType: input.locationType,
     skills: cleanSkills,
@@ -345,9 +356,9 @@ export function calculateBusinessGigStats(gigs: Gig[]): BusinessGigStats {
 
   for (const gig of gigs) {
     if (gig.status === 'open') stats.open += 1;
-    else if (gig.status === 'in-progress') stats.inProgress += 1;
+    else if ((gig.status === 'in-progress' || gig.status === 'filled')) stats.inProgress += 1;
     else if (gig.status === 'completed') stats.completed += 1;
-    else if (gig.status === 'cancelled') stats.cancelled += 1;
+    else if ((gig.status === 'cancelled' || gig.status === 'closed')) stats.cancelled += 1;
 
     if (gig.pay && typeof gig.pay === 'number') {
       stats.totalBudget += gig.pay;
@@ -374,7 +385,7 @@ export function filterAndSortGigs(gigs: Gig[], options: GigFilterOptions): Gig[]
   // 2. Filter by Category
   if (options.category && options.category !== 'all') {
     result = result.filter(
-      (g) => g.category?.toLowerCase() === options.category?.toLowerCase()
+      (g) => categoryId(g.category || '') === categoryId(options.category || '')
     );
   }
 
@@ -414,6 +425,56 @@ export function filterAndSortGigs(gigs: Gig[], options: GigFilterOptions): Gig[]
   });
 
   return result;
+}
+
+export interface BrowsePage {
+  gigs: Gig[];
+  cursor: QueryDocumentSnapshot | null;
+  hasMore: boolean;
+}
+
+/** Read bounded batches, filtering each batch so older matching gigs are reachable.
+ * Cursors refer to the last scanned document, even when the batch has no matches.
+ * This keeps substring search compatible with legacy gigs without a search index.
+ */
+export async function getBrowsePage(
+  options: GigFilterOptions,
+  cursor: QueryDocumentSnapshot | null = null,
+  signal?: AbortSignal,
+): Promise<BrowsePage> {
+  const sort = options.sortBy ?? 'newest';
+  const constraints: QueryConstraint[] = [where('status', '==', 'open')];
+  if (sort === 'pay-high' || sort === 'pay-low') constraints.push(orderBy('pay', sort === 'pay-high' ? 'desc' : 'asc'));
+  if (sort === 'applicants') constraints.push(orderBy('applicantsCount', 'desc'));
+  constraints.push(orderBy('createdAt', sort === 'oldest' ? 'asc' : 'desc'));
+  let nextCursor = cursor;
+  let hasMore = true;
+  const gigs: Gig[] = [];
+  // Limit each interaction to 150 documents. The UI offers Continue searching
+  // for sparse matches rather than claiming the entire collection is empty.
+  for (let batch = 0; batch < 5 && gigs.length < 20 && hasMore; batch++) {
+    if (signal?.aborted) throw new Error('Search cancelled.');
+    const pageQuery = query(collection(db, 'gigs'), ...constraints,
+      ...(nextCursor ? [startAfter(nextCursor)] : []), limit(30));
+    try {
+      const snapshot = await getDocsFromServer(pageQuery);
+      if (signal?.aborted) throw new Error('Search cancelled.');
+      hasMore = snapshot.docs.length === 30;
+      nextCursor = snapshot.docs[snapshot.docs.length - 1] ?? nextCursor;
+      for (const document of snapshot.docs) {
+        const gig = { ...document.data(), id: document.id } as Gig;
+        if (matchesDiscoveryFilters(gig, options)) {
+          if (gig.locationType !== 'remote' && validCoordinates(options.origin) && validCoordinates(gig.coordinates)) {
+            gig.distanceKm = distanceKm(options.origin, gig.coordinates);
+          }
+          gigs.push(gig);
+        }
+      }
+    } catch (error) {
+      throw new Error(parseFirebaseError(error));
+    }
+  }
+  return { gigs, cursor: nextCursor, hasMore };
 }
 
 /**
@@ -474,6 +535,12 @@ export async function getGigById(gigId: string): Promise<Gig | null> {
     console.error('Firestore getGigById error:', error);
     throw new Error(parseFirebaseError(error));
   }
+}
+
+export function subscribeToGig(gigId: string, onUpdate: (gig: Gig | null) => void, onError: (error: Error) => void): () => void {
+  return onSnapshot(doc(db, 'gigs', gigId), snapshot => {
+    onUpdate(snapshot.exists() ? { ...snapshot.data(), id: snapshot.id } as Gig : null);
+  }, error => onError(new Error(parseFirebaseError(error))));
 }
 
 /**

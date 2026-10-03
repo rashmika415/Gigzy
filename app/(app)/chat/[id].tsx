@@ -344,8 +344,8 @@ export default function ChatRoomScreen() {
                   size={14}
                   color={
                     item.readBy?.length > 1
-                      ? colors.primary
-                      : "rgba(0, 55, 49, 0.6)"
+                      ? colors.primaryOnColor
+                      : "rgba(255, 255, 255, 0.8)"
                   }
                   style={styles.checkIcon}
                 />
@@ -668,8 +668,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerAvatarBusiness: {
-    backgroundColor: "rgba(44, 73, 104, 0.3)",
-    borderColor: "#7BA6D6",
+    backgroundColor: colors.accentLight,
+    borderColor: "#2C4968",
   },
   headerAvatarImg: {
     width: 40,
@@ -717,7 +717,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   roleDotBusiness: {
-    backgroundColor: "#7BA6D6",
+    backgroundColor: "#2C4968",
   },
   headerRoleText: {
     fontSize: 11,
@@ -730,9 +730,9 @@ const styles = StyleSheet.create({
   gigBanner: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(111, 216, 199, 0.08)",
+    backgroundColor: colors.primaryLight,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(111, 216, 199, 0.2)",
+    borderBottomColor: colors.surfaceBorder,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     gap: spacing.sm,
@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: borderRadius.sm,
     borderWidth: 1,
-    borderColor: "rgba(111, 216, 199, 0.3)",
+    borderColor: colors.surfaceBorder,
   },
   gigBannerActionText: {
     fontSize: 11,
@@ -854,7 +854,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   bubbleAvatarBusiness: {
-    backgroundColor: "rgba(44, 73, 104, 0.3)",
+    backgroundColor: colors.accentLight,
   },
   bubbleAvatarText: {
     fontSize: 11,
@@ -914,7 +914,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   timeTextMe: {
-    color: "rgba(0, 55, 49, 0.75)",
+    color: "rgba(255, 255, 255, 0.8)",
   },
   timeTextOther: {
     color: colors.textMuted,
@@ -966,7 +966,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surfaceElevated,
-    borderColor: "rgba(111, 216, 199, 0.25)",
+    borderColor: colors.surfaceBorder,
     borderWidth: 1,
     borderRadius: borderRadius.full,
     paddingHorizontal: 12,

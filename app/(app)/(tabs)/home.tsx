@@ -1,3 +1,4 @@
+import AppBanner, { AppPhoto } from '../../../components/AppBanner';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -12,12 +13,12 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useAuth } from '../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../constants/theme';
-import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig } from '../../services/gigService';
-import { subscribeToUserChats, getOrCreateChat } from '../../services/chatService';
-import { Gig } from '../../types/gig';
-import { subscribeToNotifications } from '../../services/notificationService';
+import { useAuth } from '../../../context/AuthContext';
+import { colors, spacing, borderRadius } from '../../../constants/theme';
+import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig } from '../../../services/gigService';
+import { subscribeToUserChats, getOrCreateChat } from '../../../services/chatService';
+import { Gig } from '../../../types/gig';
+import { subscribeToNotifications } from '../../../services/notificationService';
 
 export default function Home() {
   const { user, userData } = useAuth();
@@ -126,7 +127,7 @@ export default function Home() {
       return;
     }
     if (gig.postedBy?.uid === user.uid) {
-      router.push('/(app)/my-gigs' as any);
+      router.push('/(app)/(tabs)/my-gigs' as any);
       return;
     }
 
@@ -173,10 +174,6 @@ export default function Home() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Background blobs */}
-      <View style={styles.blob1} />
-      <View style={styles.blob2} />
-
       <ScrollView
         style={styles.flex}
         contentContainerStyle={styles.scrollContent}
@@ -185,9 +182,9 @@ export default function Home() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerGreetingBlock}>
-            <Text style={styles.greeting}>Hello, {firstName}! 👋</Text>
+            <Text style={styles.greeting}>Hello, {firstName}!</Text>
             <Text style={styles.subtitle}>
-              Role Profile: <Text style={styles.roleLabel}>{getRoleLabel()}</Text>
+              <Text style={styles.roleLabel}>{getRoleLabel()}</Text>
             </Text>
           </View>
 
@@ -209,7 +206,7 @@ export default function Home() {
                 try {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 } catch {}
-                router.push('/(app)/messages' as any);
+                router.push('/(app)/(tabs)/messages' as any);
               }}
               activeOpacity={0.8}
             >
@@ -225,7 +222,7 @@ export default function Home() {
 
             <TouchableOpacity
               style={styles.avatarCircle}
-              onPress={() => router.push('/(app)/profile' as any)}
+              onPress={() => router.push('/(app)/(tabs)/profile' as any)}
               activeOpacity={0.8}
             >
               <Text style={styles.avatarText}>
@@ -235,10 +232,13 @@ export default function Home() {
           </View>
         </View>
 
-        {/* Business Owner / Post Gig CTA Banner */}
+        {/* Business Owner / Post Gig CTA Banner — only visible to clients */}
+        {role !== 'client' && <AppBanner kind="youth" title="Your next opportunity starts here." description="Find local gigs that fit your skills and your schedule." action="Explore gigs" onPress={() => router.push('/(app)/(tabs)/browse')} />}
+        {role === 'client' && (
         <View style={styles.ctaCard}>
+          <View style={{ marginBottom: spacing.md }}><AppPhoto kind="business" /></View>
           <View style={styles.ctaBadge}>
-            <Ionicons name="flash" size={14} color="#080B14" />
+            <Ionicons name="flash" size={14} color={colors.primaryOnColor} />
             <Text style={styles.ctaBadgeText}>FOR BUSINESS OWNERS</Text>
           </View>
           <Text style={styles.ctaTitle}>Need Help with a Task?</Text>
@@ -257,7 +257,7 @@ export default function Home() {
               }}
               activeOpacity={0.85}
             >
-              <Ionicons name="add-circle-outline" size={20} color="#080B14" />
+              <Ionicons name="add-circle-outline" size={20} color={colors.primaryOnColor} />
               <Text style={styles.postGigButtonText}>Post New Gig</Text>
             </TouchableOpacity>
 
@@ -267,7 +267,7 @@ export default function Home() {
                 try {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 } catch {}
-                router.push('/(app)/my-gigs' as any);
+                router.push('/(app)/(tabs)/my-gigs' as any);
               }}
               activeOpacity={0.85}
             >
@@ -276,23 +276,24 @@ export default function Home() {
             </TouchableOpacity>
           </View>
         </View>
+        )}
 
         {/* Quick stats row */}
         <View style={styles.statsRow}>
           {[
             {
-              label: role === 'client' ? 'Gigs Posted' : 'Gigs Active',
+              label: role === 'client' ? 'Gigs Posted' : 'Latest Gigs',
               value: gigs.length.toString(),
               emoji: '💼',
-              onPress: role === 'client' ? () => router.push('/(app)/my-gigs' as any) : undefined,
+              onPress: role === 'client' ? () => router.push('/(app)/(tabs)/my-gigs' as any) : undefined,
             },
             {
-              label: role === 'client' ? 'Total Value' : 'Earnings',
+              label: role === 'client' ? 'Total Value' : 'Listed Pay',
               value: `$${gigs.reduce((acc, g) => acc + (g.pay || 0), 0).toLocaleString()}`,
               emoji: '💰',
-              onPress: role === 'client' ? () => router.push('/(app)/my-gigs' as any) : undefined,
+              onPress: role === 'client' ? () => router.push('/(app)/(tabs)/my-gigs' as any) : undefined,
             },
-            { label: 'Rating', value: '5.0', emoji: '⭐', onPress: undefined },
+            { label: 'Rating', value: userData?.ratingCount ? (userData.ratingAverage ?? 0).toFixed(1) : '\u2014', emoji: '⭐', onPress: undefined },
           ].map((stat) => (
             <TouchableOpacity
               key={stat.label}
@@ -323,18 +324,13 @@ export default function Home() {
 
             {role === 'client' ? (
               <TouchableOpacity
-                onPress={() => router.push('/(app)/my-gigs' as any)}
+                onPress={() => router.push('/(app)/(tabs)/my-gigs' as any)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Text style={styles.seeAllText}>Manage All ({gigs.length}) →</Text>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/post-gig' as any)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.seeAllText}>+ Post Gig</Text>
-              </TouchableOpacity>
+              <Text style={styles.seeAllText}>Browse All</Text>
             )}
           </View>
 
@@ -366,7 +362,7 @@ export default function Home() {
                   style={styles.gigItemCard}
                   onPress={() => {
                     if (role === 'client') {
-                      router.push('/(app)/my-gigs' as any);
+                      router.push('/(app)/(tabs)/my-gigs' as any);
                     }
                   }}
                   activeOpacity={role === 'client' ? 0.85 : 1}
@@ -389,10 +385,10 @@ export default function Home() {
                           <Text
                             style={[
                               styles.gigStatusPillText,
-                              gig.status === 'open' && { color: '#10B981' },
-                              gig.status === 'in-progress' && { color: '#F59E0B' },
-                              gig.status === 'completed' && { color: '#A78BFA' },
-                              gig.status === 'cancelled' && { color: '#EF4444' },
+                              gig.status === 'open' && { color: '#147D54' },
+                              gig.status === 'in-progress' && { color: '#986000' },
+                              gig.status === 'completed' && { color: '#6D28D9' },
+                              gig.status === 'cancelled' && { color: '#B42318' },
                             ]}
                           >
                             {gig.status === 'in-progress' ? 'In Progress' : gig.status}
@@ -466,10 +462,10 @@ export default function Home() {
                         activeOpacity={0.8}
                       >
                         {startingChatGigId === gig.id ? (
-                          <ActivityIndicator size="small" color="#003731" />
+                          <ActivityIndicator size="small" color={colors.primaryOnColor} />
                         ) : (
                           <>
-                            <Ionicons name="chatbubble-ellipses-outline" size={13} color="#003731" />
+                            <Ionicons name="chatbubble-ellipses-outline" size={13} color={colors.primaryOnColor} />
                             <Text style={styles.contactEmployerBtnText}>Chat</Text>
                           </>
                         )}
@@ -495,33 +491,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    width: '100%',
+    maxWidth: 1040,
+    alignSelf: 'center',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxl,
   },
-  blob1: {
-    position: 'absolute',
-    top: -60,
-    left: -80,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: colors.primaryGlow,
-    opacity: 0.35,
-  },
-  blob2: {
-    position: 'absolute',
-    bottom: 80,
-    right: -60,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: colors.accentLight,
-    opacity: 0.4,
-  },
 
   // Header
   header: {
+    flexWrap: 'wrap',
+    gap: spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -529,6 +510,7 @@ const styles = StyleSheet.create({
   },
   headerGreetingBlock: {
     flex: 1,
+    minWidth: 140,
     marginRight: spacing.sm,
   },
   headerActionsRight: {
@@ -607,15 +589,15 @@ const styles = StyleSheet.create({
   contactEmployerBtnText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#003731',
+    color: colors.primaryOnColor,
   },
 
   // CTA Card
   ctaCard: {
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     borderWidth: 1.5,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: colors.surfaceBorder,
     padding: spacing.lg,
     marginBottom: spacing.lg,
   },
@@ -631,7 +613,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   ctaBadgeText: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -650,10 +632,12 @@ const styles = StyleSheet.create({
   },
   ctaButtonsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
   postGigButton: {
     flex: 1,
+    minWidth: 160,
     backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
     paddingVertical: 12,
@@ -669,15 +653,16 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   postGigButtonText: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontSize: 14,
     fontWeight: '800',
   },
   manageGigsButton: {
     flex: 1,
+    minWidth: 160,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.4)',
+    borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.md,
     paddingVertical: 12,
     paddingHorizontal: spacing.sm,
@@ -715,6 +700,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   statLabel: {
+    textAlign: 'center',
     fontSize: 12,
     color: colors.textMuted,
   },
@@ -842,7 +828,7 @@ const styles = StyleSheet.create({
   },
   gigStatusProgress: {
     backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: colors.surfaceBorder,
   },
   gigStatusCompleted: {
     backgroundColor: 'rgba(124, 58, 237, 0.15)',
@@ -863,7 +849,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   gigCategoryBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: colors.surfaceElevated,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: borderRadius.sm,
@@ -926,7 +912,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    borderTopColor: colors.surfaceBorder,
   },
   gigMetaRow: {
     flexDirection: 'row',
