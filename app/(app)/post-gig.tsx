@@ -1,3 +1,4 @@
+import AppBanner from '../../components/AppBanner';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -284,8 +285,8 @@ export default function PostGigScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Background glowing decorations */}
-      <View style={styles.blob1} />
-      <View style={styles.blob2} />
+
+
 
       {/* Top Navigation Bar */}
       <View style={styles.navBar}>
@@ -313,6 +314,7 @@ export default function PostGigScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          <AppBanner compact kind="business" title="Make room for local talent." description="Clear details help the right people find your gig." />
           {/* Submission Error Banner with Retry Option */}
           {submitError ? (
             <View style={styles.errorBanner}>
@@ -484,7 +486,7 @@ export default function PostGigScreen() {
                   disabled={loading}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="add" size={20} color="#080B14" />
+                  <Ionicons name="add" size={20} color={colors.primaryOnColor} />
                   <Text style={styles.addSkillBtnText}>Add</Text>
                 </TouchableOpacity>
               </View>
@@ -559,7 +561,7 @@ export default function PostGigScreen() {
                 <Ionicons
                   name="wallet-outline"
                   size={16}
-                  color={form.payType === 'fixed' ? '#080B14' : colors.textSecondary}
+                  color={form.payType === 'fixed' ? colors.primaryOnColor : colors.textSecondary}
                 />
                 <Text
                   style={[
@@ -588,7 +590,7 @@ export default function PostGigScreen() {
                 <Ionicons
                   name="time-outline"
                   size={16}
-                  color={form.payType === 'hourly' ? '#080B14' : colors.textSecondary}
+                  color={form.payType === 'hourly' ? colors.primaryOnColor : colors.textSecondary}
                 />
                 <Text
                   style={[
@@ -902,14 +904,14 @@ export default function PostGigScreen() {
             >
               {loading ? (
                 <View style={styles.loadingRow}>
-                  <ActivityIndicator color="#080B14" size="small" />
+                  <ActivityIndicator color={colors.primaryOnColor} size="small" />
                   <Text style={styles.submitButtonText}>
                     {submissionStage === 'saving' ? 'Persisting to Firestore...' : 'Validating Gig...'}
                   </Text>
                 </View>
               ) : (
                 <View style={styles.loadingRow}>
-                  <Ionicons name="paper-plane" size={18} color="#080B14" />
+                  <Ionicons name="paper-plane" size={18} color={colors.primaryOnColor} />
                   <Text style={styles.submitButtonText}>Post Gig Now</Text>
                 </View>
               )}
@@ -1152,26 +1154,6 @@ const styles = StyleSheet.create({
   },
 
   // Glowing background blobs
-  blob1: {
-    position: 'absolute',
-    top: -50,
-    right: -50,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: colors.primaryGlow,
-    opacity: 0.3,
-  },
-  blob2: {
-    position: 'absolute',
-    bottom: 120,
-    left: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: colors.accentLight,
-    opacity: 0.25,
-  },
 
   // Navigation Bar
   navBar: {
@@ -1238,7 +1220,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
   },
   retryBannerBtnText: {
-    color: '#FFF',
+    color: colors.primaryOnColor,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1346,7 +1328,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     gap: 6,
@@ -1384,7 +1366,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   addSkillBtnText: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -1427,7 +1409,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   suggestedChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.full,
@@ -1468,7 +1450,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   payTypeBtnTextActive: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontWeight: '700',
   },
 
@@ -1515,7 +1497,7 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
   presetChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.full,
@@ -1544,7 +1526,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   dateChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.full,
@@ -1607,7 +1589,7 @@ const styles = StyleSheet.create({
   },
   locationTypeCard: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.md,
@@ -1672,7 +1654,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   submitButtonText: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 0.3,
@@ -1684,7 +1666,7 @@ const styles = StyleSheet.create({
   // Modals Overlay
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
@@ -1694,7 +1676,7 @@ const styles = StyleSheet.create({
   datePickerModalContent: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -1744,7 +1726,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   pickerItemTextActive: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontWeight: '800',
   },
   modalDatePreview: {
@@ -1790,7 +1772,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalApplyBtnText: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontWeight: '700',
   },
 
@@ -1798,7 +1780,7 @@ const styles = StyleSheet.create({
   successModalCard: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -1879,12 +1861,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryModalBtnText: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontWeight: '700',
     fontSize: 15,
   },
   secondaryModalBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,

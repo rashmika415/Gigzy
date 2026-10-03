@@ -45,7 +45,7 @@ export default function EmptyState({
           activeOpacity={0.85}
         >
           {actionIcon && (
-            <Ionicons name={actionIcon} size={20} color="#080B14" />
+            <Ionicons name={actionIcon} size={20} color={colors.primaryOnColor} />
           )}
           <Text style={styles.actionText}>{actionLabel}</Text>
         </TouchableOpacity>
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   actionText: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontSize: 14,
     fontWeight: '800',
   },

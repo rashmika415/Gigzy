@@ -112,7 +112,7 @@ export default function GigCard({
           <Ionicons
             name="people"
             size={12}
-            color={gig.applicantsCount > 0 ? '#10B981' : colors.textMuted}
+            color={gig.applicantsCount > 0 ? '#147D54' : colors.textMuted}
           />
           <Text
             style={[
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   categoryBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.sm,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    borderTopColor: colors.surfaceBorder,
   },
   metaItem: {
     flexDirection: 'row',
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   applicantsChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.full,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   applicantsTextActive: {
-    color: '#10B981',
+    color: '#147D54',
     fontWeight: '700',
   },
 
@@ -270,6 +270,6 @@ const styles = StyleSheet.create({
   actionsFooter: {
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    borderTopColor: colors.surfaceBorder,
   },
 });

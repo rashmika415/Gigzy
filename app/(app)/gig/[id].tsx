@@ -166,10 +166,6 @@ export default function GigDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Background blobs */}
-      <View style={styles.blob1} />
-      <View style={styles.blob2} />
-
       {/* Header */}
       <Header onBack={() => router.back()} onShare={handleShare} />
 
@@ -307,7 +303,7 @@ export default function GigDetailScreen() {
                 onPress={handleContactBusiness}
                 activeOpacity={0.8}
               >
-                <Ionicons name="chatbubble-ellipses-outline" size={16} color="#080B14" />
+                <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.primaryOnColor} />
               </TouchableOpacity>
             )}
           </View>
@@ -337,10 +333,10 @@ export default function GigDetailScreen() {
             disabled={startingChat}
           >
             {startingChat ? (
-              <ActivityIndicator size="small" color="#080B14" />
+              <ActivityIndicator size="small" color={colors.primaryOnColor} />
             ) : (
               <>
-                <Ionicons name="chatbubble-ellipses" size={18} color="#080B14" />
+                <Ionicons name="chatbubble-ellipses" size={18} color={colors.primaryOnColor} />
                 <Text style={styles.contactBtnText}>Contact Business</Text>
               </>
             )}
@@ -355,7 +351,7 @@ export default function GigDetailScreen() {
             onPress={() => router.push('/(app)/(tabs)/my-gigs' as any)}
             activeOpacity={0.85}
           >
-            <Ionicons name="settings-outline" size={18} color="#080B14" />
+            <Ionicons name="settings-outline" size={18} color={colors.primaryOnColor} />
             <Text style={styles.contactBtnText}>Manage This Gig</Text>
           </TouchableOpacity>
         </View>
@@ -419,26 +415,6 @@ const styles = StyleSheet.create({
   },
   flex: { flex: 1 },
   padH: { paddingHorizontal: spacing.lg },
-  blob1: {
-    position: 'absolute',
-    top: -80,
-    right: -60,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: colors.primaryGlow,
-    opacity: 0.2,
-  },
-  blob2: {
-    position: 'absolute',
-    bottom: 120,
-    left: -80,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: colors.accentLight,
-    opacity: 0.3,
-  },
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingBottom: 120,
@@ -583,7 +559,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: colors.surfaceElevated,
     marginVertical: spacing.md,
   },
   specsGrid: {
@@ -602,7 +578,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(111, 216, 199, 0.1)',
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -756,7 +732,7 @@ const styles = StyleSheet.create({
   contactBtnText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#080B14',
+    color: colors.primaryOnColor,
   },
   manageBtn: {
     flex: 1,

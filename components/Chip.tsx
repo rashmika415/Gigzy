@@ -43,9 +43,9 @@ export default function Chip({
   ];
 
   const labelColor =
-    variant === 'selected' ? '#080B14' : colors.textSecondary;
+    variant === 'selected' ? colors.primaryOnColor : colors.textSecondary;
   const iconColor =
-    variant === 'selected' ? '#080B14' : colors.textSecondary;
+    variant === 'selected' ? colors.primaryOnColor : colors.textSecondary;
 
   const inner = (
     <>
@@ -77,7 +77,7 @@ export default function Chip({
           <Ionicons
             name="close-circle"
             size={isSm ? 13 : 15}
-            color={variant === 'selected' ? '#080B14' : colors.textMuted}
+            color={variant === 'selected' ? colors.primaryOnColor : colors.textMuted}
           />
         </TouchableOpacity>
       )}
@@ -99,10 +99,10 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.full,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: colors.surfaceBorder,
     paddingVertical: 5,
     paddingHorizontal: 12,
   },
@@ -112,8 +112,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
   },
   selected: {
-    backgroundColor: colors.text,
-    borderColor: colors.text,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   outline: {
     backgroundColor: 'transparent',

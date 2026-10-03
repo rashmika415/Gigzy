@@ -132,7 +132,7 @@ export default function MessagesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Subtle background ambient glows */}
-      <View style={styles.glowTop} />
+
 
       {/* Header */}
       <View style={styles.header}>
@@ -258,7 +258,7 @@ export default function MessagesScreen() {
                 onPress={() => router.push('/(app)/(tabs)/home' as any)}
                 activeOpacity={0.85}
               >
-                <Ionicons name="briefcase-outline" size={18} color="#003731" />
+                <Ionicons name="briefcase-outline" size={18} color={colors.primaryOnColor} />
                 <Text style={styles.exploreButtonText}>Explore Gigs</Text>
               </TouchableOpacity>
             )}
@@ -354,16 +354,6 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  glowTop: {
-    position: 'absolute',
-    top: -60,
-    right: -40,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: colors.primaryLight,
-    opacity: 0.3,
-  },
   header: {
     height: 56,
     flexDirection: 'row',
@@ -388,7 +378,7 @@ const styles = StyleSheet.create({
   },
   headerUnreadBadge: {
     backgroundColor: colors.primaryLight,
-    borderColor: 'rgba(111, 216, 199, 0.3)',
+    borderColor: colors.surfaceBorder,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -492,7 +482,7 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: 'rgba(111, 216, 199, 0.2)',
+    borderColor: colors.surfaceBorder,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
@@ -522,7 +512,7 @@ const styles = StyleSheet.create({
   exploreButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#003731',
+    color: colors.primaryOnColor,
   },
   chatCard: {
     flexDirection: 'row',
@@ -535,7 +525,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chatCardUnread: {
-    borderColor: 'rgba(111, 216, 199, 0.4)',
+    borderColor: colors.surfaceBorder,
     backgroundColor: colors.surfaceElevated,
   },
   avatarWrapper: {
@@ -552,8 +542,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarCircleBusiness: {
-    backgroundColor: 'rgba(44, 73, 104, 0.3)',
-    borderColor: '#7BA6D6',
+    backgroundColor: colors.accentLight,
+    borderColor: '#2C4968',
   },
   avatarImage: {
     width: 52,
@@ -568,7 +558,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   avatarTextBusiness: {
-    color: '#ADC9EE',
+    color: '#2C4968',
   },
   onlineBadge: {
     position: 'absolute',
@@ -604,7 +594,7 @@ const styles = StyleSheet.create({
   },
   userNameBold: {
     fontWeight: '800',
-    color: '#FFF',
+    color: colors.text,
   },
   roleTag: {
     paddingHorizontal: 6,
@@ -614,10 +604,10 @@ const styles = StyleSheet.create({
   },
   roleTagYouth: {
     backgroundColor: colors.primaryLight,
-    borderColor: 'rgba(111, 216, 199, 0.3)',
+    borderColor: colors.surfaceBorder,
   },
   roleTagBusiness: {
-    backgroundColor: 'rgba(44, 73, 104, 0.3)',
+    backgroundColor: colors.accentLight,
     borderColor: 'rgba(123, 166, 214, 0.4)',
   },
   roleTagText: {
@@ -628,7 +618,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   roleTagTextBusiness: {
-    color: '#ADC9EE',
+    color: '#2C4968',
   },
   timeText: {
     fontSize: 12,
@@ -642,7 +632,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(111, 216, 199, 0.08)',
+    backgroundColor: colors.primaryLight,
     borderRadius: borderRadius.sm,
     paddingHorizontal: 6,
     paddingVertical: 2,

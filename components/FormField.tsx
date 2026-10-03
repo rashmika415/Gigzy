@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'ios' ? 12 : 8,
   },
   inputContainerError: {
-    backgroundColor: 'rgba(147, 0, 10, 0.06)',
+    backgroundColor: colors.errorLight,
   },
   icon: {
     marginRight: 10,
