@@ -67,8 +67,10 @@ export default function BrowseScreen() {
   const handleRefresh = () => setRefreshing(true);
 
   const handleGigPress = (gig: Gig) => {
-    // TODO: Navigate to gig detail screen (gig/[id].tsx)
-    // router.push({ pathname: '/(app)/gig/[id]', params: { id: gig.id } });
+    router.push({
+      pathname: '/(app)/gig/[id]',
+      params: { id: gig.id },
+    } as any);
   };
 
   const renderGigItem = ({ item }: { item: Gig }) => (
