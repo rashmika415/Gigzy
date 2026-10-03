@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-nativ
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../constants/theme';
 import StatusPill from './StatusPill';
+import BookmarkButton from './BookmarkButton';
 import Chip from './Chip';
 import { categoryId } from '../services/discoveryFilters';
 import { GIG_CATEGORIES } from '../types/gig';
@@ -22,6 +23,8 @@ interface GigCardProps {
   maxSkills?: number;
   /** Additional style applied to the outer container */
   style?: ViewStyle;
+  /** Show the youth account bookmark control. */
+  showBookmark?: boolean;
 }
 
 export default function GigCard({
@@ -31,6 +34,7 @@ export default function GigCard({
   renderActions,
   maxSkills = 3,
   style,
+  showBookmark = false,
 }: GigCardProps) {
   const locationIcon =
     gig.locationType === 'remote' ? 'globe-outline' : 'location-outline';
@@ -44,6 +48,7 @@ export default function GigCard({
     >
       {/* ── Top Row: category & status ── */}
       <View style={styles.topRow}>
+        <View style={styles.badges}>
         <View style={styles.categoryBadge}>
           <Text style={styles.categoryText}>{GIG_CATEGORIES.find(category => category.id === categoryId(gig.category))?.name ?? gig.category}</Text>
         </View>
@@ -53,6 +58,8 @@ export default function GigCard({
           showChevron={!!onStatusPress}
           onPress={onStatusPress ? () => onStatusPress(gig) : undefined}
         />
+        </View>
+        {showBookmark && <BookmarkButton gigId={gig.id} title={gig.title} />}
       </View>
 
       {/* ── Title & Pay ── */}
@@ -112,7 +119,7 @@ export default function GigCard({
           <Ionicons
             name="people"
             size={12}
-            color={gig.applicantsCount > 0 ? '#10B981' : colors.textMuted}
+            color={gig.applicantsCount > 0 ? '#147D54' : colors.textMuted}
           />
           <Text
             style={[
@@ -134,6 +141,7 @@ export default function GigCard({
 }
 
 const styles = StyleSheet.create({
+  badges: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   card: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
@@ -150,7 +158,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   categoryBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.sm,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -231,7 +239,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    borderTopColor: colors.surfaceBorder,
   },
   metaItem: {
     flexDirection: 'row',
@@ -245,7 +253,7 @@ const styles = StyleSheet.create({
   applicantsChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.full,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -262,7 +270,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   applicantsTextActive: {
-    color: '#10B981',
+    color: '#147D54',
     fontWeight: '700',
   },
 
@@ -270,6 +278,6 @@ const styles = StyleSheet.create({
   actionsFooter: {
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    borderTopColor: colors.surfaceBorder,
   },
 });

@@ -1,39 +1,42 @@
-// Design tokens for the LocalWorks app
-// Dark, teal-accented youth gig-marketplace aesthetic
+// Shared warm-white and teal design tokens for Gigzy.
 
 export const colors = {
-  background: '#0D1515',
-  surface: '#151D1D',
-  surfaceElevated: '#192121',
-  surfaceBorder: 'rgba(135, 147, 144, 0.2)',
-  surfaceBorderSubtle: 'rgba(61, 73, 70, 0.3)',
-  surfaceHover: 'rgba(111, 216, 199, 0.08)',
+  background: '#FAF9F6',
+  surface: '#FFFFFF',
+  surfaceElevated: '#F3F6F3',
+  surfaceBorder: '#DFE7E2',
+  surfaceBorderSubtle: '#ECF0EC',
+  surfaceHover: '#E7F4EF',
 
-  primary: '#6FD8C7',
-  primaryDark: '#2B9E8F',
-  primaryLight: 'rgba(111, 216, 199, 0.15)',
-  primaryGlow: 'rgba(111, 216, 199, 0.25)',
-  primaryOnColor: '#003731',
+  primary: '#087F73',
+  primaryDark: '#06665D',
+  primaryLight: '#E7F4EF',
+  primaryGlow: 'rgba(8, 127, 115, 0.10)',
+  primaryOnColor: '#FFFFFF',
 
   accent: '#2C4968',
-  accentLight: 'rgba(44, 73, 104, 0.15)',
+  accentLight: '#EDF2F8',
 
-  text: '#DCE4E4',
-  textSecondary: '#BCC9C5',
-  textMuted: '#879390',
-  placeholder: '#6B7280',
+  text: '#172B27',
+  textSecondary: '#61716B',
+  textMuted: '#6B7B74',
+  placeholder: '#788780',
 
-  error: '#FFB4AB',
-  errorText: '#FFDAD6',
-  errorLight: 'rgba(147, 0, 10, 0.2)',
-  errorBorder: 'rgba(255, 180, 171, 0.5)',
+  error: '#B42318',
+  errorText: '#B42318',
+  errorLight: '#FFF1EE',
+  errorBorder: '#F3C5BD',
 
-  success: '#10B981',
-  successLight: 'rgba(16, 185, 129, 0.12)',
+  success: '#147D54',
+  successLight: '#EAF6EF',
 
-  inputBg: '#151D1D',
-  inputBorder: 'rgba(135, 147, 144, 0.2)',
-  inputBorderFocus: '#6FD8C7',
+  warning: '#986000',
+  warningLight: '#FFF5DF',
+  overlay: 'rgba(23, 43, 39, 0.42)',
+
+  inputBg: '#FFFFFF',
+  inputBorder: '#DFE7E2',
+  inputBorderFocus: '#087F73',
 };
 
 export const fonts = {
@@ -54,10 +57,10 @@ export const spacing = {
 };
 
 export const borderRadius = {
-  sm: 4,
-  md: 8,
-  lg: 12,
-  xl: 16,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
   full: 9999,
 };
 
@@ -65,8 +68,8 @@ export const shadows = {
   card: {
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.06,
     shadowRadius: 12,
-    elevation: 6,
+    elevation: 2,
   },
 };

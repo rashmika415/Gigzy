@@ -69,5 +69,5 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 22, fontWeight: '700' }, label: { color: colors.text, fontSize: 16, fontWeight: '700' },
   note: { color: colors.textMuted, lineHeight: 20 }, link: { color: colors.primary, fontWeight: '600', paddingVertical: 8 },
   error: { color: colors.error }, button: { backgroundColor: colors.primary, padding: 16, borderRadius: 16, alignItems: 'center' },
-  buttonText: { color: colors.background, fontWeight: '700' },
+  buttonText: { color: colors.primaryOnColor, fontWeight: '700' },
 });

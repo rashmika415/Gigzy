@@ -109,7 +109,7 @@ export default function BrowseScreen() {
   const renderGigItem = useCallback(
     ({ item }: { item: Gig }) => (
       <View style={styles.cardWrapper}>
-        <GigCard gig={item} onPress={handleGigPress} />
+        <GigCard gig={item} onPress={handleGigPress} showBookmark />
       </View>
     ),
     [handleGigPress],
@@ -119,10 +119,6 @@ export default function BrowseScreen() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
-      {/* Background blobs */}
-      <View style={styles.blob1} />
-      <View style={styles.blob2} />
-
       {/* ── Header ── */}
       <View style={styles.header}>
         <View>
@@ -155,7 +151,7 @@ export default function BrowseScreen() {
           <Ionicons
             name="swap-vertical"
             size={18}
-            color={selectedSort !== 'newest' ? '#080B14' : colors.primary}
+            color={selectedSort !== 'newest' ? colors.primaryOnColor : colors.primary}
           />
         </TouchableOpacity>
       </View>
@@ -176,7 +172,7 @@ export default function BrowseScreen() {
             <Ionicons
               name="grid-outline"
               size={14}
-              color={selectedCategory === 'all' ? '#080B14' : colors.textSecondary}
+              color={selectedCategory === 'all' ? colors.primaryOnColor : colors.textSecondary}
             />
             <Text
               style={[
@@ -200,7 +196,7 @@ export default function BrowseScreen() {
                 <Ionicons
                   name={cat.icon as any}
                   size={14}
-                  color={isSelected ? '#080B14' : colors.textSecondary}
+                  color={isSelected ? colors.primaryOnColor : colors.textSecondary}
                 />
                 <Text
                   style={[styles.categoryChipText, isSelected && styles.categoryChipTextSelected]}
@@ -320,7 +316,7 @@ export default function BrowseScreen() {
                       <Ionicons
                         name={opt.icon}
                         size={16}
-                        color={isActive ? '#080B14' : colors.textMuted}
+                        color={isActive ? colors.primaryOnColor : colors.textMuted}
                       />
                     </View>
                     <Text
@@ -348,26 +344,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  blob1: {
-    position: 'absolute',
-    top: -60,
-    right: -80,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: colors.primaryGlow,
-    opacity: 0.25,
-  },
-  blob2: {
-    position: 'absolute',
-    bottom: 100,
-    left: -60,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: colors.accentLight,
-    opacity: 0.35,
   },
 
   // Header
@@ -405,12 +381,12 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#10B981',
+    backgroundColor: '#147D54',
   },
   liveText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#10B981',
+    color: '#147D54',
   },
 
   // Search + Sort row
@@ -470,7 +446,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   categoryChipTextSelected: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontWeight: '700',
   },
 
@@ -483,7 +459,7 @@ const styles = StyleSheet.create({
   locationChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.full,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -544,7 +520,7 @@ const styles = StyleSheet.create({
   // Sort Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalCard: {
@@ -562,7 +538,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: colors.surfaceElevated,
     alignSelf: 'center',
     marginBottom: spacing.md,
   },
@@ -593,7 +569,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },

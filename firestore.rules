@@ -26,6 +26,16 @@ service cloud.firestore {
         && request.resource.data.get('isVerified', false) != true;
       allow update: if isAdmin() || (owns(userId) && active() && protectedUserFieldsUnchanged());
       allow delete: if false;
+      match /savedGigs/{gigId} {
+        allow read: if owns(userId) && active();
+        allow create: if owns(userId) && active() && currentUser().data.role == 'freelancer'
+          && request.resource.data.keys().hasOnly(['gigId', 'savedAt'])
+          && request.resource.data.gigId == gigId
+          && request.resource.data.savedAt == request.time
+          && exists(/databases/$(database)/documents/gigs/$(gigId));
+        allow update: if false;
+        allow delete: if owns(userId) && active();
+      }
       match /notifications/{notificationId} {
         allow read: if owns(userId);
         allow create, delete: if isAdmin();

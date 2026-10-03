@@ -107,17 +107,17 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   tabTextSelected: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontWeight: '800',
   },
   badge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.full,
     paddingHorizontal: 6,
     paddingVertical: 1,
   },
   badgeSelected: {
-    backgroundColor: '#080B14',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   badgeText: {
     fontSize: 11,
@@ -125,6 +125,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   badgeTextSelected: {
-    color: colors.primary,
+    color: colors.primaryOnColor,
   },
 });
