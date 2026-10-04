@@ -420,7 +420,7 @@ export default function EditProfile() {
                 </View>
               ) : (
                 <View style={styles.cameraIconContainer}>
-                  <Ionicons name="camera" size={16} color="#000" />
+                  <Ionicons name="camera" size={16} color={colors.primaryOnColor} />
                 </View>
               )}
             </TouchableOpacity>
@@ -657,7 +657,7 @@ export default function EditProfile() {
               activeOpacity={0.8}
             >
               {saving ? (
-                <ActivityIndicator size="small" color="#000" />
+                <ActivityIndicator size="small" color={colors.primaryOnColor} />
               ) : (
                 <Text style={styles.saveButtonText}>Save Profile Changes</Text>
               )}
@@ -943,17 +943,17 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   saveButtonText: {
-    color: '#000',
+    color: colors.primaryOnColor,
     fontSize: 16,
     fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#0f1322',
+    backgroundColor: colors.surface,
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
     maxHeight: '65%',
@@ -965,7 +965,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.lg,
     borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: colors.surfaceBorder,
   },
   modalTitle: {
     fontSize: 18,
@@ -983,7 +983,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: colors.surfaceBorder,
   },
   modalItemActive: {
     backgroundColor: 'rgba(245, 158, 11, 0.04)',

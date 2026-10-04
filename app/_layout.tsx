@@ -40,13 +40,13 @@ function RootLayoutNav() {
       router.replace('/(auth)/welcome');
     } else if (user && inAuthGroup) {
       // Logged in → send to app home
-      router.replace('/(app)/home');
+      router.replace('/(app)/(tabs)/home');
     }
   }, [user, loading, segments, router]);
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }} />
     </>
   );

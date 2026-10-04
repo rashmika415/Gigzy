@@ -61,6 +61,7 @@ function setup() {
     require: (name) => {
       if (name === 'firebase/firestore') return firestore;
       if (name === '../FirebaseConfig') return { db: {} };
+      if (name === './discoveryFilters') return require('./helpers/load-ts.cjs')('../services/discoveryFilters.ts');
       throw new Error(`Unexpected import: ${name}`);
     },
     console: { error: () => {} },
