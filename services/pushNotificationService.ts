@@ -8,7 +8,7 @@ const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreCl
 
 let Notifications: any = null;
 
-if (!isExpoGo) {
+if (!isExpoGo && Platform.OS !== 'web') {
   Notifications = require('expo-notifications');
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -25,7 +25,7 @@ function tokenDocumentId(token: string) {
 }
 
 export async function registerDeviceForPush(userId: string) {
-  if (!Device.isDevice) return null;
+  if (Platform.OS === 'web' || !Device.isDevice) return null;
   if (isExpoGo) {
     console.warn('Push notifications are not supported in Expo Go for SDK 53+.');
     return null;

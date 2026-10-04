@@ -1,9 +1,9 @@
 // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 // @ts-expect-error getReactNativePersistence ships in the RN build of firebase/auth
 // (resolved by Metro's "react-native" export condition) but isn't in the package's public types.
-import { getAuth, initializeAuth, getReactNativePersistence } from "firebase/auth";
-import { initializeFirestore } from "firebase/firestore";
+import { initializeAuth, getReactNativePersistence, getAuth, type Auth } from "firebase/auth";
+import { initializeFirestore, getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
@@ -30,18 +30,33 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Firebase services
-export const auth = Platform.OS === "web" ? getAuth(app) : initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-});
+export const auth: Auth =
+  Platform.OS === "web"
+    ? getAuth(app)
+    : (() => {
+        try {
+          return initializeAuth(app, {
+            persistence: getReactNativePersistence(AsyncStorage),
+          });
+        } catch (_e) {
+          return getAuth(app);
+        }
+      })();
 // Firestore's streaming transport can be buffered indefinitely by some mobile
 // networks/proxies. Native builds use long polling so writes either complete or
 // surface an error instead of leaving the UI stuck on "Persisting...".
-export const db = initializeFirestore(app, {
-    experimentalForceLongPolling: Platform.OS !== "web",
-});
+export const db = (() => {
+  try {
+    return initializeFirestore(app, {
+      experimentalForceLongPolling: Platform.OS !== "web",
+    });
+  } catch (_e) {
+    return getFirestore(app);
+  }
+})();
 export const storage = getStorage(app);
 
 export default app;
