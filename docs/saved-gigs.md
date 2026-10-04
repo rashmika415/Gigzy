@@ -16,7 +16,9 @@ Review and deploy the updated rules to the team's intended Firebase project befo
 firebase deploy --only firestore:rules --project local-workers-74bdd
 ```
 
-The implementation does not deploy rules or modify production data. Member 1 should retain the `savedGigs` subcollection rules when editing the shared users rules.
+On 2026-10-04, investigation confirmed that the active rules in `local-workers-74bdd` did not contain the `savedGigs` match, so Firebase denied bookmark reads and writes. A scoped update was prepared from the deployed rules, adding only the saved-gig match already present in this repository. Firebase's rules validation reported no issues. The update was published and its active contents verified. Other deployed permissions were preserved, and no user or gig documents were changed. Member 1 should retain the `savedGigs` subcollection rules when editing the shared users rules.
+
+If a bookmark subscription fails, its button now displays the underlying error and offers **Retry** directly beside the bookmark. Retry reloads the saved state; it does not claim a failed write succeeded. If access is denied again, confirm that the app targets the intended Firebase project and that a subsequent rules deployment retained the saved-gig match.
 
 ## Verification
 
@@ -29,6 +31,6 @@ npx expo export --platform web
 
 The rules command uses the demo project `demo-gigzy-saved` and a local Firestore emulator on port 8085; Java is required. It does not contact production Firestore. Ordinary service tests skip the emulator-only test when `FIRESTORE_EMULATOR_HOST` is absent. The rules suite checks ownership, anonymous access, role and suspension restrictions, schema validation, duplicate saves, and removal after a gig is deleted.
 
-Implementation validation: all 20 service tests, changed-file lint, TypeScript, web export and browser checks pass. The rules suite could not execute in this session because the official emulator download stalled; run `npm run test:rules` before deploying. No live Firebase test has been performed.
+Latest validation: 35 tests pass, with the emulator-only rules test skipped. TypeScript and bookmark-component lint pass. The local rules suite could not execute because the official emulator download stalled. The published rules passed Firebase's compilation check and were read back to verify the exact scoped update. An authenticated bookmark write from a real account has not been exercised in this session.
 
 Browser checks use an isolated preview with local fixtures under the ignored `.expo/app-ui/preview` directory. At 320px, 390px and 1440px they cover saving without opening the card, navigation to Saved, removal, empty and unavailable rows, current completed status, detail bookmarks, failed writes, subscription errors, the business role guard, horizontal overflow and runtime exceptions. Screenshots are in `.expo/app-ui/saved-*.png`. Test native device behavior and real account switching after deploying rules.

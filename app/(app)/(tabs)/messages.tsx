@@ -1,16 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
-  RefreshControl,
-  Image,
-} from 'react-native';
+import { formatRelativeDate } from '../../../localization/format';
+import { Text, TextInput } from '../../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -22,21 +14,11 @@ import { Chat, ParticipantDetail } from '../../../types/chat';
 function formatTimestamp(timestamp: any): string {
   if (!timestamp) return '';
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffMinutes < 1) return 'Just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return formatRelativeDate(date);
 }
 
 export default function MessagesScreen() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,10 +30,14 @@ export default function MessagesScreen() {
   useEffect(() => {
     if (!user) return;
 
+    let active = true;
+    let unsubscribe: () => void = () => {};
+    void Promise.resolve().then(() => {
+    if (!active) return;
     setLoading(true);
     setErrorMsg('');
 
-    const unsubscribe = subscribeToUserChats(
+    unsubscribe = subscribeToUserChats(
       user.uid,
       (userChats) => {
         setChats(userChats);
@@ -65,7 +51,9 @@ export default function MessagesScreen() {
       }
     );
 
+    });
     return () => {
+      active = false;
       unsubscribe();
     };
   }, [user]);
@@ -77,7 +65,7 @@ export default function MessagesScreen() {
     } catch {}
   };
 
-  const getOtherParticipant = (chat: Chat): ParticipantDetail => {
+  const getOtherParticipant = useCallback((chat: Chat): ParticipantDetail => {
     if (!user) return { uid: '', fullName: 'User', role: 'freelancer' };
     const otherUid = chat.participants.find((p) => p !== user.uid) || '';
     return (
@@ -87,7 +75,7 @@ export default function MessagesScreen() {
         role: 'freelancer',
       }
     );
-  };
+  }, [user]);
 
   const filteredChats = useMemo(() => {
     return chats.filter((chat) => {
@@ -116,7 +104,7 @@ export default function MessagesScreen() {
       }
       return true;
     });
-  }, [chats, searchQuery, activeTab, user]);
+  }, [chats, searchQuery, activeTab, user, getOtherParticipant]);
 
   const totalUnread = useMemo(() => {
     if (!user) return 0;
@@ -149,10 +137,10 @@ export default function MessagesScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Messages</Text>
+          <Text style={styles.headerTitle}>{t("Messages")}</Text>
           {totalUnread > 0 && (
             <View style={styles.headerUnreadBadge}>
-              <Text style={styles.headerUnreadText}>{totalUnread} new</Text>
+              <Text style={styles.headerUnreadText}>{totalUnread}{t("new")}</Text>
             </View>
           )}
         </View>
@@ -172,7 +160,7 @@ export default function MessagesScreen() {
           <Ionicons name="search-outline" size={18} color={colors.placeholder} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search messages, names, or gigs..."
+            placeholder={t("Search messages, names, or gigs...")}
             placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -205,7 +193,7 @@ export default function MessagesScreen() {
               activeOpacity={0.8}
             >
               <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
-                {label}
+                {t(label)}
               </Text>
             </TouchableOpacity>
           );
@@ -229,12 +217,12 @@ export default function MessagesScreen() {
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Syncing conversations...</Text>
+            <Text style={styles.loadingText}>{t("Syncing conversations...")}</Text>
           </View>
         ) : errorMsg ? (
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle-outline" size={32} color={colors.error} />
-            <Text style={styles.errorText}>{errorMsg}</Text>
+            <Text style={styles.errorText}>{t(errorMsg ?? "")}</Text>
           </View>
         ) : filteredChats.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -242,18 +230,10 @@ export default function MessagesScreen() {
               <Ionicons name="chatbubbles-outline" size={40} color={colors.primary} />
             </View>
             <Text style={styles.emptyTitle}>
-              {searchQuery
-                ? 'No matching conversations'
-                : activeTab === 'unread'
-                ? 'All caught up!'
-                : 'No conversations yet'}
+              {searchQuery ? t("No matching conversations") : activeTab === 'unread' ? t("All caught up!") : t("No conversations yet")}
             </Text>
             <Text style={styles.emptySubtitle}>
-              {searchQuery
-                ? 'Try searching with a different name or keyword.'
-                : activeTab === 'unread'
-                ? 'You have read all received messages.'
-                : 'Connect with employers or youth freelancers from gig listings to start chatting.'}
+              {searchQuery ? t("Try searching with a different name or keyword.") : activeTab === 'unread' ? t("You have read all received messages.") : t("Connect with employers or youth freelancers from gig listings to start chatting.")}
             </Text>
 
             {!searchQuery && (
@@ -263,7 +243,7 @@ export default function MessagesScreen() {
                 activeOpacity={0.85}
               >
                 <Ionicons name="briefcase-outline" size={18} color={colors.primaryOnColor} />
-                <Text style={styles.exploreButtonText}>Explore Gigs</Text>
+                <Text style={styles.exploreButtonText}>{t("Explore Gigs")}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -310,11 +290,11 @@ export default function MessagesScreen() {
                   <View style={styles.chatHeaderRow}>
                     <View style={styles.nameRoleContainer}>
                       <Text style={[styles.userName, unread > 0 && styles.userNameBold]} numberOfLines={1}>
-                        {other.fullName || 'User'}
+                        {other.fullName || t("User")}
                       </Text>
                       <View style={[styles.roleTag, isBusiness ? styles.roleTagBusiness : styles.roleTagYouth]}>
                         <Text style={[styles.roleTagText, isBusiness ? styles.roleTagTextBusiness : styles.roleTagTextYouth]}>
-                          {isBusiness ? 'Client' : 'Freelancer'}
+                          {isBusiness ? t("Client") : t("Freelancer")}
                         </Text>
                       </View>
                     </View>
@@ -329,7 +309,7 @@ export default function MessagesScreen() {
                       <Ionicons name="briefcase-outline" size={12} color={colors.primary} />
                       <Text style={styles.gigPillText} numberOfLines={1}>
                         {chat.gigTitle}
-                        {chat.gigPay ? ` • $${chat.gigPay}${chat.gigPayType === 'hourly' ? '/hr' : ''}` : ''}
+                        {chat.gigPay ? t(" • ${{value0}}{{value1}}", { value0: chat.gigPay, value1: chat.gigPayType === 'hourly' ? t("/hr") : '' }) : ''}
                       </Text>
                     </View>
                   )}
@@ -340,8 +320,12 @@ export default function MessagesScreen() {
                       style={[styles.lastMessageText, unread > 0 && styles.lastMessageTextUnread]}
                       numberOfLines={1}
                     >
+ HEAD
                       {isSentByMe ? 'You: ' : ''}
                       {lastMsgPreview}
+=======
+                      {isSentByMe ? t("You: ") : ''}
+                      {chat.lastMessage?.text || t("Started a new conversation")}
                     </Text>
 
                     {unread > 0 && (

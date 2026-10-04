@@ -1,5 +1,7 @@
+import { Text } from '../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../FirebaseConfig';
@@ -21,6 +23,7 @@ function getFirebaseError(code: string): string {
 }
 
 export default function Login() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -44,25 +47,25 @@ export default function Login() {
     }
   };
 
-  return <AuthScreen title="Welcome back" subtitle="Your next opportunity is closer than you think." eyebrow="LET'S GET YOU BACK TO IT">
+  return <AuthScreen title={t("Welcome back")} subtitle={t("Your next opportunity is closer than you think.")} eyebrow={t("LET'S GET YOU BACK TO IT")}>
     <View style={authStyles.form}>
-      <AuthField label="Email address" icon="mail-outline" value={email} onChangeText={value => { setEmail(value); setError(''); }}
+      <AuthField label={t("Email address")} icon="mail-outline" value={email} onChangeText={value => { setEmail(value); setError(''); }}
         placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress" editable={!loading} returnKeyType="next" />
-      <AuthField label="Password" icon="lock-closed-outline" password value={password} onChangeText={value => { setPassword(value); setError(''); }}
-        placeholder="Enter your password" autoCapitalize="none" autoComplete="current-password" textContentType="password" editable={!loading} returnKeyType="go" onSubmitEditing={handleLogin} />
+      <AuthField label={t("Password")} icon="lock-closed-outline" password value={password} onChangeText={value => { setPassword(value); setError(''); }}
+        placeholder={t("Enter your password")} autoCapitalize="none" autoComplete="current-password" textContentType="password" editable={!loading} returnKeyType="go" onSubmitEditing={handleLogin} />
       <TouchableOpacity style={styles.forgot} onPress={() => router.push('/(auth)/forgot-password')} accessibilityRole="link" disabled={loading}>
-        <Text style={authStyles.link}>Forgot password?</Text>
+        <Text style={authStyles.link}>{t("Forgot password?")}</Text>
       </TouchableOpacity>
-      <AuthError message={error} />
-      <AuthButton title="Sign in" onPress={handleLogin} loading={loading} />
+      <AuthError message={t(error ?? "")} />
+      <AuthButton title={t("Sign in")} onPress={handleLogin} loading={loading} />
     </View>
     <View style={authStyles.footer}>
-      <Text style={authStyles.footerText}>New to Gigzy?</Text>
+      <Text style={authStyles.footerText}>{t("New to Gigzy?")}</Text>
       <TouchableOpacity style={authStyles.footerLink} accessibilityRole="link" onPress={() => router.push('/(auth)/role-select')} disabled={loading}>
-        <Text style={authStyles.link}>Create an account</Text>
+        <Text style={authStyles.link}>{t("Create an account")}</Text>
       </TouchableOpacity>
     </View>
-    <Text style={styles.note}>Local people. Meaningful opportunities.</Text>
+    <Text style={styles.note}>{t("Local people. Meaningful opportunities.")}</Text>
   </AuthScreen>;
 }
 const styles = StyleSheet.create({

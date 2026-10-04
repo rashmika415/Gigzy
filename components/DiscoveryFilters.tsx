@@ -1,5 +1,7 @@
+import { Text } from './LocalizedText';
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
-import { Modal, ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Modal, ScrollView, View, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FormField from './FormField';
 import Chip from './Chip';
@@ -12,6 +14,7 @@ import type { GigFilterOptions } from '../types/gig';
 export default function DiscoveryFilters({ visible, value, onApply, onClose }: {
   visible: boolean; value: GigFilterOptions; onApply: (options: GigFilterOptions) => void; onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(value);
   const [minPay, setMinPay] = useState(value.minPay?.toString() ?? '');
   const [maxPay, setMaxPay] = useState(value.maxPay?.toString() ?? '');
@@ -40,25 +43,25 @@ export default function DiscoveryFilters({ visible, value, onApply, onClose }: {
   };
   return <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
     <SafeAreaView style={styles.container}>
-      <View style={styles.row}><Text style={styles.title}>Filter gigs</Text><TouchableOpacity onPress={onClose}><Text style={styles.link}>Cancel</Text></TouchableOpacity></View>
+      <View style={styles.row}><Text style={styles.title}>{t("Filter gigs")}</Text><TouchableOpacity onPress={onClose}><Text style={styles.link}>{t("Cancel")}</Text></TouchableOpacity></View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.label}>Pay</Text>
-        <SegmentedControl options={[{ key: 'all', label: 'Any rate' }, { key: 'fixed', label: 'Fixed' }, { key: 'hourly', label: 'Hourly' }]} selectedKey={draft.payType ?? 'all'} onSelect={key => setDraft({ ...draft, payType: key as GigFilterOptions['payType'] })} />
-        <FormField label="Minimum pay" value={minPay} onChangeText={setMinPay} keyboardType="decimal-pad" />
-        <FormField label="Maximum pay" value={maxPay} onChangeText={setMaxPay} keyboardType="decimal-pad" hint="Choose a rate type to compare similar pay amounts." />
-        <Text style={styles.label}>Distance</Text>
-        <TouchableOpacity onPress={locate} disabled={locating}><Text style={styles.link}>{locating ? 'Finding your location…' : draft.origin ? 'Update my location' : 'Use my location'}</Text></TouchableOpacity>
-        {draft.origin && <Text style={styles.note}>Location ready. Distances are measured in a straight line.</Text>}
-        <FormField label="Within (km)" value={radius} onChangeText={setRadius} keyboardType="decimal-pad" hint="Remote gigs are included. Gigs without coordinates are excluded when distance is set." />
-        <Text style={styles.label}>Availability</Text>
-        <FormField label="Available from" placeholder="YYYY-MM-DD" value={draft.dateFrom ?? ''} onChangeText={dateFrom => setDraft({ ...draft, dateFrom })} />
-        <FormField label="Available through" placeholder="YYYY-MM-DD" value={draft.dateTo ?? ''} onChangeText={dateTo => setDraft({ ...draft, dateTo })} />
-        <FormField label="Earliest start time" placeholder="HH:MM (24-hour)" value={draft.timeFrom ?? ''} onChangeText={timeFrom => setDraft({ ...draft, timeFrom })} />
-        <FormField label="Latest start time" placeholder="HH:MM (24-hour)" value={draft.timeTo ?? ''} onChangeText={timeTo => setDraft({ ...draft, timeTo })} hint="Times use the gig's local time. Gigs without a start time are excluded when time filters are set." />
-        <Chip label="Weekends only" variant={draft.weekendsOnly ? 'selected' : 'default'} onPress={() => setDraft({ ...draft, weekendsOnly: !draft.weekendsOnly })} />
-        {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-        <TouchableOpacity style={styles.button} onPress={apply} disabled={locating}><Text style={styles.buttonText}>Apply filters</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => { setDraft({}); setMinPay(''); setMaxPay(''); setRadius(''); setError(''); }}><Text style={styles.link}>Reset filters</Text></TouchableOpacity>
+        <Text style={styles.label}>{t("Pay")}</Text>
+        <SegmentedControl options={[{ key: 'all', label: t("Any rate") }, { key: 'fixed', label: t("Fixed") }, { key: 'hourly', label: t("Hourly") }]} selectedKey={draft.payType ?? 'all'} onSelect={key => setDraft({ ...draft, payType: key as GigFilterOptions['payType'] })} />
+        <FormField label={t("Minimum pay")} value={minPay} onChangeText={setMinPay} keyboardType="decimal-pad" />
+        <FormField label={t("Maximum pay")} value={maxPay} onChangeText={setMaxPay} keyboardType="decimal-pad" hint={t("Choose a rate type to compare similar pay amounts.")} />
+        <Text style={styles.label}>{t("Distance")}</Text>
+        <TouchableOpacity onPress={locate} disabled={locating}><Text style={styles.link}>{locating ? t("Finding your location…") : draft.origin ? t("Update my location") : t("Use my location")}</Text></TouchableOpacity>
+        {draft.origin && <Text style={styles.note}>{t("Location ready. Distances are measured in a straight line.")}</Text>}
+        <FormField label={t("Within (km)")} value={radius} onChangeText={setRadius} keyboardType="decimal-pad" hint={t("Remote gigs are included. Gigs without coordinates are excluded when distance is set.")} />
+        <Text style={styles.label}>{t("Availability")}</Text>
+        <FormField label={t("Available from")} placeholder="YYYY-MM-DD" value={draft.dateFrom ?? ''} onChangeText={dateFrom => setDraft({ ...draft, dateFrom })} />
+        <FormField label={t("Available through")} placeholder="YYYY-MM-DD" value={draft.dateTo ?? ''} onChangeText={dateTo => setDraft({ ...draft, dateTo })} />
+        <FormField label={t("Earliest start time")} placeholder="HH:MM (24-hour)" value={draft.timeFrom ?? ''} onChangeText={timeFrom => setDraft({ ...draft, timeFrom })} />
+        <FormField label={t("Latest start time")} placeholder="HH:MM (24-hour)" value={draft.timeTo ?? ''} onChangeText={timeTo => setDraft({ ...draft, timeTo })} hint={t("Times use the gig's local time. Gigs without a start time are excluded when time filters are set.")} />
+        <Chip label={t("Weekends only")} variant={draft.weekendsOnly ? 'selected' : 'default'} onPress={() => setDraft({ ...draft, weekendsOnly: !draft.weekendsOnly })} />
+        {!!error && <Text accessibilityRole="alert" style={styles.error}>{t(error ?? "")}</Text>}
+        <TouchableOpacity style={styles.button} onPress={apply} disabled={locating}><Text style={styles.buttonText}>{t("Apply filters")}</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => { setDraft({}); setMinPay(''); setMaxPay(''); setRadius(''); setError(''); }}><Text style={styles.link}>{t("Reset filters")}</Text></TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   </Modal>;

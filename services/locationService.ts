@@ -1,5 +1,5 @@
 import * as Location from 'expo-location';
-import { Platform } from 'react-native';
+import { searchAddresses } from './geoapifyGeocoding';
 import type { Coordinates } from '../types/gig';
 
 function withTimeout<T>(request: Promise<T>): Promise<T> {
@@ -22,9 +22,7 @@ export async function getCurrentCoordinates(): Promise<Coordinates> {
 
 export async function coordinatesForAddress(address: string): Promise<Coordinates> {
   if (!address.trim()) throw new Error('Enter a gig address first.');
-  if (Platform.OS === 'web') throw new Error('Address lookup is available on mobile. Enter coordinates manually on web.');
-  await requestPermission();
-  const results = await withTimeout(Location.geocodeAsync(address));
+  const results = await withTimeout(searchAddresses(address, process.env.EXPO_PUBLIC_GEOAPIFY_API_KEY ?? ''));
   if (!results.length) throw new Error('Address not found. Try a more specific address or enter coordinates.');
-  return { latitude: results[0].latitude, longitude: results[0].longitude };
+  return results[0].coordinates;
 }

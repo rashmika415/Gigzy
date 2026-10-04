@@ -1,5 +1,7 @@
+import { Text } from './LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../constants/theme';
 
@@ -26,13 +28,14 @@ export default function EmptyState({
   actionIcon,
   onAction,
 }: EmptyStateProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <View style={styles.iconCircle}>
         <Ionicons name={icon} size={36} color={colors.primary} />
       </View>
 
-      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.title}>{t(title)}</Text>
 
       {description ? (
         <Text style={styles.description}>{description}</Text>
@@ -40,6 +43,8 @@ export default function EmptyState({
 
       {onAction && actionLabel && (
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={t(actionLabel ?? '')}
           style={styles.actionBtn}
           onPress={onAction}
           activeOpacity={0.85}
@@ -47,7 +52,7 @@ export default function EmptyState({
           {actionIcon && (
             <Ionicons name={actionIcon} size={20} color={colors.primaryOnColor} />
           )}
-          <Text style={styles.actionText}>{actionLabel}</Text>
+          <Text style={styles.actionText}>{t(actionLabel ?? '')}</Text>
         </TouchableOpacity>
       )}
     </View>

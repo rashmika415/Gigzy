@@ -1,5 +1,7 @@
+import { Text } from '../../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +13,7 @@ import type { Gig } from '../../../types/gig';
 import { borderRadius, colors, fonts, spacing } from '../../../constants/theme';
 
 function SavedGigRow({ gigId }: { gigId: string }) {
+  const { t } = useTranslation();
   const [gig, setGig] = useState<Gig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,15 +33,15 @@ function SavedGigRow({ gigId }: { gigId: string }) {
     return () => { active = false; unsubscribe?.(); };
   }, [gigId, attempt]);
 
-  if (loading) return <View style={styles.unavailable}><LoadingState message="Loading saved gig..." /></View>;
+  if (loading) return <View style={styles.unavailable}><LoadingState message={t("Loading saved gig...")} /></View>;
   if (error) return <View style={styles.unavailable}>
-    <ErrorState title="Unable to load this gig" message={error} onRetry={() => setAttempt(value => value + 1)} />
+    <ErrorState title={t("Unable to load this gig")} message={t(error ?? "")} onRetry={() => setAttempt(value => value + 1)} />
     <BookmarkButton gigId={gigId} showLabel />
   </View>;
   if (!gig) return <View style={styles.unavailable}>
     <View style={styles.unavailableCopy}><Ionicons name="briefcase-outline" size={24} color={colors.textMuted} />
-      <Text style={styles.unavailableTitle}>Gig no longer available</Text>
-      <Text style={styles.subtitle}>This gig has been removed. You can remove it from your saved list.</Text>
+      <Text style={styles.unavailableTitle}>{t("Gig no longer available")}</Text>
+      <Text style={styles.subtitle}>{t("This gig has been removed. You can remove it from your saved list.")}</Text>
     </View>
     <BookmarkButton gigId={gigId} showLabel />
   </View>;
@@ -46,26 +49,27 @@ function SavedGigRow({ gigId }: { gigId: string }) {
 }
 
 export default function SavedGigsScreen() {
+  const { t } = useTranslation();
   const { enabled, items, loading, error, retry } = useSavedGigs();
   const [visibleCount, setVisibleCount] = useState(20);
   const [revision, setRevision] = useState(0);
-  if (!enabled) return <SafeAreaView style={styles.container}><EmptyState title="Saved gigs are for youth accounts" description="Sign in with your youth account to keep opportunities for later." /></SafeAreaView>;
+  if (!enabled) return <SafeAreaView style={styles.container}><EmptyState title={t("Saved gigs are for youth accounts")} description={t("Sign in with your youth account to keep opportunities for later.")} /></SafeAreaView>;
   const refresh = () => { retry(); setRevision(value => value + 1); };
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
     <View style={styles.header}>
-      <View style={styles.heading}><Text style={styles.title}>Saved gigs</Text>
-        <Text style={styles.subtitle}>{items.length ? `${items.length} ${items.length === 1 ? 'opportunity' : 'opportunities'} kept for later` : 'Keep your next opportunity close.'}</Text></View>
+      <View style={styles.heading}><Text style={styles.title}>{t("Saved gigs")}</Text>
+        <Text style={styles.subtitle}>{items.length ? t("Saved opportunities: {{count}}", { count: items.length }) : t("Keep your next opportunity close.")}</Text></View>
       <Ionicons name="bookmark" size={25} color={colors.primary} />
     </View>
     <FlatList data={items.slice(0, visibleCount)} keyExtractor={item => `${revision}:${item.gigId}`}
       renderItem={({ item }) => <SavedGigRow gigId={item.gigId} />}
       contentContainerStyle={styles.list} ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}
-      ListHeaderComponent={error && items.length > 0 ? <ErrorState title="Saved gigs could not refresh" message={error} onRetry={refresh} /> : null}
-      ListEmptyComponent={loading ? <LoadingState message="Loading your saved gigs..." /> : error ?
-        <ErrorState title="Unable to load saved gigs" message={error} onRetry={refresh} /> :
-        <EmptyState icon="bookmark-outline" title="No saved gigs yet" description="Tap the bookmark on a gig to find it here later." actionLabel="Browse gigs" actionIcon="compass-outline" onAction={() => router.navigate('/(app)/(tabs)/browse')} />}
-      ListFooterComponent={items.length > visibleCount ? <TouchableOpacity accessibilityRole="button" style={styles.more} onPress={() => setVisibleCount(value => value + 20)}><Text style={styles.moreText}>Load more saved gigs</Text></TouchableOpacity> : null}
+      ListHeaderComponent={error && items.length > 0 ? <ErrorState title={t("Saved gigs could not refresh")} message={t(error ?? "")} onRetry={refresh} /> : null}
+      ListEmptyComponent={loading ? <LoadingState message={t("Loading your saved gigs...")} /> : error ?
+        <ErrorState title={t("Unable to load saved gigs")} message={t(error ?? "")} onRetry={refresh} /> :
+        <EmptyState icon="bookmark-outline" title={t("No saved gigs yet")} description={t("Tap the bookmark on a gig to find it here later.")} actionLabel={t("Browse gigs")} actionIcon="compass-outline" onAction={() => router.navigate('/(app)/(tabs)/browse')} />}
+      ListFooterComponent={items.length > visibleCount ? <TouchableOpacity accessibilityRole="button" style={styles.more} onPress={() => setVisibleCount(value => value + 20)}><Text style={styles.moreText}>{t("Load more saved gigs")}</Text></TouchableOpacity> : null}
       showsVerticalScrollIndicator={false} />
   </SafeAreaView>;
 }

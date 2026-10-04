@@ -1,5 +1,9 @@
+import { formatDate as localizedDate } from '../../localization/format';
+import { translate } from "../../localization/i18n";
+import { Text } from '../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -14,10 +18,11 @@ const ICONS: Record<NotificationType, keyof typeof Ionicons.glyphMap> = {
 
 function formatDate(value: any) {
   const date = value?.toDate?.() ?? (value ? new Date(value) : null);
-  return date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString() : 'Just now';
+  return date && !Number.isNaN(date.getTime()) ? localizedDate(date) : translate('Just now');
 }
 
 export default function NotificationsScreen() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,18 +46,18 @@ export default function NotificationsScreen() {
           <Ionicons name="arrow-back" size={23} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>
-          <Text style={styles.title}>Notifications</Text>
-          <Text style={styles.subtitle}>{unreadCount ? `${unreadCount} unread` : 'You are all caught up'}</Text>
+          <Text style={styles.title}>{t("Notifications")}</Text>
+          <Text style={styles.subtitle}>{unreadCount ? t("{{value0}} unread", { value0: unreadCount }) : t("You are all caught up")}</Text>
         </View>
         <TouchableOpacity disabled={!unreadCount || !user} onPress={() => user && markAllNotificationsRead(user.uid, items)}>
-          <Text style={[styles.markAll, !unreadCount && styles.disabled]}>Read all</Text>
+          <Text style={[styles.markAll, !unreadCount && styles.disabled]}>{t("Read all")}</Text>
         </TouchableOpacity>
       </View>
       {loading ? <ActivityIndicator style={styles.loader} color={colors.primary} /> : (
         <ScrollView contentContainerStyle={styles.content}>
           {items.length === 0 ? (
             <View style={styles.empty}><Ionicons name="notifications-off-outline" size={42} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>No notifications yet</Text><Text style={styles.emptyText}>Gig updates, reviews and endorsements will appear here.</Text></View>
+              <Text style={styles.emptyTitle}>{t("No notifications yet")}</Text><Text style={styles.emptyText}>{t("Gig updates, reviews and endorsements will appear here.")}</Text></View>
           ) : items.map((item) => (
             <TouchableOpacity key={item.id} style={[styles.card, !item.read && styles.unreadCard]} onPress={() => openNotification(item)}>
               <View style={styles.notificationIcon}><Ionicons name={ICONS[item.type] ?? ICONS.system} size={20} color={colors.primary} /></View>
