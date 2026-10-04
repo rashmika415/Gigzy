@@ -327,7 +327,9 @@ export default function Home() {
                 <Text style={styles.seeAllText}>{t("Manage All (")}{gigs.length}) →</Text>
               </TouchableOpacity>
             ) : (
-              <Text style={styles.seeAllText}>{t("Browse All")}</Text>
+              <TouchableOpacity onPress={() => router.push('/(app)/(tabs)/browse' as any)}>
+                <Text style={styles.seeAllText}>{t("Browse All")} →</Text>
+              </TouchableOpacity>
             )}
           </View>
 
@@ -358,13 +360,20 @@ export default function Home() {
                   onPress={() => {
                     if (role === 'client') {
                       router.push('/(app)/(tabs)/my-gigs' as any);
+                    } else {
+                      router.push({
+                        pathname: '/(app)/gig/[id]',
+                        params: { id: gig.id },
+                      } as any);
                     }
                   }}
-                  activeOpacity={role === 'client' ? 0.85 : 1}
+                  activeOpacity={0.9}
                 >
+                  {/* Top Header: Category & Status Badge on Left, Pay Badge on Right */}
                   <View style={styles.gigItemHeader}>
                     <View style={styles.gigHeaderBadges}>
                       <View style={styles.gigCategoryBadge}>
+                        <Ionicons name="briefcase-outline" size={12} color={colors.primary} />
                         <Text style={styles.gigCategoryBadgeText}>{gig.category}</Text>
                       </View>
                       {gig.status && (
@@ -377,13 +386,22 @@ export default function Home() {
                             gig.status === 'cancelled' && styles.gigStatusCancelled,
                           ]}
                         >
+                          <View
+                            style={[
+                              styles.statusDot,
+                              gig.status === 'open' && { backgroundColor: '#10B981' },
+                              gig.status === 'in-progress' && { backgroundColor: '#F59E0B' },
+                              gig.status === 'completed' && { backgroundColor: '#8B5CF6' },
+                              gig.status === 'cancelled' && { backgroundColor: '#EF4444' },
+                            ]}
+                          />
                           <Text
                             style={[
                               styles.gigStatusPillText,
-                              gig.status === 'open' && { color: '#147D54' },
-                              gig.status === 'in-progress' && { color: '#986000' },
+                              gig.status === 'open' && { color: '#047857' },
+                              gig.status === 'in-progress' && { color: '#B45309' },
                               gig.status === 'completed' && { color: '#6D28D9' },
-                              gig.status === 'cancelled' && { color: '#B42318' },
+                              gig.status === 'cancelled' && { color: '#B91C1C' },
                             ]}
                           >
                             {gig.status === 'in-progress' ? t("In Progress") : gig.status}
@@ -391,10 +409,12 @@ export default function Home() {
                         </View>
                       )}
                     </View>
+
                     <View style={styles.gigHeaderRight}>
                       <View style={styles.gigPayBadge}>
-                        <Text style={styles.gigPayText}>
-                          ${gig.pay} {gig.payType === 'hourly' ? t("/hr") : ''}
+                        <Text style={styles.gigPayAmount}>${gig.pay}</Text>
+                        <Text style={styles.gigPayType}>
+                          {gig.payType === 'hourly' ? t("/hr") : t(" fixed")}
                         </Text>
                       </View>
                       {role === 'client' && (
@@ -412,9 +432,12 @@ export default function Home() {
                     </View>
                   </View>
 
-                  <Text style={styles.gigItemTitle} numberOfLines={1}>
+                  {/* Gig Title */}
+                  <Text style={styles.gigItemTitle} numberOfLines={2}>
                     {gig.title}
                   </Text>
+
+                  {/* Gig Description */}
                   <Text style={styles.gigItemDesc} numberOfLines={2}>
                     {gig.description}
                   </Text>
@@ -428,43 +451,96 @@ export default function Home() {
                         </View>
                       ))}
                       {gig.skills.length > 3 && (
-                        <Text style={styles.moreSkillsText}>+{gig.skills.length - 3}{t("more")}</Text>
+                        <View style={styles.moreSkillsChip}>
+                          <Text style={styles.moreSkillsText}>+{gig.skills.length - 3}</Text>
+                        </View>
                       )}
                     </View>
                   )}
 
+                  {/* Divider line */}
+                  <View style={styles.cardDivider} />
+
+                  {/* Footer: Meta info (Location & Date) and Actions (Chat icon & Apply button) */}
                   <View style={styles.gigItemFooter}>
-                    <View style={styles.gigMetaRow}>
-                      <Ionicons
-                        name={gig.locationType === 'remote' ? 'globe-outline' : 'location-outline'}
-                        size={13}
-                        color={colors.textSecondary}
-                      />
-                      <Text style={styles.gigMetaText} numberOfLines={1}>
-                        {gig.location || t("Remote")}
-                      </Text>
-                    </View>
-                    <View style={styles.gigMetaRow}>
-                      <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
-                      <Text style={styles.gigMetaText}>{gig.date}</Text>
+                    <View style={styles.metaInfoGroup}>
+                      <View style={styles.gigMetaRow}>
+                        <Ionicons
+                          name={gig.locationType === 'remote' ? 'globe-outline' : 'location-outline'}
+                          size={13}
+                          color={colors.textSecondary}
+                        />
+                        <Text style={styles.gigMetaText} numberOfLines={1}>
+                          {gig.location || t("Remote")}
+                        </Text>
+                      </View>
+                      <View style={styles.gigMetaRow}>
+                        <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
+                        <Text style={styles.gigMetaText}>{gig.date || t("Flexible")}</Text>
+                      </View>
                     </View>
 
-                    {role !== 'client' && (
-                      <TouchableOpacity
-                        style={styles.contactEmployerBtn}
-                        onPress={() => handleContactBusiness(gig)}
-                        disabled={startingChatGigId === gig.id}
-                        activeOpacity={0.8}
-                      >
-                        {startingChatGigId === gig.id ? (
-                          <ActivityIndicator size="small" color={colors.primaryOnColor} />
-                        ) : (
-                          <>
-                            <Ionicons name="chatbubble-ellipses-outline" size={13} color={colors.primaryOnColor} />
-                            <Text style={styles.contactEmployerBtnText}>{t("Chat")}</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
+                    {role === 'client' ? (
+                      <View style={styles.cardActionsGroup}>
+                        <TouchableOpacity
+                          style={styles.manageCardBtn}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            router.push('/(app)/(tabs)/my-gigs' as any);
+                          }}
+                          activeOpacity={0.8}
+                          accessibilityLabel="Manage your gig"
+                        >
+                          <Text style={styles.manageCardBtnText}>{t("Manage")}</Text>
+                          <Ionicons name="chevron-forward" size={13} color={colors.primary} />
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={styles.cardActionsGroup}>
+                        {/* Chat Icon Button */}
+                        <TouchableOpacity
+                          style={styles.chatIconButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleContactBusiness(gig);
+                          }}
+                          disabled={startingChatGigId === gig.id}
+                          activeOpacity={0.75}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          accessibilityLabel="Chat with business"
+                        >
+                          {startingChatGigId === gig.id ? (
+                            <ActivityIndicator size="small" color={colors.primary} />
+                          ) : (
+                            <Ionicons
+                              name="chatbubble-ellipses-outline"
+                              size={17}
+                              color={colors.primary}
+                            />
+                          )}
+                        </TouchableOpacity>
+
+                        {/* Apply Button */}
+                        <TouchableOpacity
+                          style={styles.applyCardBtn}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            router.push({
+                              pathname: '/(app)/gig/[id]',
+                              params: { id: gig.id },
+                            } as any);
+                          }}
+                          activeOpacity={0.85}
+                          accessibilityLabel="Apply for this gig"
+                        >
+                          <Text style={styles.applyCardBtnText}>{t("Apply")}</Text>
+                          <Ionicons
+                            name="arrow-forward"
+                            size={13}
+                            color={colors.primaryOnColor}
+                          />
+                        </TouchableOpacity>
+                      </View>
                     )}
                   </View>
                 </TouchableOpacity>
@@ -794,47 +870,78 @@ const styles = StyleSheet.create({
   },
   gigItemCard: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     padding: spacing.md,
-    gap: 6,
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   gigItemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 2,
+    gap: 8,
   },
   gigHeaderBadges: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
   },
+  gigCategoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorderSubtle,
+  },
+  gigCategoryBadgeText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
   gigStatusPill: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: borderRadius.full,
     borderWidth: 1,
   },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
   gigStatusOpen: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    backgroundColor: 'rgba(16, 185, 129, 0.10)',
+    borderColor: 'rgba(16, 185, 129, 0.28)',
   },
   gigStatusProgress: {
     backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    borderColor: colors.surfaceBorder,
+    borderColor: 'rgba(245, 158, 11, 0.28)',
   },
   gigStatusCompleted: {
-    backgroundColor: 'rgba(124, 58, 237, 0.15)',
-    borderColor: 'rgba(124, 58, 237, 0.3)',
+    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    borderColor: 'rgba(124, 58, 237, 0.28)',
   },
   gigStatusCancelled: {
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    borderColor: 'rgba(239, 68, 68, 0.3)',
+    backgroundColor: 'rgba(239, 68, 68, 0.10)',
+    borderColor: 'rgba(239, 68, 68, 0.28)',
   },
   gigStatusPillText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'capitalize',
   },
@@ -843,71 +950,93 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  gigCategoryBadge: {
-    backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: borderRadius.sm,
-  },
-  gigCategoryBadgeText: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
   gigPayBadge: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
     backgroundColor: colors.primaryLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: borderRadius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(8, 127, 115, 0.18)',
   },
-  gigPayText: {
-    fontSize: 12,
+  gigPayAmount: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.primaryDark,
+  },
+  gigPayType: {
+    fontSize: 11,
+    fontWeight: '600',
     color: colors.primary,
-    fontWeight: '700',
+    marginLeft: 2,
   },
   deleteGigBtn: {
-    padding: 4,
+    padding: 6,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.errorLight,
   },
   gigItemTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.text,
+    lineHeight: 22,
   },
   gigItemDesc: {
     fontSize: 13,
     color: colors.textSecondary,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   skillsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 6,
     marginTop: 2,
   },
   skillChip: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.sm,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorderSubtle,
   },
   skillChipText: {
-    fontSize: 10,
-    color: colors.primary,
+    fontSize: 11,
+    color: colors.primaryDark,
     fontWeight: '600',
   },
+  moreSkillsChip: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorderSubtle,
+  },
   moreSkillsText: {
-    fontSize: 10,
+    fontSize: 11,
     color: colors.textMuted,
-    alignSelf: 'center',
+    fontWeight: '600',
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: colors.surfaceBorderSubtle,
+    marginVertical: 2,
   },
   gigItemFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceBorder,
+    gap: 12,
+  },
+  metaInfoGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 14,
   },
   gigMetaRow: {
     flexDirection: 'row',
@@ -917,5 +1046,56 @@ const styles = StyleSheet.create({
   gigMetaText: {
     fontSize: 12,
     color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  cardActionsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chatIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  applyCardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: borderRadius.full,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  applyCardBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primaryOnColor,
+  },
+  manageCardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: borderRadius.full,
+  },
+  manageCardBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
   },
 });

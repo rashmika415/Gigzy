@@ -25,6 +25,7 @@ import {
     GigSortOption,
     GigStatus,
 } from "../../../types/gig";
+import { ApplicantListModal } from "../../../components/applications";
 
 const STATUS_CONFIG = STATUS_STYLES;
 
@@ -59,6 +60,15 @@ export default function MyGigs() {
   // Detail Modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedGigDetail, setSelectedGigDetail] = useState<Gig | null>(null);
+
+  // Applicants Modal state
+  const [applicantsModalVisible, setApplicantsModalVisible] = useState(false);
+  const [selectedGigForApplicants, setSelectedGigForApplicants] = useState<Gig | null>(null);
+
+  const handleOpenApplicants = (gig: Gig) => {
+    setSelectedGigForApplicants(gig);
+    setApplicantsModalVisible(true);
+  };
 
   // 1. Subscribe to Firestore real-time client gigs
   useEffect(() => {
@@ -774,12 +784,14 @@ export default function MyGigs() {
                         </Text>
                       </View>
 
-                      <View
+                      <TouchableOpacity
                         style={[
                           styles.applicantsChip,
                           gig.applicantsCount > 0 &&
                             styles.applicantsChipActive,
                         ]}
+                        onPress={() => handleOpenApplicants(gig)}
+                        activeOpacity={0.75}
                       >
                         <Ionicons
                           name="people"
@@ -800,11 +812,26 @@ export default function MyGigs() {
                           {gig.applicantsCount || 0}{" "}
                           {gig.applicantsCount === 1 ? t("Applicant") : t("Applicants")}
                         </Text>
-                      </View>
+                      </TouchableOpacity>
                     </View>
 
                     {/* Card Actions Footer */}
                     <View style={styles.cardActionsFooter}>
+                      <TouchableOpacity
+                        style={styles.actionApplicantsBtn}
+                        onPress={() => handleOpenApplicants(gig)}
+                        activeOpacity={0.75}
+                      >
+                        <Ionicons
+                          name="people-outline"
+                          size={14}
+                          color={colors.primary}
+                        />
+                        <Text style={styles.actionApplicantsBtnText}>
+                          {t("Applicants")} ({gig.applicantsCount || 0})
+                        </Text>
+                      </TouchableOpacity>
+
                       <TouchableOpacity
                         style={styles.actionStatusBtn}
                         onPress={() => handleOpenStatusModal(gig)}
@@ -1201,6 +1228,21 @@ export default function MyGigs() {
 
             <View style={styles.detailModalFooter}>
               <TouchableOpacity
+                style={styles.detailApplicantsBtn}
+                onPress={() => {
+                  setDetailModalVisible(false);
+                  if (selectedGigDetail)
+                    handleOpenApplicants(selectedGigDetail);
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="people" size={16} color={colors.primaryOnColor} />
+                <Text style={styles.detailApplicantsBtnText}>
+                  {t("View Applicants")} ({selectedGigDetail?.applicantsCount || 0})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={styles.detailChangeStatusBtn}
                 onPress={() => {
                   setDetailModalVisible(false);
@@ -1216,6 +1258,20 @@ export default function MyGigs() {
           </View>
         </View>
       </Modal>
+
+      {/* Business Applicants Modal */}
+      {selectedGigForApplicants && (
+        <ApplicantListModal
+          visible={applicantsModalVisible}
+          gigId={selectedGigForApplicants.id}
+          gigTitle={selectedGigForApplicants.title}
+          businessId={user?.uid || ''}
+          onClose={() => {
+            setApplicantsModalVisible(false);
+            setSelectedGigForApplicants(null);
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -1808,6 +1864,23 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     gap: 8,
   },
+  actionApplicantsBtn: {
+    flex: 1.2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(245, 158, 11, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.35)",
+    borderRadius: borderRadius.md,
+    paddingVertical: 7,
+    gap: 4,
+  },
+  actionApplicantsBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.primary,
+  },
   actionStatusBtn: {
     flex: 1,
     flexDirection: "row",
@@ -2101,24 +2174,44 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.surfaceBorder,
     backgroundColor: colors.surfaceElevated,
+    flexDirection: "row",
+    gap: spacing.sm,
   },
-  detailChangeStatusBtn: {
+  detailApplicantsBtn: {
+    flex: 1,
     backgroundColor: colors.primary,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
     borderRadius: borderRadius.full,
-    gap: 8,
+    gap: 6,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
-  detailChangeStatusBtnText: {
+  detailApplicantsBtnText: {
     color: colors.primaryOnColor,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "800",
+  },
+  detailChangeStatusBtn: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: borderRadius.full,
+    gap: 6,
+  },
+  detailChangeStatusBtnText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

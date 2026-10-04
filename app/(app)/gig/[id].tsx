@@ -17,6 +17,9 @@ import { distanceKm, validCoordinates } from '../../../services/discoveryFilters
 import { getCurrentCoordinates } from '../../../services/locationService';
 import type { Gig } from '../../../types/gig';
 import { GIG_CATEGORIES } from '../../../types/gig';
+import { subscribeToUserApplicationForGig } from '../../../services/applicationService';
+import type { Application } from '../../../types/application';
+import { ApplyModal, ApplicationDetailModal, ApplicantListModal } from '../../../components/applications';
 
 /** Resolve category id or name to the category object */
 function resolveCategory(raw: string) {
@@ -46,6 +49,27 @@ export default function GigDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [startingChat, setStartingChat] = useState(false);
+  const [userApplication, setUserApplication] = useState<Application | null>(null);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [showAppDetailModal, setShowAppDetailModal] = useState(false);
+  const [showApplicantListModal, setShowApplicantListModal] = useState(false);
+
+  // Subscribe to youth user's application status on this gig
+  useEffect(() => {
+    if (!id || !user || role !== 'freelancer') {
+      setUserApplication(null);
+      return;
+    }
+    const unsub = subscribeToUserApplicationForGig(
+      id,
+      user.uid,
+      (app) => {
+        setUserApplication(app);
+      },
+      () => {}
+    );
+    return () => unsub();
+  }, [id, user, role]);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,11 +249,21 @@ export default function GigDetailScreen() {
               label={t("Location ({{value0}})", { value0: t(gig.locationType === 'on-site' ? 'On-site' : gig.locationType === 'hybrid' ? 'Hybrid' : 'Remote') })}
               value={gig.location || t('Remote')}
             />
-            <SpecItem
-              icon="people-outline"
-              label={t("Applicants")}
-              value={`${gig.applicantsCount || 0} applied`}
-            />
+            {gigOwner ? (
+              <TouchableOpacity onPress={() => setShowApplicantListModal(true)} activeOpacity={0.7}>
+                <SpecItem
+                  icon="people-outline"
+                  label={t("Applicants")}
+                  value={`${gig.applicantsCount || 0} applied (view)`}
+                />
+              </TouchableOpacity>
+            ) : (
+              <SpecItem
+                icon="people-outline"
+                label={t("Applicants")}
+                value={`${gig.applicantsCount || 0} applied`}
+              />
+            )}
             <SpecItem
               icon="eye-outline"
               label={t("Views")}
@@ -303,44 +337,152 @@ export default function GigDetailScreen() {
       </ScrollView>
 
       {/* ── Bottom Action Bar ── */}
-      {!gigOwner && role === 'freelancer' && gig.status === 'open' && (
+      {!gigOwner && role === 'freelancer' && (
         <View style={styles.bottomBar}>
-          <View style={styles.bottomPayPreview}>
-            <Text style={styles.bottomPayLabel}>{t("Pay")}</Text>
-            <Text style={styles.bottomPayValue}>
-              ${gig.pay}{gig.payType === 'hourly' ? t("/hr") : ''}
-            </Text>
-          </View>
+          {gig.status !== 'open' ? (
+            <View style={styles.closedBanner}>
+              <Ionicons name="information-circle" size={18} color={colors.textSecondary} />
+              <Text style={styles.closedBannerText}>
+                {t("This gig is no longer accepting applications.")}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.bottomPayPreview}>
+                <Text style={styles.bottomPayLabel}>{t("Pay")}</Text>
+                <Text style={styles.bottomPayValue}>
+                  ${gig.pay}{gig.payType === 'hourly' ? t("/hr") : ''}
+                </Text>
+              </View>
 
-          <TouchableOpacity
-            style={styles.contactBtn}
-            onPress={handleContactBusiness}
-            activeOpacity={0.85}
-            disabled={startingChat}
-          >
-            {startingChat ? (
-              <ActivityIndicator size="small" color={colors.primaryOnColor} />
-            ) : (
-              <>
-                <Ionicons name="chatbubble-ellipses" size={18} color={colors.primaryOnColor} />
-                <Text style={styles.contactBtnText}>{t("Contact Business")}</Text>
-              </>
-            )}
-          </TouchableOpacity>
+              {userApplication ? (
+                userApplication.status === 'pending' ? (
+                  <TouchableOpacity
+                    style={styles.appliedPendingBtn}
+                    onPress={() => setShowAppDetailModal(true)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="time" size={18} color="#D97706" />
+                    <Text style={styles.appliedPendingBtnText}>{t("Applied - Pending")}</Text>
+                  </TouchableOpacity>
+                ) : userApplication.status === 'accepted' ? (
+                  <View style={styles.acceptedActionRow}>
+                    <TouchableOpacity
+                      style={styles.appliedAcceptedBtn}
+                      onPress={() => setShowAppDetailModal(true)}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="checkmark-circle" size={18} color="#059669" />
+                      <Text style={styles.appliedAcceptedBtnText}>{t("Application Accepted")}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.acceptedChatBtn}
+                      onPress={handleContactBusiness}
+                      activeOpacity={0.85}
+                      disabled={startingChat}
+                    >
+                      {startingChat ? (
+                        <ActivityIndicator size="small" color={colors.primaryOnColor} />
+                      ) : (
+                        <Ionicons name="chatbubble-ellipses" size={18} color={colors.primaryOnColor} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ) : userApplication.status === 'rejected' ? (
+                  <TouchableOpacity
+                    style={styles.appliedRejectedBtn}
+                    onPress={() => setShowAppDetailModal(true)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#DC2626" />
+                    <Text style={styles.appliedRejectedBtnText}>{t("Application Rejected")}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.appliedCompletedBtn}
+                    onPress={() => setShowAppDetailModal(true)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="trophy" size={18} color="#4F46E5" />
+                    <Text style={styles.appliedCompletedBtnText}>{t("Application Completed")}</Text>
+                  </TouchableOpacity>
+                )
+              ) : (
+                <TouchableOpacity
+                  style={styles.applyBtn}
+                  onPress={() => setShowApplyModal(true)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="paper-plane" size={18} color={colors.primaryOnColor} />
+                  <Text style={styles.applyBtnText}>{t("Apply Now")}</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
         </View>
       )}
 
       {gigOwner && (
         <View style={styles.bottomBar}>
           <TouchableOpacity
-            style={styles.manageBtn}
+            style={styles.applicantsBtn}
+            onPress={() => setShowApplicantListModal(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="people" size={18} color={colors.primaryOnColor} />
+            <Text style={styles.applicantsBtnText}>
+              {t("Applicants")} ({gig.applicantsCount || 0})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.manageBtnSecondary}
             onPress={() => router.push('/(app)/(tabs)/my-gigs' as any)}
             activeOpacity={0.85}
           >
-            <Ionicons name="settings-outline" size={18} color={colors.primaryOnColor} />
-            <Text style={styles.contactBtnText}>{t("Manage This Gig")}</Text>
+            <Ionicons name="settings-outline" size={18} color={colors.primary} />
+            <Text style={styles.manageBtnSecondaryText}>{t("Manage")}</Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {/* ── Modals ── */}
+      <ApplyModal
+        visible={showApplyModal}
+        gig={gig}
+        youthId={user?.uid || ''}
+        youthName={userData?.fullName || user?.displayName || 'Youth Freelancer'}
+        youthPhotoURL={userData?.photoURL || ''}
+        youthSkills={
+          userData?.skillBadges?.map((b: any) => b.label) ||
+          (Array.isArray(userData?.skills)
+            ? userData.skills
+            : typeof userData?.skills === 'string'
+            ? [userData.skills]
+            : [])
+        }
+        youthBio={userData?.bio || ''}
+        onClose={() => setShowApplyModal(false)}
+        onSuccess={() => {
+          setShowApplyModal(false);
+          Alert.alert(t("Success"), t("Application submitted successfully."));
+        }}
+      />
+
+      <ApplicationDetailModal
+        visible={showAppDetailModal}
+        application={userApplication}
+        onClose={() => setShowAppDetailModal(false)}
+      />
+
+      {gigOwner && (
+        <ApplicantListModal
+          visible={showApplicantListModal}
+          gigId={gig.id}
+          gigTitle={gig.title}
+          businessId={user?.uid || ''}
+          onClose={() => setShowApplicantListModal(false)}
+        />
       )}
     </SafeAreaView>
   );
@@ -736,5 +878,161 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 5,
+  },
+  applyBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: 14,
+    gap: 8,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  applyBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primaryOnColor,
+  },
+  appliedPendingBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    borderRadius: borderRadius.lg,
+    paddingVertical: 14,
+  },
+  appliedPendingBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  acceptedActionRow: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  appliedAcceptedBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+    borderRadius: borderRadius.lg,
+    paddingVertical: 14,
+  },
+  appliedAcceptedBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  acceptedChatBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appliedRejectedBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+    borderRadius: borderRadius.lg,
+    paddingVertical: 14,
+  },
+  appliedRejectedBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  appliedCompletedBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.4)',
+    borderRadius: borderRadius.lg,
+    paddingVertical: 14,
+  },
+  appliedCompletedBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#4F46E5',
+  },
+  closedBanner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    paddingVertical: 14,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+  closedBannerText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  applicantsBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: 14,
+    gap: 8,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  applicantsBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primaryOnColor,
+  },
+  manageBtnSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingVertical: 14,
+    gap: 6,
+  },
+  manageBtnSecondaryText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
   },
 });

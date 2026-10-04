@@ -204,6 +204,16 @@ export default function Profile() {
         <LanguageSelector />
         {/* Action Buttons */}
         <View style={styles.actionSection}>
+          {isYouth && (
+            <TouchableOpacity
+              style={styles.applicationsButton}
+              onPress={() => router.push('/(app)/applications' as any)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+              <Text style={styles.applicationsButtonText}>{t("My Applications")}</Text>
+            </TouchableOpacity>
+          )}
           {user && <TouchableOpacity
             style={styles.publicButton}
             onPress={() => router.push({ pathname: '/(app)/profile/[id]', params: { id: user.uid } } as any)}
@@ -408,6 +418,22 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     gap: spacing.md,
     width: '100%',
+  },
+  applicationsButton: {
+    borderRadius: borderRadius.full,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  applicationsButtonText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '700',
   },
   editButton: {
     backgroundColor: colors.primary,
