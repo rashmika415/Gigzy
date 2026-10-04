@@ -84,5 +84,34 @@ service cloud.firestore {
         allow update, delete: if active() && resource.data.senderId == request.auth.uid;
       }
     }
+    match /applications/{applicationId} {
+      function isApplicant() {
+        return signedIn() && resource != null && request.auth.uid == resource.data.youthId;
+      }
+      function isGigOwner() {
+        return signedIn() && resource != null && request.auth.uid == resource.data.businessId;
+      }
+      function willBeApplicant() {
+        return signedIn() && request.auth.uid == request.resource.data.youthId;
+      }
+
+      allow read: if active() && (resource == null || isApplicant() || isGigOwner() || isAdmin());
+
+      allow create: if active() && willBeApplicant()
+        && currentUser().data.get('role', '') in ['freelancer', 'youth']
+        && request.resource.data.status == 'pending'
+        && request.resource.data.availabilityConfirmed == true
+        && request.resource.data.message is string
+        && request.resource.data.message.size() >= 5
+        && exists(/databases/$(database)/documents/gigs/$(request.resource.data.gigId))
+        && get(/databases/$(database)/documents/gigs/$(request.resource.data.gigId)).data.status == 'open';
+
+      allow update: if active() && isGigOwner()
+        && resource != null && resource.data.status == 'pending'
+        && (request.resource.data.status in ['accepted', 'rejected'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      allow delete: if isAdmin();
+    }
   }
 }
