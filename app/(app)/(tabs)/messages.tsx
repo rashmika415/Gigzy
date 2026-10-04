@@ -320,12 +320,8 @@ export default function MessagesScreen() {
                       style={[styles.lastMessageText, unread > 0 && styles.lastMessageTextUnread]}
                       numberOfLines={1}
                     >
- HEAD
                       {isSentByMe ? 'You: ' : ''}
                       {lastMsgPreview}
-=======
-                      {isSentByMe ? t("You: ") : ''}
-                      {chat.lastMessage?.text || t("Started a new conversation")}
                     </Text>
 
                     {unread > 0 && (
