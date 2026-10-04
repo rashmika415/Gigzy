@@ -1,5 +1,7 @@
+import { Text } from '../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
@@ -39,6 +41,7 @@ function isValidPassword(password: string): boolean {
 }
 
 export default function Register() {
+  const { t } = useTranslation();
   const { role: roleParam } = useLocalSearchParams<{ role?: string }>();
   const role: Role = roleParam === 'business' ? 'business' : 'youth';
 
@@ -99,37 +102,33 @@ export default function Register() {
     }
   };
 
-  return <AuthScreen title="Your next chapter starts here" subtitle={role === 'business' ? 'Find the right local talent for your business.' : 'Find flexible work. Build skills. Make your next move.'}
-    eyebrow="MAKE ROOM FOR OPPORTUNITY" compact backTo="role-select">
+  return <AuthScreen title={t("Your next chapter starts here")} subtitle={role === 'business' ? t("Find the right local talent for your business.") : t("Find flexible work. Build skills. Make your next move.")}
+    eyebrow={t("MAKE ROOM FOR OPPORTUNITY")} compact backTo="role-select">
     <View style={authStyles.form}>
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Change account role" disabled={loading} style={styles.role}
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t("Change account role")} disabled={loading} style={styles.role}
         onPress={() => router.replace('/(auth)/role-select')}>
         <View style={styles.roleLabel}><Ionicons name={role === 'business' ? 'storefront-outline' : 'briefcase-outline'} size={18} color={authColors.primary} />
-          <Text style={styles.roleText}>{ROLE_LABEL[role]}</Text></View>
-        <Text style={styles.change}>Change</Text>
+          <Text style={styles.roleText}>{t(ROLE_LABEL[role])}</Text></View>
+        <Text style={styles.change}>{t("Change")}</Text>
       </TouchableOpacity>
-      <AuthField label="Full name" icon="person-outline" value={fullName} onChangeText={value => { setFullName(value); setError(''); }}
-        placeholder="Your full name" autoCapitalize="words" autoCorrect={false} autoComplete="name" textContentType="name" editable={!loading} />
-      <AuthField label="Email address" icon="mail-outline" value={email} onChangeText={value => { setEmail(value); setError(''); }}
+      <AuthField label={t("Full name")} icon="person-outline" value={fullName} onChangeText={value => { setFullName(value); setError(''); }}
+        placeholder={t("Your full name")} autoCapitalize="words" autoCorrect={false} autoComplete="name" textContentType="name" editable={!loading} />
+      <AuthField label={t("Email address")} icon="mail-outline" value={email} onChangeText={value => { setEmail(value); setError(''); }}
         placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress" editable={!loading} />
-      <AuthField label="Password" icon="lock-closed-outline" password value={password} onChangeText={value => { setPassword(value); setError(''); }}
-        placeholder="Create a password" autoCapitalize="none" autoComplete="new-password" textContentType="newPassword" editable={!loading} hint="At least 8 characters, including one number." />
-      <AuthField label="Confirm password" icon="lock-closed-outline" password value={confirmPassword} onChangeText={value => { setConfirmPassword(value); setError(''); }}
-        placeholder="Re-enter your password" autoCapitalize="none" autoComplete="new-password" textContentType="newPassword" editable={!loading}
+      <AuthField label={t("Password")} icon="lock-closed-outline" password value={password} onChangeText={value => { setPassword(value); setError(''); }}
+        placeholder={t("Create a password")} autoCapitalize="none" autoComplete="new-password" textContentType="newPassword" editable={!loading} hint={t("At least 8 characters, including one number.")} />
+      <AuthField label={t("Confirm password")} icon="lock-closed-outline" password value={confirmPassword} onChangeText={value => { setConfirmPassword(value); setError(''); }}
+        placeholder={t("Re-enter your password")} autoCapitalize="none" autoComplete="new-password" textContentType="newPassword" editable={!loading}
         error={confirmPassword && password !== confirmPassword ? 'Passwords do not match.' : undefined} />
       <View style={styles.checkboxes}>
-        <AuthCheckbox checked={agreedToTerms} onPress={() => { setAgreedToTerms(value => !value); setError(''); }} disabled={loading}>
-          I am 16 or older and agree to the Terms of Use and Privacy Policy.
-        </AuthCheckbox>
-        <AuthCheckbox checked={notifyOnMatch} onPress={() => setNotifyOnMatch(value => !value)} disabled={loading}>
-          Send me an alert when a gig matches my skills.
-        </AuthCheckbox>
+        <AuthCheckbox checked={agreedToTerms} onPress={() => { setAgreedToTerms(value => !value); setError(''); }} disabled={loading}>{t("I am 16 or older and agree to the Terms of Use and Privacy Policy.")}</AuthCheckbox>
+        <AuthCheckbox checked={notifyOnMatch} onPress={() => setNotifyOnMatch(value => !value)} disabled={loading}>{t("Send me an alert when a gig matches my skills.")}</AuthCheckbox>
       </View>
-      <AuthError message={error} />
-      <AuthButton title="Create account" onPress={handleRegister} loading={loading} />
+      <AuthError message={t(error ?? "")} />
+      <AuthButton title={t("Create account")} onPress={handleRegister} loading={loading} />
     </View>
-    <View style={authStyles.footer}><Text style={authStyles.footerText}>Already part of Gigzy?</Text>
-      <TouchableOpacity style={authStyles.footerLink} accessibilityRole="link" onPress={() => router.replace('/(auth)/login')} disabled={loading}><Text style={authStyles.link}>Sign in</Text></TouchableOpacity>
+    <View style={authStyles.footer}><Text style={authStyles.footerText}>{t("Already part of Gigzy?")}</Text>
+      <TouchableOpacity style={authStyles.footerLink} accessibilityRole="link" onPress={() => router.replace('/(auth)/login')} disabled={loading}><Text style={authStyles.link}>{t("Sign in")}</Text></TouchableOpacity>
     </View>
   </AuthScreen>;
 }

@@ -1,15 +1,8 @@
+import { formatRelativeDate, formatNumber, formatCalendarDate } from '../../../localization/format';
+import { Text } from '../../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  Share,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Share, Alert, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -19,6 +12,7 @@ import { subscribeToGig } from '../../../services/gigService';
 import { getOrCreateChat } from '../../../services/chatService';
 import { StatusPill, Chip, LoadingState, ErrorState } from '../../../components';
 import BookmarkButton from '../../../components/BookmarkButton';
+import LocationMap from '../../../components/maps/LocationMap';
 import { distanceKm, validCoordinates } from '../../../services/discoveryFilters';
 import { getCurrentCoordinates } from '../../../services/locationService';
 import type { Gig } from '../../../types/gig';
@@ -36,22 +30,11 @@ function resolveCategory(raw: string) {
 function formatPostedDate(ts: any): string {
   if (!ts) return '';
   const millis = ts?.toMillis ? ts.toMillis() : new Date(ts).getTime();
-  const diff = Date.now() - millis;
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(millis).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return formatRelativeDate(new Date(millis));
 }
 
 export default function GigDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user, userData } = useAuth();
   const role = userData?.role ?? 'freelancer';
@@ -82,7 +65,7 @@ export default function GigDetailScreen() {
     if (!validCoordinates(gig?.coordinates)) return;
     setLocating(true);
     try { setDistance(distanceKm(await getCurrentCoordinates(), gig.coordinates)); }
-    catch (failure) { Alert.alert('Location unavailable', failure instanceof Error ? failure.message : 'Try again.'); }
+    catch (failure) { Alert.alert(t("Location unavailable"), failure instanceof Error ? failure.message : t("Try again.")); }
     finally { setLocating(false); }
   };
 
@@ -133,7 +116,7 @@ export default function GigDetailScreen() {
         params: { id: chat.id },
       } as any);
     } catch (err: any) {
-      Alert.alert('Chat Error', err.message || 'Failed to start conversation.');
+      Alert.alert(t("Chat Error"), err.message || t("Failed to start conversation."));
     } finally {
       setStartingChat(false);
     }
@@ -145,7 +128,7 @@ export default function GigDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <Header onBack={() => router.back()} />
-        <LoadingState message="Loading gig details…" size="large" />
+        <LoadingState message={t("Loading gig details…")} size="large" />
       </SafeAreaView>
     );
   }
@@ -156,8 +139,8 @@ export default function GigDetailScreen() {
         <Header onBack={() => router.back()} />
         <View style={styles.padH}>
           <ErrorState
-            title={gig === null && !error ? 'Gig not found' : 'Failed to load gig'}
-            message={error || 'This gig may have been removed or does not exist.'}
+            title={gig === null && !error ? t("Gig not found") : t("Failed to load gig")}
+            message={error || t("This gig may have been removed or does not exist.")}
             onRetry={error ? () => setRetry(value => value + 1) : undefined}
           />
         </View>
@@ -181,7 +164,7 @@ export default function GigDetailScreen() {
           <View style={styles.badgeRow}>
             <View style={styles.categoryBadge}>
               <Ionicons name={cat!.icon as any} size={14} color={colors.primary} />
-              <Text style={styles.categoryText}>{cat!.name}</Text>
+              <Text style={styles.categoryText}>{t(cat!.name)}</Text>
             </View>
             <StatusPill status={gig.status} />
           </View>
@@ -199,8 +182,7 @@ export default function GigDetailScreen() {
             </View>
             <View style={styles.posterInfo}>
               <Text style={styles.posterName}>{gig.postedBy.fullName}</Text>
-              <Text style={styles.postedTime}>
-                Posted {formatPostedDate(gig.createdAt)}
+              <Text style={styles.postedTime}>{t("Posted")}{' '}{formatPostedDate(gig.createdAt)}
               </Text>
             </View>
           </View>
@@ -211,11 +193,11 @@ export default function GigDetailScreen() {
           {/* Pay highlight */}
           <View style={styles.paySection}>
             <View>
-              <Text style={styles.payLabel}>COMPENSATION</Text>
+              <Text style={styles.payLabel}>{t("COMPENSATION")}</Text>
               <View style={styles.payRow}>
-                <Text style={styles.payAmount}>${gig.pay.toLocaleString()}</Text>
+                <Text style={styles.payAmount}>${formatNumber(gig.pay)}</Text>
                 <Text style={styles.payType}>
-                  {gig.payType === 'hourly' ? ' / hour' : ' Fixed Price'}
+                  {gig.payType === 'hourly' ? t(" / hour") : t(" Fixed Price")}
                 </Text>
               </View>
             </View>
@@ -229,39 +211,43 @@ export default function GigDetailScreen() {
 
           {gig.locationType !== 'remote' && (validCoordinates(gig.coordinates) ?
             <TouchableOpacity onPress={showDistance} disabled={locating}><Text style={styles.categoryText}>
-              {locating ? 'Finding your location?' : distance !== undefined ? `${distance.toFixed(1)} km away (straight-line distance)` : 'Show distance from me'}
-            </Text></TouchableOpacity> : <Text style={styles.postedTime}>Distance unavailable for this gig.</Text>)}
+              {locating ? t("Finding your location?") : distance !== undefined ? t("{{value0}} km away (straight-line distance)", { value0: distance.toFixed(1) }) : t("Show distance from me")}
+            </Text></TouchableOpacity> : <Text style={styles.postedTime}>{t("Distance unavailable for this gig.")}</Text>)}
           {/* Specs Grid */}
           <View style={styles.specsGrid}>
             <SpecItem
               icon="calendar-outline"
-              label="Deadline"
-              value={`${gig.date || 'Flexible'}${gig.time ? ` at ${gig.time}` : ''}`}
+              label={t("Deadline")}
+              value={gig.time ? t('{{date}} at {{time}}', { date: gig.date ? formatCalendarDate(gig.date) : t('Flexible'), time: gig.time }) : gig.date ? formatCalendarDate(gig.date) : t('Flexible')}
             />
             <SpecItem
               icon={gig.locationType === 'remote' ? 'globe-outline' : 'location-outline'}
-              label={`Location (${gig.locationType})`}
-              value={gig.location || 'Remote'}
+              label={t("Location ({{value0}})", { value0: t(gig.locationType === 'on-site' ? 'On-site' : gig.locationType === 'hybrid' ? 'Hybrid' : 'Remote') })}
+              value={gig.location || t('Remote')}
             />
             <SpecItem
               icon="people-outline"
-              label="Applicants"
+              label={t("Applicants")}
               value={`${gig.applicantsCount || 0} applied`}
             />
             <SpecItem
               icon="eye-outline"
-              label="Views"
+              label={t("Views")}
               value={`${gig.viewsCount || 0} views`}
             />
           </View>
         </View>
 
         {/* ── Description Section ── */}
+        {gig.locationType !== 'remote' && validCoordinates(gig.coordinates) && <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t("Meeting point")}</Text>
+          <Text style={styles.descriptionText}>{gig.location}</Text>
+          <LocationMap key={`${gig.id}-${gig.coordinates.latitude}-${gig.coordinates.longitude}`} point={gig.coordinates} />
+        </View>}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
             <Ionicons name="document-text-outline" size={16} color={colors.primary} />
-            {'  '}Job Description
-          </Text>
+            {'  '}{t("Job Description")}</Text>
           <Text style={styles.descriptionText}>{gig.description}</Text>
         </View>
 
@@ -270,8 +256,7 @@ export default function GigDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
               <Ionicons name="flash-outline" size={16} color={colors.primary} />
-              {'  '}Required Skills
-            </Text>
+              {'  '}{t("Required Skills")}</Text>
             <View style={styles.skillsWrap}>
               {gig.skills.map((skill, i) => (
                 <Chip key={i} label={skill} icon="checkmark-circle-outline" />
@@ -284,8 +269,7 @@ export default function GigDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
             <Ionicons name="business-outline" size={16} color={colors.primary} />
-            {'  '}Posted By
-          </Text>
+            {'  '}{t("Posted By")}</Text>
           <View style={styles.posterCard}>
             <View style={styles.posterCardAvatar}>
               <Text style={styles.posterCardAvatarText}>
@@ -295,7 +279,7 @@ export default function GigDetailScreen() {
             <View style={styles.posterCardInfo}>
               <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/profile/[id]', params: { id: gig.postedBy.uid } })}>
                 <Text style={styles.posterCardName}>{gig.postedBy.fullName}</Text>
-                <Text style={styles.categoryText}>View business profile</Text>
+                <Text style={styles.categoryText}>{t("View business profile")}</Text>
               </TouchableOpacity>
               <Text style={styles.posterCardEmail}>{gig.postedBy.email}</Text>
             </View>
@@ -314,7 +298,7 @@ export default function GigDetailScreen() {
         {/* ── Gig ID footer ── */}
         <View style={styles.gigIdRow}>
           <Ionicons name="finger-print-outline" size={13} color={colors.textMuted} />
-          <Text style={styles.gigIdText}>ID: {gig.id}</Text>
+          <Text style={styles.gigIdText}>{t("ID:")}{gig.id}</Text>
         </View>
       </ScrollView>
 
@@ -322,9 +306,9 @@ export default function GigDetailScreen() {
       {!gigOwner && role === 'freelancer' && gig.status === 'open' && (
         <View style={styles.bottomBar}>
           <View style={styles.bottomPayPreview}>
-            <Text style={styles.bottomPayLabel}>Pay</Text>
+            <Text style={styles.bottomPayLabel}>{t("Pay")}</Text>
             <Text style={styles.bottomPayValue}>
-              ${gig.pay}{gig.payType === 'hourly' ? '/hr' : ''}
+              ${gig.pay}{gig.payType === 'hourly' ? t("/hr") : ''}
             </Text>
           </View>
 
@@ -339,7 +323,7 @@ export default function GigDetailScreen() {
             ) : (
               <>
                 <Ionicons name="chatbubble-ellipses" size={18} color={colors.primaryOnColor} />
-                <Text style={styles.contactBtnText}>Contact Business</Text>
+                <Text style={styles.contactBtnText}>{t("Contact Business")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -354,7 +338,7 @@ export default function GigDetailScreen() {
             activeOpacity={0.85}
           >
             <Ionicons name="settings-outline" size={18} color={colors.primaryOnColor} />
-            <Text style={styles.contactBtnText}>Manage This Gig</Text>
+            <Text style={styles.contactBtnText}>{t("Manage This Gig")}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -365,6 +349,7 @@ export default function GigDetailScreen() {
 // ── Sub-components ──
 
 function Header({ onBack, onShare }: { onBack: () => void; onShare?: () => void }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.header}>
       <TouchableOpacity
@@ -376,7 +361,7 @@ function Header({ onBack, onShare }: { onBack: () => void; onShare?: () => void 
         <Ionicons name="chevron-back" size={24} color={colors.text} />
       </TouchableOpacity>
 
-      <Text style={styles.headerTitle}>Gig Details</Text>
+      <Text style={styles.headerTitle}>{t("Gig Details")}</Text>
 
       {onShare ? (
         <TouchableOpacity
@@ -395,13 +380,14 @@ function Header({ onBack, onShare }: { onBack: () => void; onShare?: () => void 
 }
 
 function SpecItem({ icon, label, value }: { icon: string; label: string; value: string }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.specItem}>
       <View style={styles.specIconCircle}>
         <Ionicons name={icon as any} size={16} color={colors.primary} />
       </View>
       <View style={styles.specTextWrap}>
-        <Text style={styles.specLabel}>{label}</Text>
+        <Text style={styles.specLabel}>{t(label)}</Text>
         <Text style={styles.specValue} numberOfLines={1}>{value}</Text>
       </View>
     </View>

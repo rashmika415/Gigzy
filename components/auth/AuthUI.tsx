@@ -1,9 +1,8 @@
+import { Text, TextInput } from '../LocalizedText';
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
-  Text, TextInput, TouchableOpacity, useWindowDimensions, View,
-} from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import type { TextInputProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -12,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { authColors as palette } from '../../constants/authTheme';
 import { fonts } from '../../constants/theme';
+import LanguageSelector from '../LanguageSelector';
 
 export const authPhoto = require('../../assets/images/auth/gigzy-cafe-hero.png');
 
@@ -23,15 +23,17 @@ export function AuthBrand() {
 }
 
 export function AuthPhoto({ style, compact = false }: { style?: ImageProps['style']; compact?: boolean }) {
+  const { t } = useTranslation();
   return <Image source={authPhoto} style={[styles.photo, compact && styles.compactPhoto, style]}
     contentFit="cover" contentPosition="center" transition={200}
-    accessibilityLabel="Young adults collaborating with a local café owner" />;
+    accessibilityLabel={t("Young adults collaborating with a local café owner")} />;
 }
 
 export function AuthScreen({ title, subtitle, eyebrow = 'YOUR NEXT CHAPTER', children, compact = false, backTo = 'welcome' }: {
   title: string; subtitle: string; eyebrow?: string; children: ReactNode; compact?: boolean;
   backTo?: 'welcome' | 'role-select' | 'login';
 }) {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const wide = width >= 900;
   const goBack = () => {
@@ -43,7 +45,7 @@ export function AuthScreen({ title, subtitle, eyebrow = 'YOUR NEXT CHAPTER', chi
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={goBack} accessibilityRole="button" accessibilityLabel="Go back" style={styles.back}>
+          <TouchableOpacity onPress={goBack} accessibilityRole="button" accessibilityLabel={t("Go back")} style={styles.back}>
             <Ionicons name="arrow-back" size={20} color={palette.text} />
           </TouchableOpacity>
           <AuthBrand />
@@ -53,17 +55,18 @@ export function AuthScreen({ title, subtitle, eyebrow = 'YOUR NEXT CHAPTER', chi
           {wide && <View style={styles.story}>
             <AuthPhoto style={styles.storyPhoto} />
             <View style={styles.storyCopy}>
-              <View style={styles.storyLabel}><Ionicons name="location-outline" size={16} color={palette.primary} /><Text style={styles.storyEyebrow}>GOOD WORK. CLOSE TO HOME.</Text></View>
-              <Text style={styles.storyTitle}>Small gigs.{ '\n' }Big possibilities.</Text>
-              <Text style={styles.storyBody}>Meet local businesses, put your skills to work, and make your next move.</Text>
+              <View style={styles.storyLabel}><Ionicons name="location-outline" size={16} color={palette.primary} /><Text style={styles.storyEyebrow}>{t("GOOD WORK. CLOSE TO HOME.")}</Text></View>
+              <Text style={styles.storyTitle}>{t("Small gigs.")}{ '\n' }{t("Big possibilities.")}</Text>
+              <Text style={styles.storyBody}>{t("Meet local businesses, put your skills to work, and make your next move.")}</Text>
             </View>
           </View>}
           <View style={[styles.formColumn, wide && styles.wideFormColumn]}>
             {!wide && <AuthPhoto compact={compact} />}
+            <LanguageSelector />
             <View style={styles.intro}>
-              <Text style={styles.eyebrow}>{eyebrow}</Text>
-              <Text accessibilityRole="header" style={styles.title}>{title}</Text>
-              <Text style={styles.subtitle}>{subtitle}</Text>
+              <Text style={styles.eyebrow}>{t(eyebrow)}</Text>
+              <Text accessibilityRole="header" style={styles.title}>{t(title)}</Text>
+              <Text style={styles.subtitle}>{t(subtitle)}</Text>
             </View>
             {children}
           </View>
@@ -77,45 +80,48 @@ type AuthFieldProps = TextInputProps & {
   label: string; icon: keyof typeof Ionicons.glyphMap; password?: boolean; hint?: string; error?: string;
 };
 export function AuthField({ label, icon, password = false, hint, error, ...props }: AuthFieldProps) {
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   const [visible, setVisible] = useState(false);
   return <View style={styles.field}>
-    <Text style={styles.label}>{label}</Text>
+    <Text style={styles.label}>{t(label)}</Text>
     <View style={[styles.inputWrap, focused && styles.focused, !!error && styles.invalid]}>
       <Ionicons name={icon} size={19} color={focused ? palette.primary : palette.secondary} />
-      <TextInput {...props} accessibilityLabel={label} style={styles.input}
+      <TextInput {...props} accessibilityLabel={t(label)} style={styles.input}
         placeholderTextColor={palette.placeholder} secureTextEntry={password && !visible}
         onFocus={event => { setFocused(true); props.onFocus?.(event); }}
         onBlur={event => { setFocused(false); props.onBlur?.(event); }} />
-      {password && <TouchableOpacity accessibilityRole="button" accessibilityLabel={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+      {password && <TouchableOpacity accessibilityRole="button" accessibilityLabel={visible ? t("Hide {{value0}}", { value0: label.toLowerCase() }) : t("Show {{value0}}", { value0: label.toLowerCase() })}
         accessibilityState={{ disabled: props.editable === false }} disabled={props.editable === false}
         style={styles.eye} onPress={() => setVisible(previous => !previous)}>
         <Ionicons name={visible ? 'eye-off-outline' : 'eye-outline'} size={20} color={palette.secondary} />
       </TouchableOpacity>}
     </View>
-    {!!(error || hint) && <Text style={[styles.hint, !!error && styles.errorText]}>{error || hint}</Text>}
+    {!!(error || hint) && <Text style={[styles.hint, !!error && styles.errorText]}>{t(error || hint || '')}</Text>}
   </View>;
 }
 
 export function AuthButton({ title, onPress, loading = false, disabled = false, secondary = false }: {
   title: string; onPress: () => void; loading?: boolean; disabled?: boolean; secondary?: boolean;
 }) {
+  const { t } = useTranslation();
   return <TouchableOpacity onPress={onPress} disabled={loading || disabled} activeOpacity={0.85}
     accessibilityRole="button" accessibilityState={{ disabled: loading || disabled, busy: loading }}
     aria-disabled={loading || disabled} aria-busy={loading}
     style={[styles.button, secondary && styles.secondaryButton, (loading || disabled) && styles.disabled]}>
     {loading ? <ActivityIndicator color={secondary ? palette.primary : palette.surface} /> : <>
-      <Text style={[styles.buttonText, secondary && styles.secondaryButtonText]}>{title}</Text>
+      <Text style={[styles.buttonText, secondary && styles.secondaryButtonText]}>{t(title)}</Text>
       <Ionicons name="arrow-forward" size={18} color={secondary ? palette.primary : palette.surface} />
     </>}
   </TouchableOpacity>;
 }
 
 export function AuthError({ message }: { message: string }) {
+  const { t } = useTranslation();
   if (!message) return null;
   return <View accessibilityRole="alert" accessibilityLiveRegion="polite" aria-live="polite" style={styles.error}>
     <Ionicons name="alert-circle-outline" size={20} color={palette.error} />
-    <Text style={styles.errorMessage}>{message}</Text>
+    <Text style={styles.errorMessage}>{t(message)}</Text>
   </View>;
 }
 
@@ -157,7 +163,7 @@ const styles = StyleSheet.create({
   eye: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   hint: { fontFamily: fonts.body, fontSize: 12, lineHeight: 18, color: palette.secondary }, errorText: { color: palette.error },
   button: { minHeight: 54, borderRadius: 14, backgroundColor: palette.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 15 },
-  buttonText: { fontFamily: fonts.bodyMedium, fontSize: 16, color: palette.surface },
+  buttonText: { flexShrink: 1, textAlign: 'center', fontFamily: fonts.bodyMedium, fontSize: 16, color: palette.surface },
   secondaryButton: { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border }, secondaryButtonText: { color: palette.primary }, disabled: { opacity: 0.65 },
   error: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 12, backgroundColor: palette.errorBackground },
   errorMessage: { flex: 1, fontFamily: fonts.body, fontSize: 14, lineHeight: 21, color: palette.error },

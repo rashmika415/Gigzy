@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Tabs } from 'expo-router';
 import { useAuth } from '../../../context/AuthContext';
 import { LoadingState, TabBar } from '../../../components';
@@ -21,18 +22,19 @@ function SharedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     }} />;
 }
 export default function TabLayout() {
+  const { t } = useTranslation();
   const { userData, loading } = useAuth();
-  if (loading || !userData) return <LoadingState message="Loading your account?" />;
+  if (loading || !userData) return <LoadingState message={t("Loading your account?")} />;
   return <Tabs initialRouteName="home" tabBar={props => <SharedTabBar {...props} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.background } }}>
-    <Tabs.Screen name="home" options={{ title: 'Home' }} />
+    <Tabs.Screen name="home" options={{ title: t("Home") }} />
     <Tabs.Protected guard={userData.role === 'freelancer'}>
-      <Tabs.Screen name="browse" options={{ title: 'Browse' }} />
-      <Tabs.Screen name="saved" options={{ title: 'Saved' }} />
+      <Tabs.Screen name="browse" options={{ title: t("Browse") }} />
+      <Tabs.Screen name="saved" options={{ title: t("Saved") }} />
     </Tabs.Protected>
     <Tabs.Protected guard={userData.role === 'client'}>
-      <Tabs.Screen name="my-gigs" options={{ title: 'My Gigs' }} />
+      <Tabs.Screen name="my-gigs" options={{ title: t("My Gigs") }} />
     </Tabs.Protected>
-    <Tabs.Screen name="messages" options={{ title: 'Messages' }} />
-    <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+    <Tabs.Screen name="messages" options={{ title: t("Messages") }} />
+    <Tabs.Screen name="profile" options={{ title: t("Profile") }} />
   </Tabs>;
 }

@@ -1,5 +1,7 @@
+import { Text } from './LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { colors, spacing, borderRadius } from '../constants/theme';
 
 interface LoadingStateProps {
@@ -13,10 +15,11 @@ export default function LoadingState({
   message = 'Loading…',
   size = 'small',
 }: LoadingStateProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <ActivityIndicator color={colors.primary} size={size} />
-      <Text style={styles.text}>{message}</Text>
+      <Text style={styles.text}>{t(message)}</Text>
     </View>
   );
 }

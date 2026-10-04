@@ -15,6 +15,10 @@ import {
   HankenGrotesk_500Medium,
 } from '@expo-google-fonts/hanken-grotesk';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import LanguageProvider from '../localization/LanguageProvider';
+import { useFonts } from 'expo-font';
+import { NotoSansSinhala_400Regular, NotoSansSinhala_700Bold } from '@expo-google-fonts/noto-sans-sinhala';
+import { NotoSansTamil_400Regular, NotoSansTamil_700Bold } from '@expo-google-fonts/noto-sans-tamil';
 
 if (Platform.OS !== 'web') {
   SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -55,14 +59,15 @@ function RootLayoutNav() {
 export default function RootLayout() {
   const [syneLoaded] = useSyneFonts({ Syne_600SemiBold, Syne_700Bold, Syne_800ExtraBold });
   const [hankenLoaded] = useHankenFonts({ HankenGrotesk_400Regular, HankenGrotesk_500Medium });
+  const [localFontsLoaded] = useFonts({ NotoSansSinhala_400Regular, NotoSansSinhala_700Bold, NotoSansTamil_400Regular, NotoSansTamil_700Bold });
 
-  if (!syneLoaded || !hankenLoaded) {
+  if (!syneLoaded || !hankenLoaded || !localFontsLoaded) {
     return null;
   }
 
   return (
-    <AuthProvider>
+    <LanguageProvider><AuthProvider>
       <RootLayoutNav />
-    </AuthProvider>
+    </AuthProvider></LanguageProvider>
   );
 }

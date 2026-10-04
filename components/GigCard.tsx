@@ -1,5 +1,8 @@
+import { formatNumber, formatCalendarDate } from '../localization/format';
+import { Text } from './LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../constants/theme';
 import StatusPill from './StatusPill';
@@ -36,6 +39,7 @@ export default function GigCard({
   style,
   showBookmark = false,
 }: GigCardProps) {
+  const { t } = useTranslation();
   const locationIcon =
     gig.locationType === 'remote' ? 'globe-outline' : 'location-outline';
 
@@ -50,7 +54,7 @@ export default function GigCard({
       <View style={styles.topRow}>
         <View style={styles.badges}>
         <View style={styles.categoryBadge}>
-          <Text style={styles.categoryText}>{GIG_CATEGORIES.find(category => category.id === categoryId(gig.category))?.name ?? gig.category}</Text>
+          <Text style={styles.categoryText}>{t(GIG_CATEGORIES.find(category => category.id === categoryId(gig.category))?.name ?? gig.category)}</Text>
         </View>
 
         <StatusPill
@@ -68,9 +72,9 @@ export default function GigCard({
           {gig.title}
         </Text>
         <View style={styles.payPill}>
-          <Text style={styles.payAmount}>${gig.pay}</Text>
+          <Text style={styles.payAmount}>${formatNumber(gig.pay)}</Text>
           <Text style={styles.payType}>
-            {gig.payType === 'hourly' ? '/hr' : ' fixed'}
+            {gig.payType === 'hourly' ? t("/hr") : t(" fixed")}
           </Text>
         </View>
       </View>
@@ -101,13 +105,13 @@ export default function GigCard({
         <View style={styles.metaItem}>
           <Ionicons name={locationIcon as any} size={13} color={colors.textSecondary} />
           <Text style={styles.metaText} numberOfLines={1}>
-            {gig.location || 'Remote'}{gig.distanceKm !== undefined ? ` - ${gig.distanceKm.toFixed(1)} km` : ''}
+            {gig.location || t("Remote")}{gig.distanceKm !== undefined ? t(" - {{value0}} km", { value0: gig.distanceKm.toFixed(1) }) : ''}
           </Text>
         </View>
 
         <View style={styles.metaItem}>
           <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
-          <Text style={styles.metaText}>{gig.date || 'Flexible'}</Text>
+          <Text style={styles.metaText}>{gig.date ? formatCalendarDate(gig.date) : t("Flexible")}</Text>
         </View>
 
         <View
@@ -235,6 +239,8 @@ const styles = StyleSheet.create({
   // Meta
   metaRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 6,
@@ -243,10 +249,12 @@ const styles = StyleSheet.create({
   },
   metaItem: {
     flexDirection: 'row',
+    maxWidth: '100%',
     alignItems: 'center',
     gap: 4,
   },
   metaText: {
+    flexShrink: 1,
     fontSize: 12,
     color: colors.textSecondary,
   },
