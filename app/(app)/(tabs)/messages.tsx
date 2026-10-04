@@ -94,7 +94,11 @@ export default function MessagesScreen() {
       const other = getOtherParticipant(chat);
       const name = other.fullName?.toLowerCase() || '';
       const gig = chat.gigTitle?.toLowerCase() || '';
-      const lastMsg = chat.lastMessage?.text?.toLowerCase() || '';
+      const lastMsg = (
+        typeof chat.lastMessage === 'string'
+          ? chat.lastMessage
+          : chat.lastMessage?.text || ''
+      ).toLowerCase();
       const query = searchQuery.trim().toLowerCase();
 
       const matchesSearch =
@@ -267,8 +271,18 @@ export default function MessagesScreen() {
           filteredChats.map((chat) => {
             const other = getOtherParticipant(chat);
             const unread = user ? (chat.unreadCount?.[user.uid] || 0) : 0;
-            const isSentByMe = chat.lastMessage?.senderId === user?.uid;
+            const isSentByMe =
+              typeof chat.lastMessage === 'object' &&
+              chat.lastMessage?.senderId === user?.uid;
             const isBusiness = other.role === 'client';
+            const lastMsgPreview =
+              typeof chat.lastMessage === 'string'
+                ? chat.lastMessage
+                : chat.lastMessage?.text || 'Started a new conversation';
+            const timestampValue =
+              chat.lastMessageAt ||
+              (typeof chat.lastMessage === 'object' ? chat.lastMessage?.createdAt : null) ||
+              chat.updatedAt;
 
             return (
               <TouchableOpacity
@@ -305,7 +319,7 @@ export default function MessagesScreen() {
                       </View>
                     </View>
                     <Text style={[styles.timeText, unread > 0 && styles.timeTextUnread]}>
-                      {formatTimestamp(chat.lastMessage?.createdAt || chat.updatedAt)}
+                      {formatTimestamp(timestampValue)}
                     </Text>
                   </View>
 
@@ -327,7 +341,7 @@ export default function MessagesScreen() {
                       numberOfLines={1}
                     >
                       {isSentByMe ? 'You: ' : ''}
-                      {chat.lastMessage?.text || 'Started a new conversation'}
+                      {lastMsgPreview}
                     </Text>
 
                     {unread > 0 && (

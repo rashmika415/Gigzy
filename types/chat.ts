@@ -19,6 +19,7 @@ export interface LastMessage {
 
 export interface Chat {
   id: string;
+  conversationId?: string;
   gigId?: string;
   applicationId?: string;
   youthId?: string;
@@ -29,7 +30,8 @@ export interface Chat {
   gigCategory?: string;
   participants: string[];
   participantDetails: Record<string, ParticipantDetail>;
-  lastMessage?: LastMessage;
+  lastMessage?: LastMessage | string;
+  lastMessageAt?: any;
   unreadCount?: Record<string, number>;
   createdAt: any;
   updatedAt: any;
@@ -40,15 +42,20 @@ export type MessageType = 'text' | 'image' | 'system' | 'offer';
 export interface ChatMessage {
   id: string;
   chatId: string;
+  conversationId?: string;
   senderId: string;
+  receiverId?: string;
   senderName: string;
   senderPhotoURL?: string;
   text: string;
   mediaUrl?: string;
   type: MessageType;
+  read?: boolean;
   readBy: string[];
   createdAt: any;
 }
+
+export type { Conversation, Message } from './messaging';
 
 export interface QuickReply {
   id: string;
