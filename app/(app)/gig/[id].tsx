@@ -19,6 +19,7 @@ import { subscribeToGig } from '../../../services/gigService';
 import { getOrCreateChat } from '../../../services/chatService';
 import { StatusPill, Chip, LoadingState, ErrorState } from '../../../components';
 import BookmarkButton from '../../../components/BookmarkButton';
+import LocationMap from '../../../components/maps/LocationMap';
 import { distanceKm, validCoordinates } from '../../../services/discoveryFilters';
 import { getCurrentCoordinates } from '../../../services/locationService';
 import type { Gig } from '../../../types/gig';
@@ -257,6 +258,11 @@ export default function GigDetailScreen() {
         </View>
 
         {/* ── Description Section ── */}
+        {gig.locationType !== 'remote' && validCoordinates(gig.coordinates) && <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Meeting point</Text>
+          <Text style={styles.descriptionText}>{gig.location}</Text>
+          <LocationMap key={`${gig.id}-${gig.coordinates.latitude}-${gig.coordinates.longitude}`} point={gig.coordinates} />
+        </View>}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
             <Ionicons name="document-text-outline" size={16} color={colors.primary} />

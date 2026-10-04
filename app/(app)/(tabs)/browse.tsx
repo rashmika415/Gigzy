@@ -9,10 +9,13 @@ import {
   ScrollView,
   Modal,
   Platform,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DiscoveryFilters from '../../../components/DiscoveryFilters';
 import { useGigDiscovery } from '../../../hooks/useGigDiscovery';
+import GigMap from '../../../components/maps/GigMap';
+import SegmentedControl from '../../../components/SegmentedControl';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -48,6 +51,7 @@ const LOCATION_OPTIONS: { key: LocationType | 'all'; label: string; icon: keyof 
 export default function BrowseScreen() {
   const { user, userData } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('list');
   const [keyword, setKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState<LocationType | 'all'>('all');
@@ -255,7 +259,11 @@ export default function BrowseScreen() {
         </View>
       )}
 
-      <FlatList
+      <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}>
+        <SegmentedControl options={[{ key: 'list', label: 'List' }, { key: 'map', label: 'Map' }]} selectedKey={viewMode} onSelect={key => { setViewMode(key); Keyboard.dismiss(); }} />
+      </View>
+      {viewMode === 'map' ? <GigMap gigs={filteredGigs} loading={loading} error={error} refreshing={refreshing} loadingMore={loadingMore} hasMore={hasMore}
+        onRefresh={refresh} onLoadMore={loadMore} onGigPress={handleGigPress} onShowList={() => setViewMode('list')} /> : <FlatList
         data={filteredGigs}
         keyExtractor={item => item.id}
         renderItem={renderGigItem}
@@ -279,6 +287,7 @@ export default function BrowseScreen() {
           )}
         </View>}
       />
+      }
       {filterModalVisible && <DiscoveryFilters visible value={advancedFilters} onApply={setAdvancedFilters} onClose={() => setFilterModalVisible(false)} />}
 
       {/* ── Sort Modal ── */}

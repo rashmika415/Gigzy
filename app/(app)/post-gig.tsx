@@ -886,7 +886,8 @@ export default function PostGigScreen() {
               onChangeText={time => handleChange('time', time)} hint="Use the local time at the gig location." />
           </View>
           {form.locationType !== 'remote' && <View style={styles.fieldGroup}>
-            <GigLocationField key={form.location} address={form.location} value={form.coordinates} error={errors.coordinates} disabled={loading}
+            <GigLocationField address={form.location} value={form.coordinates} error={errors.coordinates} disabled={loading}
+              onAddressSelected={result => setForm(previous => ({ ...previous, location: result.label, coordinates: result.coordinates }))}
               onChange={coordinates => { handleChange('coordinates', coordinates); setErrors(previous => ({ ...previous, coordinates: undefined })); }} />
           </View>}
 

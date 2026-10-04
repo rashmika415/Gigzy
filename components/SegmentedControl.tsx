@@ -40,6 +40,10 @@ export default function SegmentedControl({
     return (
       <TouchableOpacity
         key={opt.key}
+        accessibilityRole="button"
+        accessibilityLabel={opt.label}
+        accessibilityState={{ selected: isSelected }}
+        aria-pressed={isSelected}
         style={[styles.tab, isSelected && styles.tabSelected]}
         onPress={() => onSelect(opt.key)}
         activeOpacity={0.8}
