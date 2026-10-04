@@ -1,22 +1,18 @@
+import { formatNumber } from '../../../localization/format';
+import { Text } from '../../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  ActivityIndicator,
-  Image,
-} from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Image } from 'react-native';
 import { router } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../../../FirebaseConfig';
 import { useAuth } from '../../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../../constants/theme';
+import LanguageSelector from '../../../components/LanguageSelector';
 
 export default function Profile() {
+  const { t } = useTranslation();
   const { user, userData, loading } = useAuth();
 
   const handleSignOut = async () => {
@@ -65,7 +61,7 @@ export default function Profile() {
           >
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>User Profile</Text>
+          <Text style={styles.headerTitle}>{t("User Profile")}</Text>
           <TouchableOpacity
             onPress={() => router.push('/(app)/edit-profile' as any)}
             style={styles.editHeaderButton}
@@ -88,16 +84,16 @@ export default function Profile() {
               </View>
             )}
             <Text style={styles.profileName}>
-              {isYouth ? (userData?.fullName || 'Youth Member') : (userData?.businessName || 'Business Owner')}
+              {isYouth ? (userData?.fullName || t("Youth Member")) : (userData?.businessName || t("Business Owner"))}
               {!isYouth && userData?.isVerified ? '  ✓' : ''}
             </Text>
             <View style={[styles.roleBadge, { borderColor: isYouth ? 'rgba(245, 158, 11, 0.3)' : 'rgba(124, 58, 237, 0.3)' }]}>
-              <Text style={[styles.roleText, { color: isYouth ? colors.primary : colors.accent }]}>{getRoleLabel()}</Text>
+              <Text style={[styles.roleText, { color: isYouth ? colors.primary : colors.accent }]}>{t(getRoleLabel())}</Text>
             </View>
             <Text style={styles.emailText}>{user?.email}</Text>
             <View style={styles.ratingRow}>
               <Ionicons name="star" size={15} color="#986000" />
-              <Text style={styles.emailText}>{(userData?.ratingAverage ?? 0).toFixed(1)} ({userData?.ratingCount ?? 0} reviews)</Text>
+              <Text style={styles.emailText}>{t('{{rating}} · Reviews: {{count}}', { rating: formatNumber(userData?.ratingAverage ?? 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), count: userData?.ratingCount ?? 0 })}</Text>
             </View>
           </View>
         </View>
@@ -108,15 +104,15 @@ export default function Profile() {
           <View style={styles.detailsSection}>
             {/* Bio Card */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>About Me</Text>
+              <Text style={styles.cardTitle}>{t("About Me")}</Text>
               <Text style={styles.cardContentText}>
-                {userData?.bio || "No bio has been added yet. Edit your profile to tell the community about yourself!"}
+                {userData?.bio || t("No bio has been added yet. Edit your profile to tell the community about yourself!")}
               </Text>
             </View>
 
             {/* Skills Card */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Skills & Specialties</Text>
+              <Text style={styles.cardTitle}>{t("Skills & Specialties")}</Text>
               {skillsArray.length > 0 ? (
                 <View style={styles.skillsContainer}>
                   {skillsArray.map((skill, index) => (
@@ -126,85 +122,86 @@ export default function Profile() {
                   ))}
                 </View>
               ) : (
-                <Text style={styles.mutedText}>No skills specified yet.</Text>
+                <Text style={styles.mutedText}>{t("No skills specified yet.")}</Text>
               )}
             </View>
 
             {/* Availability & Contact Card */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Work & Contact Details</Text>
+              <Text style={styles.cardTitle}>{t("Work & Contact Details")}</Text>
               <View style={styles.detailRow}>
                 <Ionicons name="location-outline" size={18} color={colors.primary} style={styles.rowIcon} />
-                <View><Text style={styles.detailLabel}>Location</Text><Text style={styles.detailValue}>{userData?.location || 'Not specified'}</Text></View>
+                <View><Text style={styles.detailLabel}>{t("Location")}</Text><Text style={styles.detailValue}>{userData?.location || t("Not specified")}</Text></View>
               </View>
               {userData?.age ? <View style={styles.detailRow}>
                 <Ionicons name="person-outline" size={18} color={colors.primary} style={styles.rowIcon} />
-                <View><Text style={styles.detailLabel}>Age</Text><Text style={styles.detailValue}>{userData.age}</Text></View>
+                <View><Text style={styles.detailLabel}>{t("Age")}</Text><Text style={styles.detailValue}>{userData.age}</Text></View>
               </View> : null}
               <View style={styles.detailRow}>
                 <Ionicons name="calendar-outline" size={18} color={colors.primary} style={styles.rowIcon} />
                 <View>
-                  <Text style={styles.detailLabel}>Availability</Text>
-                  <Text style={styles.detailValue}>{userData?.availability || 'Not specified'}</Text>
+                  <Text style={styles.detailLabel}>{t("Availability")}</Text>
+                  <Text style={styles.detailValue}>{userData?.availability || t("Not specified")}</Text>
                 </View>
               </View>
               <View style={styles.detailRow}>
                 <Ionicons name="call-outline" size={18} color={colors.primary} style={styles.rowIcon} />
                 <View>
-                  <Text style={styles.detailLabel}>Phone Number</Text>
-                  <Text style={styles.detailValue}>{userData?.phone || 'Not specified'}</Text>
+                  <Text style={styles.detailLabel}>{t("Phone Number")}</Text>
+                  <Text style={styles.detailValue}>{userData?.phone || t("Not specified")}</Text>
                 </View>
               </View>
             </View>
-            {!!userData?.skillBadges?.length && <View style={styles.card}><Text style={styles.cardTitle}>Earned Skill Badges</Text><View style={styles.skillsContainer}>{userData.skillBadges.map((badge) => <View key={badge.id} style={styles.skillTag}><Text style={styles.skillTagText}>🏅 {badge.label}</Text></View>)}</View></View>}
-            {!!userData?.endorsements?.length && <View style={styles.card}><Text style={styles.cardTitle}>Community Endorsements</Text>{userData.endorsements.map((item) => <Text key={item.id} style={styles.cardContentText}>✓ {item.skill} · {item.endorserName}</Text>)}</View>}
+            {!!userData?.skillBadges?.length && <View style={styles.card}><Text style={styles.cardTitle}>{t("Earned Skill Badges")}</Text><View style={styles.skillsContainer}>{userData.skillBadges.map((badge) => <View key={badge.id} style={styles.skillTag}><Text style={styles.skillTagText}>🏅 {badge.label}</Text></View>)}</View></View>}
+            {!!userData?.endorsements?.length && <View style={styles.card}><Text style={styles.cardTitle}>{t("Community Endorsements")}</Text>{userData.endorsements.map((item) => <Text key={item.id} style={styles.cardContentText}>✓ {item.skill} · {item.endorserName}</Text>)}</View>}
           </View>
         ) : (
           // Business Profile Fields
           <View style={styles.detailsSection}>
             {/* Business Details Card */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Business Profile & Details</Text>
+              <Text style={styles.cardTitle}>{t("Business Profile & Details")}</Text>
               <View style={styles.detailRow}>
                 <Ionicons name="business-outline" size={18} color={colors.accent} style={styles.rowIcon} />
                 <View>
-                  <Text style={styles.detailLabel}>Contact Person</Text>
-                  <Text style={styles.detailValue}>{userData?.fullName || 'Not specified'}</Text>
+                  <Text style={styles.detailLabel}>{t("Contact Person")}</Text>
+                  <Text style={styles.detailValue}>{userData?.fullName || t("Not specified")}</Text>
                 </View>
               </View>
               <View style={styles.detailRow}>
                 <Ionicons name="pricetag-outline" size={18} color={colors.accent} style={styles.rowIcon} />
                 <View>
-                  <Text style={styles.detailLabel}>Category</Text>
-                  <Text style={styles.detailValue}>{userData?.businessCategory || 'Not specified'}</Text>
+                  <Text style={styles.detailLabel}>{t("Category")}</Text>
+                  <Text style={styles.detailValue}>{userData?.businessCategory || t("Not specified")}</Text>
                 </View>
               </View>
               <View style={styles.detailRow}>
                 <Ionicons name="location-outline" size={18} color={colors.accent} style={styles.rowIcon} />
                 <View>
-                  <Text style={styles.detailLabel}>Location</Text>
-                  <Text style={styles.detailValue}>{userData?.address || 'Not specified'}</Text>
+                  <Text style={styles.detailLabel}>{t("Location")}</Text>
+                  <Text style={styles.detailValue}>{userData?.address || t("Not specified")}</Text>
                 </View>
               </View>
               <View style={styles.detailRow}>
                 <Ionicons name="call-outline" size={18} color={colors.accent} style={styles.rowIcon} />
                 <View>
-                  <Text style={styles.detailLabel}>Phone Number</Text>
-                  <Text style={styles.detailValue}>{userData?.phone || 'Not specified'}</Text>
+                  <Text style={styles.detailLabel}>{t("Phone Number")}</Text>
+                  <Text style={styles.detailValue}>{userData?.phone || t("Not specified")}</Text>
                 </View>
               </View>
             </View>
 
             {/* Business Description Card */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>About the Business</Text>
+              <Text style={styles.cardTitle}>{t("About the Business")}</Text>
               <Text style={styles.cardContentText}>
-                {userData?.businessDetails || "No description has been added yet. Edit your profile to tell freelancers about your business!"}
+                {userData?.businessDetails || t("No description has been added yet. Edit your profile to tell freelancers about your business!")}
               </Text>
             </View>
           </View>
         )}
 
+        <LanguageSelector />
         {/* Action Buttons */}
         <View style={styles.actionSection}>
           {user && <TouchableOpacity
@@ -213,7 +210,7 @@ export default function Profile() {
             activeOpacity={0.8}
           >
             <Ionicons name="eye-outline" size={18} color={colors.primary} />
-            <Text style={styles.publicButtonText}>View Public Profile & Reviews</Text>
+            <Text style={styles.publicButtonText}>{t("View Public Profile & Reviews")}</Text>
           </TouchableOpacity>}
           <TouchableOpacity
             style={styles.editButton}
@@ -221,7 +218,7 @@ export default function Profile() {
             activeOpacity={0.8}
           >
             <Ionicons name="create-outline" size={18} color={colors.primaryOnColor} style={styles.buttonIcon} />
-            <Text style={styles.editButtonText}>Edit Profile</Text>
+            <Text style={styles.editButtonText}>{t("Edit Profile")}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -230,7 +227,7 @@ export default function Profile() {
             activeOpacity={0.8}
           >
             <Ionicons name="log-out-outline" size={18} color={colors.error} style={styles.buttonIcon} />
-            <Text style={styles.signOutText}>Sign Out Account</Text>
+            <Text style={styles.signOutText}>{t("Sign Out Account")}</Text>
           </TouchableOpacity>
         </View>
 

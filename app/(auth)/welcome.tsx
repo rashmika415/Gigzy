@@ -1,10 +1,13 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Text } from '../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
+import { ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { AuthBrand, AuthButton, AuthPhoto } from '../../components/auth/AuthUI';
 import { authColors as palette } from '../../constants/authTheme';
 import { fonts } from '../../constants/theme';
+import LanguageSelector from '../../components/LanguageSelector';
 
 const FEATURES: { label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { label: 'Local gigs', icon: 'location-outline' },
@@ -12,38 +15,39 @@ const FEATURES: { label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { label: 'Build experience', icon: 'sparkles-outline' },
 ];
 export default function Welcome() {
+  const { t } = useTranslation();
   const { width, height } = useWindowDimensions();
   const wide = width >= 900;
   const picture = <View style={[styles.picture, wide && styles.widePicture]}>
     <AuthPhoto style={{ height: wide ? 510 : Math.min(310, Math.max(210, height * 0.31)), borderRadius: 26 }} />
     <View style={styles.photoNote}>
       <View style={styles.noteIcon}><Ionicons name="location-outline" size={18} color={palette.primary} /></View>
-      <View><Text style={styles.noteTitle}>Opportunity starts nearby</Text><Text style={styles.noteSubtitle}>Your skills. Your community.</Text></View>
+      <View><Text style={styles.noteTitle}>{t("Opportunity starts nearby")}</Text><Text style={styles.noteSubtitle}>{t("Your skills. Your community.")}</Text></View>
     </View>
   </View>;
   return <SafeAreaView style={styles.page}>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
       <View style={styles.header}><AuthBrand />
-        <TouchableOpacity accessibilityRole="link" onPress={() => router.push('/(auth)/login')} style={styles.headerLink}><Text style={styles.signIn}>Sign in</Text><Ionicons name="arrow-forward" size={16} color={palette.primary} /></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="link" onPress={() => router.push('/(auth)/login')} style={styles.headerLink}><Text style={styles.signIn}>{t("Sign in")}</Text><Ionicons name="arrow-forward" size={16} color={palette.primary} /></TouchableOpacity>
       </View>
+      <View style={{ width: '100%', maxWidth: 1080, alignSelf: 'center' }}><LanguageSelector /></View>
       <View style={[styles.hero, wide && styles.wideHero]}>
         {!wide && picture}
         <View style={[styles.copy, wide && styles.wideCopy]}>
-          <View style={styles.eyebrowRow}><View style={styles.dot} /><Text style={styles.eyebrow}>LOCAL WORK. REAL OPPORTUNITY.</Text></View>
-          <Text accessibilityRole="header" style={[styles.title, width < 360 && styles.smallTitle, wide && styles.wideTitle]}>
-            Find your next gig,<Text style={styles.highlight}> close to home.</Text>
+          <View style={styles.eyebrowRow}><View style={styles.dot} /><Text style={styles.eyebrow}>{t("LOCAL WORK. REAL OPPORTUNITY.")}</Text></View>
+          <Text accessibilityRole="header" style={[styles.title, width < 360 && styles.smallTitle, wide && styles.wideTitle]}>{t("Find your next gig,")}{' '}<Text style={styles.highlight}>{t("close to home.")}</Text>
           </Text>
-          <Text style={styles.subtitle}>Connect with local businesses. Put your skills to work. Build something for yourself.</Text>
+          <Text style={styles.subtitle}>{t("Connect with local businesses. Put your skills to work. Build something for yourself.")}</Text>
           <View style={styles.features}>{FEATURES.map(feature => <View style={styles.feature} key={feature.label}>
-            <Ionicons name={feature.icon} size={15} color={palette.primary} /><Text style={styles.featureText}>{feature.label}</Text>
+            <Ionicons name={feature.icon} size={15} color={palette.primary} /><Text style={styles.featureText}>{t(feature.label)}</Text>
           </View>)}</View>
-          <View style={styles.actions}><AuthButton title="Get started" onPress={() => router.push('/(auth)/role-select')} />
-            <Text style={styles.actionNote}>For people finding work and businesses hiring.</Text>
+          <View style={styles.actions}><AuthButton title={t("Get started")} onPress={() => router.push('/(auth)/role-select')} />
+            <Text style={styles.actionNote}>{t("For people finding work and businesses hiring.")}</Text>
           </View>
         </View>
         {wide && picture}
       </View>
-      <View style={styles.footer}><Text style={styles.footerText}>Good work starts with a connection.</Text><Text style={styles.footerBrand}>Made for your community.</Text></View>
+      <View style={styles.footer}><Text style={styles.footerText}>{t("Good work starts with a connection.")}</Text><Text style={styles.footerBrand}>{t("Made for your community.")}</Text></View>
     </ScrollView>
   </SafeAreaView>;
 }

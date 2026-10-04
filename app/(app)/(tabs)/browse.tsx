@@ -1,16 +1,7 @@
+import { Text } from '../../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  RefreshControl,
-  TouchableOpacity,
-  ScrollView,
-  Modal,
-  Platform,
-  Keyboard,
-} from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity, ScrollView, Modal, Platform, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DiscoveryFilters from '../../../components/DiscoveryFilters';
 import { useGigDiscovery } from '../../../hooks/useGigDiscovery';
@@ -49,6 +40,7 @@ const LOCATION_OPTIONS: { key: LocationType | 'all'; label: string; icon: keyof 
 ];
 
 export default function BrowseScreen() {
+  const { t } = useTranslation();
   const { user, userData } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('list');
@@ -125,17 +117,16 @@ export default function BrowseScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
       {/* ── Header ── */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Browse Gigs</Text>
+        <View style={{ flex: 1, minWidth: 0, marginRight: spacing.sm }}>
+          <Text style={styles.title}>{t("Browse Gigs")}</Text>
           <Text style={styles.subtitle}>
-            {filteredGigs.length} open{' '}
-            {filteredGigs.length === 1 ? 'opportunity loaded' : 'opportunities loaded'}
-            {hasAnyFilter ? ' (filtered)' : ''}
+            {t("Open opportunities loaded: {{count}}", { count: filteredGigs.length })}
+            {hasAnyFilter ? t(" (filtered)") : ''}
           </Text>
         </View>
-        <TouchableOpacity style={styles.liveIndicator} onPress={() => setFilterModalVisible(true)} accessibilityLabel="Open gig filters">
+        <TouchableOpacity style={styles.liveIndicator} onPress={() => setFilterModalVisible(true)} accessibilityLabel={t("Open gig filters")}>
           <Ionicons name="options-outline" size={16} color={colors.primary} />
-          <Text style={styles.liveText}>Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text>
+          <Text style={styles.liveText}>{t("Filters")}{activeFilterCount ? t(" ({{value0}})", { value0: activeFilterCount }) : ''}</Text>
         </TouchableOpacity>
       </View>
 
@@ -144,7 +135,7 @@ export default function BrowseScreen() {
         <SearchBar
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder="Search title, skill, location…"
+          placeholder={t("Search title, skill, location…")}
           style={styles.searchBarFlex}
         />
         <TouchableOpacity
@@ -183,9 +174,7 @@ export default function BrowseScreen() {
                 styles.categoryChipText,
                 selectedCategory === 'all' && styles.categoryChipTextSelected,
               ]}
-            >
-              All
-            </Text>
+            >{t("All")}</Text>
           </TouchableOpacity>
 
           {GIG_CATEGORIES.map((cat) => {
@@ -205,7 +194,7 @@ export default function BrowseScreen() {
                 <Text
                   style={[styles.categoryChipText, isSelected && styles.categoryChipTextSelected]}
                 >
-                  {cat.name}
+                  {t(cat.name)}
                 </Text>
               </TouchableOpacity>
             );
@@ -237,7 +226,7 @@ export default function BrowseScreen() {
                 <Text
                   style={[styles.locationChipText, isSelected && styles.locationChipTextSelected]}
                 >
-                  {loc.label}
+                  {t(loc.label)}
                 </Text>
               </TouchableOpacity>
             );
@@ -250,17 +239,17 @@ export default function BrowseScreen() {
         <View style={styles.filterInfoBar}>
           <Text style={styles.filterInfoText}>
             <Text style={styles.filterInfoHighlight}>{filteredGigs.length}</Text>
-            {' '}result{filteredGigs.length !== 1 ? 's' : ''}
-            {selectedSort !== 'newest' ? ` · ${currentSortLabel}` : ''}
+            {' '}{t("result")}{filteredGigs.length !== 1 ? t("s") : ''}
+            {selectedSort !== 'newest' ? t(" · {{value0}}", { value0: t(currentSortLabel) }) : ''}
           </Text>
           <TouchableOpacity onPress={handleClearFilters} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={styles.clearFiltersText}>Clear All</Text>
+            <Text style={styles.clearFiltersText}>{t("Clear All")}</Text>
           </TouchableOpacity>
         </View>
       )}
 
       <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}>
-        <SegmentedControl options={[{ key: 'list', label: 'List' }, { key: 'map', label: 'Map' }]} selectedKey={viewMode} onSelect={key => { setViewMode(key); Keyboard.dismiss(); }} />
+        <SegmentedControl options={[{ key: 'list', label: t("List") }, { key: 'map', label: t("Map") }]} selectedKey={viewMode} onSelect={key => { setViewMode(key); Keyboard.dismiss(); }} />
       </View>
       {viewMode === 'map' ? <GigMap gigs={filteredGigs} loading={loading} error={error} refreshing={refreshing} loadingMore={loadingMore} hasMore={hasMore}
         onRefresh={refresh} onLoadMore={loadMore} onGigPress={handleGigPress} onShowList={() => setViewMode('list')} /> : <FlatList
@@ -273,17 +262,17 @@ export default function BrowseScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
         onEndReached={() => { if (!error && filteredGigs.length > 0) loadMore(); }}
         onEndReachedThreshold={0.3}
-        ListEmptyComponent={loading ? <LoadingState message="Discovering gigs..." size="large" /> : error ?
-          <ErrorState title="Failed to load gigs" message={error} onRetry={refresh} /> :
+        ListEmptyComponent={loading ? <LoadingState message={t("Discovering gigs...")} size="large" /> : error ?
+          <ErrorState title={t("Failed to load gigs")} message={t(error ?? "")} onRetry={refresh} /> :
           <EmptyState icon={hasAnyFilter ? 'search-outline' : 'briefcase-outline'}
-            title={hasMore ? 'Still looking for matches' : hasAnyFilter ? 'No matching gigs' : 'No gigs yet'}
-            description={hasMore ? 'Continue searching to check older gigs.' : hasAnyFilter ? 'Try adjusting your search or filters.' : 'Pull down to check for new opportunities.'}
-            actionLabel={hasAnyFilter && !hasMore ? 'Clear All Filters' : undefined} onAction={handleClearFilters} />}
+            title={hasMore ? t("Still looking for matches") : hasAnyFilter ? t("No matching gigs") : t("No gigs yet")}
+            description={hasMore ? t("Continue searching to check older gigs.") : hasAnyFilter ? t("Try adjusting your search or filters.") : t("Pull down to check for new opportunities.")}
+            actionLabel={hasAnyFilter && !hasMore ? t("Clear All Filters") : undefined} onAction={handleClearFilters} />}
         ListFooterComponent={<View style={{ paddingVertical: spacing.md, alignItems: 'center' }}>
-          {!!error && filteredGigs.length > 0 && <ErrorState message={error} onRetry={hasMore ? loadMore : refresh} />}
-          {loadingMore ? <LoadingState message="Finding more gigs..." /> : !loading && !refreshing && !error && (
-            hasMore ? <TouchableOpacity onPress={loadMore}><Text style={styles.clearFiltersText}>{filteredGigs.length ? 'Load more gigs' : 'Continue searching'}</Text></TouchableOpacity> :
-              filteredGigs.length > 0 ? <Text style={styles.subtitle}>You have reached the end.</Text> : null
+          {!!error && filteredGigs.length > 0 && <ErrorState message={t(error ?? "")} onRetry={hasMore ? loadMore : refresh} />}
+          {loadingMore ? <LoadingState message={t("Finding more gigs...")} /> : !loading && !refreshing && !error && (
+            hasMore ? <TouchableOpacity onPress={loadMore}><Text style={styles.clearFiltersText}>{filteredGigs.length ? t("Load more gigs") : t("Continue searching")}</Text></TouchableOpacity> :
+              filteredGigs.length > 0 ? <Text style={styles.subtitle}>{t("You have reached the end.")}</Text> : null
           )}
         </View>}
       />
@@ -304,7 +293,7 @@ export default function BrowseScreen() {
         >
           <View style={styles.modalCard}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Sort By</Text>
+            <Text style={styles.modalTitle}>{t("Sort By")}</Text>
 
             {SORT_OPTIONS.map((opt) => {
               const isActive = selectedSort === opt.key;
@@ -331,7 +320,7 @@ export default function BrowseScreen() {
                     <Text
                       style={[styles.sortOptionText, isActive && styles.sortOptionTextActive]}
                     >
-                      {opt.label}
+                      {t(opt.label)}
                     </Text>
                   </View>
                   {isActive && (

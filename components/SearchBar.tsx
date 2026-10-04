@@ -1,13 +1,7 @@
+import { TextInput } from './LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
-  ViewStyle,
-} from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Platform, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, borderRadius } from '../constants/theme';
 
@@ -28,12 +22,13 @@ export default function SearchBar({
   placeholder = 'Search by title, skill, location…',
   style,
 }: SearchBarProps) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.container, style]}>
       <Ionicons name="search-outline" size={18} color={colors.textMuted} />
       <TextInput
         style={styles.input}
-        placeholder={placeholder}
+        placeholder={t(placeholder)}
         placeholderTextColor={colors.textMuted}
         value={value}
         onChangeText={onChangeText}

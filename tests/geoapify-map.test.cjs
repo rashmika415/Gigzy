@@ -25,12 +25,14 @@ test('map bridge opens the selected pin, fits locations, handles GPS and reports
     marker: () => { const marker = { addTo: () => marker, bindTooltip() {}, on: (_, fn) => { marker.click = fn; } }; markers.push(marker); return marker; },
     circleMarker: () => ({ addTo() { return this; } }),
   };
-  const context = { L, document: { createElement: () => ({}) }, window: { parent: { postMessage: message => events.push(message) }, addEventListener() {} } };
+  const attributes = {};
+  const context = { L, document: { createElement: () => ({}), getElementById: () => ({ setAttribute: (key, value) => { attributes[key] = value; } }) }, window: { parent: { postMessage: message => events.push(message) }, addEventListener() {} } };
   const pins = ['a', 'b'].map((key, index) => ({ key, coordinates: { latitude: 6 + index, longitude: 79 }, gigs: [{ title: key }] }));
-  const html = createGeoapifyMapHTML(pins, 'test-key');
+  const html = createGeoapifyMapHTML(pins, 'test-key', undefined, { locations: 'වැඩ අවස්ථා ස්ථාන', location: 'ස්ථානය', group: count => `ස්ථාන ${count}` });
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
   scripts.forEach(match => vm.runInNewContext(match[1], context));
   assert.equal(events.at(-1).type, 'ready');
+  assert.equal(attributes['aria-label'], 'වැඩ අවස්ථා ස්ථාන');
   assert.equal(fit.length, 2);
   markers[1].click();
   assert.equal(events.at(-1).key, 'b');

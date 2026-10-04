@@ -1,5 +1,7 @@
+import { Text } from './LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { borderRadius } from '../constants/theme';
 import type { GigStatus } from '../types/gig';
@@ -66,6 +68,7 @@ export default function StatusPill({
   showChevron = false,
   onPress,
 }: StatusPillProps) {
+  const { t } = useTranslation();
   const cfg = STATUS_STYLES[status] ?? STATUS_STYLES.open;
   const isSm = size === 'sm';
 
@@ -83,7 +86,7 @@ export default function StatusPill({
           isSm && styles.labelSm,
         ]}
       >
-        {cfg.label}
+        {t(cfg.label)}
       </Text>
       {showChevron && (
         <Ionicons

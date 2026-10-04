@@ -1,5 +1,7 @@
+import { Text } from '../LocalizedText';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import MapCanvas from './MapCanvas';
 import type { MapCanvasHandle } from './MapCanvas.types';
 import { createGeoapifyMapHTML } from '../../services/geoapifyMap';
@@ -8,9 +10,14 @@ import type { Coordinates } from '../../types/gig';
 import { colors, borderRadius } from '../../constants/theme';
 
 export default function LocationMap({ point, onChange, disabled }: { point?: Coordinates; onChange?: (point: Coordinates) => void; disabled?: boolean }) {
+  const { i18n } = useTranslation();
+  return <LocationMapContent key={i18n.resolvedLanguage} point={point} onChange={onChange} disabled={disabled} />;
+}
+function LocationMapContent({ point, onChange, disabled }: { point?: Coordinates; onChange?: (point: Coordinates) => void; disabled?: boolean }) {
+  const { t } = useTranslation();
   const apiKey = process.env.EXPO_PUBLIC_GEOAPIFY_API_KEY?.trim() ?? '';
   // Keep the document stable while dragging; send external coordinate changes through the bridge.
-  const [html] = useState(() => createGeoapifyMapHTML([], apiKey, { point, editable: !!onChange }));
+  const [html] = useState(() => createGeoapifyMapHTML([], apiKey, { point, editable: !!onChange }, { locations: t('Gig locations'), location: t('Gig location'), group: count => t('Gigs at this location: {{count}}', { count }) }));
   const canvas = useRef<MapCanvasHandle>(null);
   const [ready, setReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -42,12 +49,12 @@ export default function LocationMap({ point, onChange, disabled }: { point?: Coo
     return () => clearTimeout(timer);
   }, [apiKey, loaded, failed, attempt]);
   return <View style={styles.map} pointerEvents={disabled ? 'none' : 'auto'}>
-    {!apiKey ? <Text style={styles.note}>Map preview is unavailable. You can still enter coordinates below.</Text> : failed ? <View style={styles.overlay}>
-      <Text style={styles.note}>Unable to load the map. Your selected location is kept.</Text>
-      <TouchableOpacity accessibilityRole="button" onPress={() => { setFailed(false); setLoaded(false); setReady(false); setAttempt(value => value + 1); }}><Text style={styles.link}>Retry map</Text></TouchableOpacity>
+    {!apiKey ? <Text style={styles.note}>{t("Map preview is unavailable. You can still enter coordinates below.")}</Text> : failed ? <View style={styles.overlay}>
+      <Text style={styles.note}>{t("Unable to load the map. Your selected location is kept.")}</Text>
+      <TouchableOpacity accessibilityRole="button" onPress={() => { setFailed(false); setLoaded(false); setReady(false); setAttempt(value => value + 1); }}><Text style={styles.link}>{t("Retry map")}</Text></TouchableOpacity>
     </View> : <>
       <MapCanvas key={attempt} ref={canvas} html={html} onEvent={receive} />
-      {!loaded && <View pointerEvents="none" style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={styles.note}>Loading map...</Text></View>}
+      {!loaded && <View pointerEvents="none" style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={styles.note}>{t("Loading map...")}</Text></View>}
     </>}
   </View>;
 }

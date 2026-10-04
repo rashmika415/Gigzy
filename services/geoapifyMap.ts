@@ -6,9 +6,9 @@ function scriptJSON(value: unknown) {
   return JSON.stringify(value).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 }
 
-export function createGeoapifyMapHTML(pins: GigMapPin[], apiKey: string, location?: { point?: Coordinates; editable?: boolean }) {
+export function createGeoapifyMapHTML(pins: GigMapPin[], apiKey: string, location?: { point?: Coordinates; editable?: boolean }, labels?: { locations: string; location: string; group: (count: number) => string }) {
   const data = pins.map(pin => ({ key: pin.key, latitude: pin.coordinates.latitude, longitude: pin.coordinates.longitude,
-    count: pin.gigs.length, title: pin.gigs.length === 1 ? pin.gigs[0].title : `${pin.gigs.length} gigs at this location` }));
+    count: pin.gigs.length, title: pin.gigs.length === 1 ? pin.gigs[0].title : labels?.group(pin.gigs.length) ?? `${pin.gigs.length} gigs at this location` }));
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <style>html,body,#map{height:100%;width:100%;margin:0;background:#FAF9F6}.gig-pin{background:#087F73;border:2px solid white;border-radius:50%;color:white;text-align:center;line-height:28px;font-weight:bold;box-shadow:0 2px 6px #0004}.leaflet-control-attribution{max-width:calc(100vw - 12px);font-size:10px}</style></head><body><div id="map" role="application" aria-label="Gig locations"></div>
@@ -17,6 +17,8 @@ export function createGeoapifyMapHTML(pins: GigMapPin[], apiKey: string, locatio
 <script>
 try {
 var pins=${scriptJSON(data)}, apiKey=${scriptJSON(apiKey)};
+var labels=${scriptJSON({ locations: labels?.locations ?? 'Gig locations', location: labels?.location ?? 'Gig location' })};
+document.getElementById('map').setAttribute('aria-label',labels.locations);
 var locationOptions=${scriptJSON(location ?? null)}, locationMarker=null, selectedPoint=locationOptions&&locationOptions.point;
 var map=L.map('map').setView([6.9271,79.8612],11), userMarker=null, loaded=false;
 var tiles=L.tileLayer('https://maps.geoapify.com/v1/tile/osm-carto/{z}/{x}/{y}.png?apiKey='+encodeURIComponent(apiKey),{
@@ -33,7 +35,7 @@ marker.bindTooltip(label);marker.on('click',function(){emit('pin',pin.key);});
 function selectPoint(point,notify){
 selectedPoint=point;
 if(locationMarker)locationMarker.setLatLng([point.latitude,point.longitude]);
-else {locationMarker=L.marker([point.latitude,point.longitude],{draggable:!!locationOptions.editable,title:'Gig location',icon:L.divIcon({className:'gig-pin',html:'&#8226;',iconSize:[28,28],iconAnchor:[14,14]})}).addTo(map);
+else {locationMarker=L.marker([point.latitude,point.longitude],{draggable:!!locationOptions.editable,title:labels.location,icon:L.divIcon({className:'gig-pin',html:'&#8226;',iconSize:[28,28],iconAnchor:[14,14]})}).addTo(map);
 locationMarker.on('dragend',function(){var point=locationMarker.getLatLng();selectPoint({latitude:point.lat,longitude:point.lng},true);});}
 if(notify)emit('location',null,point);
 }

@@ -1,11 +1,7 @@
+import { Text } from './LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { colors, borderRadius } from '../constants/theme';
 
 interface SegmentOption {
@@ -34,6 +30,7 @@ export default function SegmentedControl({
   onSelect,
   scrollable = false,
 }: SegmentedControlProps) {
+  const { t } = useTranslation();
   const segments = options.map((opt) => {
     const isSelected = opt.key === selectedKey;
 
@@ -41,7 +38,7 @@ export default function SegmentedControl({
       <TouchableOpacity
         key={opt.key}
         accessibilityRole="button"
-        accessibilityLabel={opt.label}
+        accessibilityLabel={t(opt.label)}
         accessibilityState={{ selected: isSelected }}
         aria-pressed={isSelected}
         style={[styles.tab, isSelected && styles.tabSelected]}
@@ -49,7 +46,7 @@ export default function SegmentedControl({
         activeOpacity={0.8}
       >
         <Text style={[styles.tabText, isSelected && styles.tabTextSelected]}>
-          {opt.label}
+          {t(opt.label)}
         </Text>
         {opt.count !== undefined && (
           <View style={[styles.badge, isSelected && styles.badgeSelected]}>

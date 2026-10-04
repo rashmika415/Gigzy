@@ -1,6 +1,8 @@
+import { Text } from './LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, borderRadius } from '../constants/theme';
 
@@ -27,6 +29,7 @@ interface TabBarProps {
 }
 
 export default function TabBar({ tabs, activeTab, onTabPress }: TabBarProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -41,7 +44,7 @@ export default function TabBar({ tabs, activeTab, onTabPress }: TabBarProps) {
             onPress={() => onTabPress(tab.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
-            accessibilityLabel={tab.label}
+            accessibilityLabel={t(tab.label)}
             activeOpacity={0.7}
           >
             <View style={styles.iconWrapper}>
@@ -62,7 +65,7 @@ export default function TabBar({ tabs, activeTab, onTabPress }: TabBarProps) {
               style={[styles.label, isActive && styles.labelActive]}
               numberOfLines={1}
             >
-              {tab.label}
+              {t(tab.label)}
             </Text>
             {isActive && <View style={styles.activeIndicator} />}
           </TouchableOpacity>

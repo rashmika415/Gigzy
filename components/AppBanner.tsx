@@ -1,4 +1,6 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Text } from './LocalizedText';
+import { useTranslation } from 'react-i18next';
+import { Image, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { borderRadius, colors, fonts, spacing } from '../constants/theme';
@@ -22,12 +24,13 @@ export default function AppBanner({ kind, title, description, action, onPress, c
   onPress?: () => void;
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   const wide = useWindowDimensions().width >= 900 && !compact;
   return (
     <View style={[styles.card, compact && styles.compact, wide && styles.wide]}>
       {compact ? <Image source={photos[kind]} style={styles.thumbnail} resizeMode="cover" accessible={false} /> : <View style={wide && styles.widePhoto}><AppPhoto kind={kind} /></View>}
       <View style={[styles.content, compact && styles.compactContent, wide && styles.wideContent]}>
-        <Text style={[styles.title, compact && styles.compactTitle]}>{title}</Text>
+        <Text style={[styles.title, compact && styles.compactTitle]}>{t(title)}</Text>
         <Text style={styles.description}>{description}</Text>
         {action && onPress && <TouchableOpacity accessibilityRole="button" onPress={onPress} style={styles.action} activeOpacity={0.8}>
           <Text style={styles.actionText}>{action}</Text>

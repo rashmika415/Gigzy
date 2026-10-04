@@ -1,5 +1,7 @@
+import { Text } from '../LocalizedText';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapCanvas from './MapCanvas';
 import type { MapCanvasHandle } from './MapCanvas.types';
@@ -16,11 +18,13 @@ import MapResults from './MapResults';
 import type { GigMapProps } from './GigMap.types';
 
 export default function GigMap(props: GigMapProps) {
+  const { i18n } = useTranslation();
   // Filtering can unmount the map document. Reset readiness when pins reappear.
-  return <GigMapContent key={JSON.stringify(getGigMapData(props.gigs).pins.map(pin => [pin.key, pin.gigs.map(gig => [gig.id, gig.title])]))} {...props} />;
+  return <GigMapContent key={i18n.resolvedLanguage + JSON.stringify(getGigMapData(props.gigs).pins.map(pin => [pin.key, pin.gigs.map(gig => [gig.id, gig.title])]))} {...props} />;
 }
 
 function GigMapContent(props: GigMapProps) {
+  const { t } = useTranslation();
   const { pins } = useMemo(() => getGigMapData(props.gigs), [props.gigs]);
   const map = useRef<MapCanvasHandle>(null);
   const [ready, setReady] = useState(false);
@@ -33,7 +37,7 @@ function GigMapContent(props: GigMapProps) {
   const selected = pins.find(pin => pin.key === selectedKey);
   const apiKey = process.env.EXPO_PUBLIC_GEOAPIFY_API_KEY?.trim() ?? '';
   const configured = !!apiKey;
-  const html = useMemo(() => createGeoapifyMapHTML(pins, apiKey), [pins, apiKey]);
+  const html = useMemo(() => createGeoapifyMapHTML(pins, apiKey, undefined, { locations: t('Gig locations'), location: t('Gig location'), group: count => t('Gigs at this location: {{count}}', { count }) }), [pins, apiKey, t]);
   const fitPins = () => map.current?.send({ type: 'fit' });
   const { onGigPress } = props;
   const receive = useCallback((event: unknown) => {
@@ -66,28 +70,28 @@ function GigMapContent(props: GigMapProps) {
   };
 
   let content;
-  if (props.loading && !props.gigs.length) content = <LoadingState message="Finding gig locations..." />;
-  else if (props.error && !props.gigs.length) content = <ErrorState title="Unable to load gig locations" message={props.error} onRetry={props.onRefresh} />;
-  else if (!pins.length) content = <EmptyState icon="map-outline" title={props.hasMore ? 'No pins in these results yet' : 'No gig locations to show'}
-    description="Remote gigs and gigs without coordinates appear in the list. Try other filters or load more opportunities."
-    actionLabel="View gig list" onAction={props.onShowList} />;
-  else if (!configured) content = <EmptyState icon="map-outline" title="Map unavailable" description="You can still explore these opportunities in the list." actionLabel="View gig list" onAction={props.onShowList} />;
-  else if (failed) content = <ErrorState title="The map could not load" message="Check your connection and try again, or switch to the list." onRetry={() => { setFailed(false); setReady(false); setLoaded(false); setAttempt(value => value + 1); }} />;
+  if (props.loading && !props.gigs.length) content = <LoadingState message={t("Finding gig locations...")} />;
+  else if (props.error && !props.gigs.length) content = <ErrorState title={t("Unable to load gig locations")} message={t(props.error ?? "")} onRetry={props.onRefresh} />;
+  else if (!pins.length) content = <EmptyState icon="map-outline" title={props.hasMore ? t("No pins in these results yet") : t("No gig locations to show")}
+    description={t("Remote gigs and gigs without coordinates appear in the list. Try other filters or load more opportunities.")}
+    actionLabel={t("View gig list")} onAction={props.onShowList} />;
+  else if (!configured) content = <EmptyState icon="map-outline" title={t("Map unavailable")} description={t("You can still explore these opportunities in the list.")} actionLabel={t("View gig list")} onAction={props.onShowList} />;
+  else if (failed) content = <ErrorState title={t("The map could not load")} message={t("Check your connection and try again, or switch to the list.")} onRetry={() => { setFailed(false); setReady(false); setLoaded(false); setAttempt(value => value + 1); }} />;
   else content = <View style={styles.mapContainer}>
     <MapCanvas key={attempt} ref={map} html={html} onEvent={receive} />
     <View style={styles.controls}>
-      <TouchableOpacity style={styles.control} accessibilityRole="button" accessibilityLabel="Show all gig pins" onPress={fitPins} disabled={!ready}><Ionicons name="scan-outline" size={22} color={colors.primary} /></TouchableOpacity>
-      <TouchableOpacity style={styles.control} accessibilityRole="button" accessibilityLabel="Center map on my location" onPress={locate} disabled={!ready || locating}><Ionicons name="locate-outline" size={22} color={colors.primary} /></TouchableOpacity>
+      <TouchableOpacity style={styles.control} accessibilityRole="button" accessibilityLabel={t("Show all gig pins")} onPress={fitPins} disabled={!ready}><Ionicons name="scan-outline" size={22} color={colors.primary} /></TouchableOpacity>
+      <TouchableOpacity style={styles.control} accessibilityRole="button" accessibilityLabel={t("Center map on my location")} onPress={locate} disabled={!ready || locating}><Ionicons name="locate-outline" size={22} color={colors.primary} /></TouchableOpacity>
     </View>
   </View>;
 
   return <View style={styles.container}>
     <MapResults {...props} />
-    {!!locationError && <Text accessibilityRole="alert" style={styles.error}>{locationError}</Text>}
+    {!!locationError && <Text accessibilityRole="alert" style={styles.error}>{t(locationError ?? "")}</Text>}
     <View style={styles.body}>{content}</View>
     <Modal visible={!!selected} animationType="slide" onRequestClose={() => setSelectedKey(null)}>
       <SafeAreaView style={styles.container}>
-        <View style={styles.modalHeader}><Text style={styles.title}>Gigs at this location</Text><TouchableOpacity style={styles.control} accessibilityRole="button" accessibilityLabel="Close location gigs" onPress={() => setSelectedKey(null)}><Ionicons name="close" size={23} color={colors.text} /></TouchableOpacity></View>
+        <View style={styles.modalHeader}><Text style={styles.title}>{t("Gigs at this location")}</Text><TouchableOpacity style={styles.control} accessibilityRole="button" accessibilityLabel={t("Close location gigs")} onPress={() => setSelectedKey(null)}><Ionicons name="close" size={23} color={colors.text} /></TouchableOpacity></View>
         <ScrollView contentContainerStyle={styles.modalList}>{selected?.gigs.map(gig => <GigCard key={gig.id} gig={gig} showBookmark onPress={item => { setSelectedKey(null); props.onGigPress(item); }} />)}</ScrollView>
       </SafeAreaView>
     </Modal>

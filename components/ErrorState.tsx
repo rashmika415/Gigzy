@@ -1,5 +1,7 @@
+import { Text } from './LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../constants/theme';
 
@@ -20,16 +22,17 @@ export default function ErrorState({
   retryLabel = 'Retry',
   onRetry,
 }: ErrorStateProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <View style={styles.iconCircle}>
         <Ionicons name="alert-circle" size={32} color={colors.error} />
       </View>
 
-      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.title}>{t(title)}</Text>
 
       {message ? (
-        <Text style={styles.message}>{message}</Text>
+        <Text style={styles.message}>{t(message)}</Text>
       ) : null}
 
       {onRetry && (
@@ -39,7 +42,7 @@ export default function ErrorState({
           activeOpacity={0.8}
         >
           <Ionicons name="refresh" size={15} color="#FFF" />
-          <Text style={styles.retryText}>{retryLabel}</Text>
+          <Text style={styles.retryText}>{t(retryLabel)}</Text>
         </TouchableOpacity>
       )}
     </View>
