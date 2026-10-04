@@ -89,10 +89,14 @@ export interface CreateGigResult {
   syncStatus: 'synced' | 'pending';
 }
 
+export interface UpdateGigResult {
+  syncStatus: 'synced' | 'pending';
+}
+
 /**
  * Validates all fields of a gig form with timezone-safe date checking.
  */
-export function validateGigForm(form: GigInput): { isValid: boolean; errors: GigValidationErrors } {
+export function validateGigForm(form: GigInput, isEdit = false): { isValid: boolean; errors: GigValidationErrors } {
   const errors: GigValidationErrors = {};
 
   // Title validation
@@ -149,7 +153,7 @@ export function validateGigForm(form: GigInput): { isValid: boolean; errors: Gig
 
       if (isNaN(year) || isNaN(month) || isNaN(day) || month < 1 || month > 12 || day < 1 || day > 31) {
         errors.date = 'Please provide a valid date (YYYY-MM-DD).';
-      } else {
+      } else if (!isEdit) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const gigDay = new Date(year, month - 1, day, 0, 0, 0, 0);
@@ -253,6 +257,61 @@ export async function createGig(
     return { id: docRef.id, syncStatus };
   } catch (error: any) {
     console.error('Firestore createGig error:', error);
+    throw new Error(parseFirebaseError(error));
+  }
+}
+
+/**
+ * Updates all details of an existing gig document in Cloud Firestore.
+ */
+export async function updateGig(
+  gigId: string,
+  input: GigInput,
+): Promise<UpdateGigResult> {
+  const { isValid, errors } = validateGigForm(input, true);
+  if (!isValid) {
+    const firstError = Object.values(errors)[0];
+    throw new Error(firstError || 'Validation failed. Please check form inputs.');
+  }
+
+  const numericPay = parseFloat(input.pay.replace(/[^0-9.]/g, ''));
+  const finalLocation =
+    input.locationType === 'remote'
+      ? input.location.trim() || 'Remote (Work from Anywhere)'
+      : input.location.trim();
+
+  const cleanSkills = input.skills.filter((s) => s.trim().length > 0);
+  const keywords = generateSearchKeywords(input.title, input.category, cleanSkills, finalLocation);
+
+  const updatedData: Record<string, any> = {
+    title: input.title.trim(),
+    description: input.description.trim(),
+    category: input.category.trim(),
+    categoryId: categoryId(input.category),
+    pay: numericPay,
+    payType: input.payType,
+    date: input.date.trim(),
+    location: finalLocation,
+    locationType: input.locationType,
+    skills: cleanSkills,
+    searchKeywords: keywords,
+    updatedAt: serverTimestamp(),
+  };
+
+  if (input.time) {
+    updatedData.time = input.time;
+  }
+  if (input.locationType !== 'remote' && input.coordinates) {
+    updatedData.coordinates = input.coordinates;
+  }
+
+  try {
+    const docRef = doc(db, 'gigs', gigId);
+    const write = updateDoc(docRef, updatedData);
+    const syncStatus = await waitForWrite(write, 20000);
+    return { syncStatus };
+  } catch (error: any) {
+    console.error('Firestore updateGig error:', error);
     throw new Error(parseFirebaseError(error));
   }
 }

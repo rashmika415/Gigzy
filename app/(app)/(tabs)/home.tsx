@@ -403,16 +403,34 @@ export default function Home() {
                         </Text>
                       </View>
                       {role === 'client' && (
-                        <TouchableOpacity
-                          style={styles.deleteGigBtn}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            handleDeleteGig(gig.id, gig.title);
-                          }}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        >
-                          <Ionicons name="trash-outline" size={16} color={colors.error} />
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <TouchableOpacity
+                            style={styles.editGigBtn}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              try {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              } catch {}
+                              router.push({
+                                pathname: '/(app)/post-gig',
+                                params: { editGigId: gig.id },
+                              } as any);
+                            }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Ionicons name="create-outline" size={16} color={colors.primary} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.deleteGigBtn}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              handleDeleteGig(gig.id, gig.title);
+                            }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Ionicons name="trash-outline" size={16} color={colors.error} />
+                          </TouchableOpacity>
+                        </View>
                       )}
                     </View>
                   </View>
@@ -453,6 +471,26 @@ export default function Home() {
                       <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
                       <Text style={styles.gigMetaText}>{gig.date}</Text>
                     </View>
+
+                    {role === 'client' && (
+                      <TouchableOpacity
+                        style={styles.updateCardBtn}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          try {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          } catch {}
+                          router.push({
+                            pathname: '/(app)/post-gig',
+                            params: { editGigId: gig.id },
+                          } as any);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="create-outline" size={12} color={colors.primaryOnColor} />
+                        <Text style={styles.updateCardBtnText}>Update</Text>
+                      </TouchableOpacity>
+                    )}
 
                     {role !== 'client' && (
                       <TouchableOpacity
@@ -870,8 +908,25 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '700',
   },
+  editGigBtn: {
+    padding: 4,
+  },
   deleteGigBtn: {
     padding: 4,
+  },
+  updateCardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    gap: 4,
+  },
+  updateCardBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primaryOnColor,
   },
   gigItemTitle: {
     fontSize: 15,

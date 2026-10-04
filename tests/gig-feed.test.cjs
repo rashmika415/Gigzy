@@ -12,6 +12,7 @@ function setup() {
   let listener;
   let stopped = false;
   const writes = [];
+  const updates = [];
   const rows = Array.from({ length: 30 }, (_, i) => ({
     id: `a${String(i).padStart(2, '0')}`,
     createdAt: { toMillis: () => i + 1 },
@@ -37,7 +38,7 @@ function setup() {
       return { id, path: maybeId ? `${nameOrId}/${maybeId}` : `${parent.name}/${id}` };
     },
     setDoc: async (ref, data) => { writes.push({ ref, data }); },
-    updateDoc: async () => {},
+    updateDoc: async (ref, data) => { updates.push({ ref, data }); },
     serverTimestamp: () => 'server-time',
     increment: (amount) => amount,
     query: (_, ...clauses) => clauses,
@@ -76,6 +77,7 @@ function setup() {
     },
     fail: () => { failure = { code: 'permission-denied' }; listener?.(); },
     writes,
+    updates,
   };
 }
 
@@ -132,4 +134,28 @@ test('live feed forwards database errors', () => {
   app.service.subscribeToRecentGigs(10, () => {}, (error) => { message = error.message; });
   app.fail();
   assert.match(message, /Permission denied/);
+});
+
+test('updating an existing gig validates and writes modified data to Firestore', async () => {
+  const app = setup();
+  const form = {
+    title: 'Updated Website Design',
+    description: 'Provide end-to-end design and redesign for landing page.',
+    category: 'Design & Creative',
+    pay: '350',
+    payType: 'fixed',
+    date: '2099-12-31',
+    location: '',
+    locationType: 'remote',
+    skills: ['Figma', 'UI/UX'],
+  };
+  const result = await app.service.updateGig('gig-123', form);
+  assert.equal(result.syncStatus, 'synced');
+  assert.equal(app.updates.length, 1);
+  assert.equal(app.updates[0].ref.path, 'gigs/gig-123');
+  assert.equal(app.updates[0].data.title, 'Updated Website Design');
+  assert.equal(app.updates[0].data.pay, 350);
+  assert.equal(app.updates[0].data.location, 'Remote (Work from Anywhere)');
+  assert.deepEqual(app.updates[0].data.skills, ['Figma', 'UI/UX']);
+  assert.equal(app.updates[0].data.updatedAt, 'server-time');
 });

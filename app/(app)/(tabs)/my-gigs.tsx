@@ -176,6 +176,17 @@ export default function MyGigs() {
     );
   };
 
+  // Edit gig handler
+  const handleEditGig = (gig: Gig) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    router.push({
+      pathname: '/(app)/post-gig',
+      params: { editGigId: gig.id },
+    } as any);
+  };
+
   // View gig details
   const handleOpenDetails = (gig: Gig) => {
     setSelectedGigDetail(gig);
@@ -832,6 +843,21 @@ export default function MyGigs() {
                     {/* Card Actions Footer */}
                     <View style={styles.cardActionsFooter}>
                       <TouchableOpacity
+                        style={styles.actionUpdateBtn}
+                        onPress={() => handleEditGig(gig)}
+                        activeOpacity={0.75}
+                      >
+                        <Ionicons
+                          name="create-outline"
+                          size={14}
+                          color={colors.primaryOnColor}
+                        />
+                        <Text style={styles.actionUpdateBtnText}>
+                          Update
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
                         style={styles.actionStatusBtn}
                         onPress={() => handleOpenStatusModal(gig)}
                         activeOpacity={0.75}
@@ -842,7 +868,7 @@ export default function MyGigs() {
                           color={colors.primary}
                         />
                         <Text style={styles.actionStatusBtnText}>
-                          Change Status
+                          Status
                         </Text>
                       </TouchableOpacity>
 
@@ -1239,6 +1265,18 @@ export default function MyGigs() {
 
             <View style={styles.detailModalFooter}>
               <TouchableOpacity
+                style={styles.detailEditBtn}
+                onPress={() => {
+                  setDetailModalVisible(false);
+                  if (selectedGigDetail) handleEditGig(selectedGigDetail);
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="create-outline" size={16} color={colors.primaryOnColor} />
+                <Text style={styles.detailEditBtnText}>Update Gig</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={styles.detailChangeStatusBtn}
                 onPress={() => {
                   setDetailModalVisible(false);
@@ -1247,7 +1285,7 @@ export default function MyGigs() {
                 }}
                 activeOpacity={0.85}
               >
-                <Ionicons name="sync" size={16} color={colors.primaryOnColor} />
+                <Ionicons name="sync-outline" size={16} color={colors.primary} />
                 <Text style={styles.detailChangeStatusBtnText}>
                   Update Status
                 </Text>
@@ -1846,7 +1884,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingTop: 8,
-    gap: 8,
+    gap: 6,
+  },
+  actionUpdateBtn: {
+    flex: 1.1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: 7,
+    gap: 4,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  actionUpdateBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.primaryOnColor,
   },
   actionStatusBtn: {
     flex: 1,
@@ -2141,8 +2199,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.surfaceBorder,
     backgroundColor: colors.surfaceElevated,
+    flexDirection: "row",
+    gap: spacing.sm,
   },
-  detailChangeStatusBtn: {
+  detailEditBtn: {
+    flex: 1,
     backgroundColor: colors.primary,
     flexDirection: "row",
     alignItems: "center",
@@ -2156,9 +2217,26 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  detailChangeStatusBtnText: {
+  detailEditBtnText: {
     color: colors.primaryOnColor,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "800",
+  },
+  detailChangeStatusBtn: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: borderRadius.full,
+    gap: 6,
+  },
+  detailChangeStatusBtnText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

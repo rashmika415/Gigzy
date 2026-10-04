@@ -100,6 +100,15 @@ export default function GigDetailScreen() {
     } catch {}
   };
 
+  const handleEditGig = () => {
+    if (!gig) return;
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+    router.push({
+      pathname: '/(app)/post-gig',
+      params: { editGigId: gig.id },
+    } as any);
+  };
+
   const handleContactBusiness = async () => {
     if (!user || !gig) return;
     if (gigOwner) {
@@ -168,7 +177,11 @@ export default function GigDetailScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <Header onBack={() => router.back()} onShare={handleShare} />
+      <Header
+        onBack={() => router.back()}
+        onShare={handleShare}
+        onEdit={gigOwner ? handleEditGig : undefined}
+      />
 
       <ScrollView
         style={styles.flex}
@@ -349,12 +362,21 @@ export default function GigDetailScreen() {
       {gigOwner && (
         <View style={styles.bottomBar}>
           <TouchableOpacity
+            style={styles.updateBtn}
+            onPress={handleEditGig}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="create-outline" size={18} color={colors.primaryOnColor} />
+            <Text style={styles.updateBtnText}>Update Gig</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.manageBtn}
             onPress={() => router.push('/(app)/(tabs)/my-gigs' as any)}
             activeOpacity={0.85}
           >
-            <Ionicons name="settings-outline" size={18} color={colors.primaryOnColor} />
-            <Text style={styles.contactBtnText}>Manage This Gig</Text>
+            <Ionicons name="list-outline" size={18} color={colors.text} />
+            <Text style={styles.manageBtnText}>My Gigs</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -364,7 +386,7 @@ export default function GigDetailScreen() {
 
 // ── Sub-components ──
 
-function Header({ onBack, onShare }: { onBack: () => void; onShare?: () => void }) {
+function Header({ onBack, onShare, onEdit }: { onBack: () => void; onShare?: () => void; onEdit?: () => void }) {
   return (
     <View style={styles.header}>
       <TouchableOpacity
@@ -378,18 +400,30 @@ function Header({ onBack, onShare }: { onBack: () => void; onShare?: () => void 
 
       <Text style={styles.headerTitle}>Gig Details</Text>
 
-      {onShare ? (
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={onShare}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="share-outline" size={22} color={colors.primary} />
-        </TouchableOpacity>
-      ) : (
-        <View style={{ width: 38 }} />
-      )}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        {onEdit && (
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={onEdit}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="create-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        )}
+        {onShare ? (
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={onShare}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="share-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        ) : !onEdit ? (
+          <View style={{ width: 38 }} />
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -736,8 +770,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.primaryOnColor,
   },
-  manageBtn: {
-    flex: 1,
+  updateBtn: {
+    flex: 1.2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -750,5 +784,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 5,
+  },
+  updateBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primaryOnColor,
+  },
+  manageBtn: {
+    flex: 0.8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    borderRadius: borderRadius.lg,
+    paddingVertical: 14,
+    gap: 6,
+  },
+  manageBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
   },
 });
