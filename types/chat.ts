@@ -20,6 +20,9 @@ export interface LastMessage {
 export interface Chat {
   id: string;
   gigId?: string;
+  applicationId?: string;
+  youthId?: string;
+  businessId?: string;
   gigTitle?: string;
   gigPay?: number;
   gigPayType?: PayType;

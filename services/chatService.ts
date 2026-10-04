@@ -23,8 +23,11 @@ import { parseFirebaseError } from './gigService';
 /**
  * Derives a deterministic or unique ID for a conversation between two users for a specific gig or DM.
  */
-export function generateChatId(uidA: string, uidB: string, gigId?: string): string {
+export function generateChatId(uidA: string, uidB: string, gigId?: string, applicationId?: string): string {
   const sortedUsers = [uidA, uidB].sort().join('_');
+  if (applicationId) {
+    return `${applicationId}_${sortedUsers}`;
+  }
   if (gigId) {
     return `${gigId}_${sortedUsers}`;
   }
@@ -37,9 +40,10 @@ export function generateChatId(uidA: string, uidB: string, gigId?: string): stri
 export async function getOrCreateChat(
   currentUser: ParticipantDetail,
   otherUser: ParticipantDetail,
-  gig?: Partial<Gig>
+  gig?: Partial<Gig>,
+  applicationId?: string
 ): Promise<Chat> {
-  const chatId = generateChatId(currentUser.uid, otherUser.uid, gig?.id);
+  const chatId = generateChatId(currentUser.uid, otherUser.uid, gig?.id, applicationId);
   const chatDocRef = doc(db, 'chats', chatId);
 
   try {
@@ -51,9 +55,17 @@ export async function getOrCreateChat(
       } as Chat;
     }
 
+    const isCurrentYouth = currentUser.role === 'freelancer';
+    const isOtherYouth = otherUser.role === 'freelancer';
+    const youthId = isCurrentYouth ? currentUser.uid : (isOtherYouth ? otherUser.uid : undefined);
+    const businessId = !isCurrentYouth && currentUser.role === 'client' ? currentUser.uid : (!isOtherYouth && otherUser.role === 'client' ? otherUser.uid : undefined);
+
     // Initialize new chat document
     const newChatData: Omit<Chat, 'id'> = {
       participants: [currentUser.uid, otherUser.uid],
+      youthId,
+      businessId,
+      applicationId,
       participantDetails: {
         [currentUser.uid]: {
           uid: currentUser.uid,
