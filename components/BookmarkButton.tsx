@@ -8,13 +8,13 @@ import { borderRadius, colors, fonts } from '../constants/theme';
 
 export default function BookmarkButton({ gigId, title, showLabel = false }: { gigId: string; title?: string; showLabel?: boolean }) {
   const { t } = useTranslation();
-  const { enabled, savedIds, pendingIds, loading, error: loadError, toggle } = useSavedGigs();
+  const { enabled, savedIds, pendingIds, loading, error: loadError, retry, toggle } = useSavedGigs();
   const [error, setError] = useState('');
   if (!enabled) return null;
   const saved = savedIds.has(gigId);
   const pending = pendingIds.has(gigId);
   return <View style={styles.container}>
-    <Pressable accessibilityRole="button" accessibilityLabel={t("{{value0}}{{value1}}", { value0: saved ? t("Remove saved gig") : t("Save gig"), value1: title ? t(": {{value0}}", { value0: t(title) }) : '' })}
+    <Pressable accessibilityRole="button" accessibilityLabel={t("{{value0}}{{value1}}", { value0: saved ? t("Remove saved gig") : t("Save gig"), value1: title ? t(": {{value0}}", { value0: title }) : '' })}
       accessibilityState={{ selected: saved, disabled: loading || pending || !!loadError, busy: pending }}
       aria-pressed={saved} disabled={loading || pending || !!loadError}
       style={({ pressed }) => [styles.button, saved && styles.saved, pressed && styles.pressed]}
@@ -27,7 +27,13 @@ export default function BookmarkButton({ gigId, title, showLabel = false }: { gi
       {showLabel && <Text style={styles.label}>{saved ? t("Remove") : t("Save gig")}</Text>}
     </Pressable>
     {!!error && <Text accessibilityRole="alert" style={styles.error}>{t(error ?? "")}</Text>}
-    {!!loadError && <Text accessibilityRole="alert" style={styles.error}>{t("Open Saved to retry.")}</Text>}
+    {!!loadError && <>
+      <Text accessibilityRole="alert" style={styles.error}>{t(loadError)}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={t('Retry saved gigs')} style={styles.retry}
+        onPress={event => { event.stopPropagation(); setError(''); retry(); }}>
+        <Text style={styles.label}>{t('Retry')}</Text>
+      </Pressable>
+    </>}
   </View>;
 }
 const styles = StyleSheet.create({
@@ -36,4 +42,5 @@ const styles = StyleSheet.create({
   saved: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   pressed: { opacity: 0.7 }, label: { fontFamily: fonts.bodyMedium, color: colors.primary, fontSize: 13 },
   error: { color: colors.error, fontSize: 12, lineHeight: 17, marginTop: 4 },
+  retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 10 },
 });
