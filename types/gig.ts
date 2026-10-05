@@ -44,6 +44,8 @@ export interface Gig {
   };
   applicantsCount: number;
   viewsCount?: number;
+  assignedYouthId?: string;
+  acceptedApplicationId?: string;
   searchKeywords?: string[];
   createdAt: any;
   updatedAt?: any;

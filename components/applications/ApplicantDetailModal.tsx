@@ -10,6 +10,7 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -24,6 +25,7 @@ interface ApplicantDetailModalProps {
   businessId: string;
   onClose: () => void;
   onStatusChanged?: (newStatus: 'accepted' | 'rejected') => void;
+  onAccepted?: (app: Application) => void;
 }
 
 function formatDate(timestamp: any): string {
@@ -48,6 +50,7 @@ export default function ApplicantDetailModal({
   businessId,
   onClose,
   onStatusChanged,
+  onAccepted,
 }: ApplicantDetailModalProps) {
   const [acting, setActing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -59,38 +62,51 @@ export default function ApplicantDetailModal({
   const initial = (application.youthName?.[0] || 'Y').toUpperCase();
   const isPending = application.status === 'pending';
 
+  const executeAccept = async () => {
+    setActing(true);
+    setErrorMsg('');
+    try {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+      await acceptApplication(application.id, businessId);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      if (onAccepted) {
+        onAccepted(application);
+      } else {
+        Alert.alert(
+          'Application Accepted! 🎉',
+          `You have accepted ${application.youthName || 'this applicant'} for "${application.gigTitle || 'this gig'}". Work is now in progress and a notification has been sent to the youth freelancer's dashboard.`
+        );
+      }
+      if (onStatusChanged) onStatusChanged('accepted');
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to accept application.');
+    } finally {
+      setActing(false);
+    }
+  };
+
   const handleAccept = () => {
-    Alert.alert(
-      'Accept Application',
-      `Are you sure you want to accept ${application.youthName || 'this applicant'} for "${application.gigTitle || 'this gig'}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Accept Applicant',
-          style: 'default',
-          onPress: async () => {
-            setActing(true);
-            setErrorMsg('');
-            try {
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              } catch {}
-              await acceptApplication(application.id, businessId);
-              try {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              } catch {}
-              Alert.alert('Applicant Accepted', `${application.youthName || 'The applicant'} has been accepted!`);
-              if (onStatusChanged) onStatusChanged('accepted');
-              onClose();
-            } catch (err: any) {
-              setErrorMsg(err.message || 'Failed to accept application.');
-            } finally {
-              setActing(false);
-            }
+    if (Platform.OS === 'web') {
+      void executeAccept();
+    } else {
+      Alert.alert(
+        'Accept Application',
+        `Are you sure you want to accept ${application.youthName || 'this applicant'} for "${application.gigTitle || 'this gig'}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Accept Applicant',
+            style: 'default',
+            onPress: () => void executeAccept(),
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleReject = () => {

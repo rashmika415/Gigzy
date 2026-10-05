@@ -157,6 +157,24 @@ export async function createApplication(input: CreateApplicationInput): Promise<
       throw new Error('Failed to create application.');
     }
 
+    // Send in-app notification to business owner
+    const targetBusinessId = (createdApp as Application).businessId;
+    if (targetBusinessId) {
+      try {
+        await sendNotification(targetBusinessId, {
+          userId: targetBusinessId,
+          type: 'application',
+          title: 'New Applicant! 📬',
+          body: `${(createdApp as Application).youthName || 'A youth freelancer'} applied for "${(createdApp as Application).gigTitle || 'your gig'}". Review their application now!`,
+          read: false,
+          route: '/(app)/applications',
+          entityId: (createdApp as Application).id,
+        });
+      } catch (notifErr) {
+        console.warn('Could not deliver application notification to business owner:', notifErr);
+      }
+    }
+
     return createdApp;
   } catch (error: any) {
     if (error.message && (
@@ -591,12 +609,29 @@ export async function acceptApplication(applicationId: string, businessId?: stri
       // Read gig document if available (must be read before any writes in Firestore transaction)
       const gigDocRef = data.gigId ? doc(db, 'gigs', data.gigId) : null;
       let gigExists = false;
+      let gigData: any = null;
       if (gigDocRef) {
         try {
           const gigSnap = await transaction.get(gigDocRef);
           gigExists = gigSnap.exists();
+          if (gigExists) {
+            gigData = gigSnap.data();
+          }
         } catch {
           gigExists = false;
+        }
+      }
+
+      // Ensure gig is open and not already assigned or in progress (prevent double accept)
+      if (gigExists && gigData) {
+        if (
+          gigData.status === 'in-progress' ||
+          gigData.status === 'completed' ||
+          gigData.status === 'filled' ||
+          gigData.status === 'closed' ||
+          Boolean(gigData.assignedYouthId)
+        ) {
+          throw new Error('This gig has already been accepted and is in progress. A youth cannot be accepted twice for this gig.');
         }
       }
 
@@ -626,7 +661,7 @@ export async function acceptApplication(applicationId: string, businessId?: stri
           userId: acceptedData.youthId,
           type: 'application',
           title: 'Application Accepted! 🎉',
-          body: `Congratulations! Your application for "${acceptedData.gigTitle || 'the gig'}" was accepted by ${acceptedData.businessName || 'the business owner'}. Work is now in progress.`,
+          body: `Great news! ${acceptedData.businessName || 'The business owner'} accepted your application for "${acceptedData.gigTitle || 'the gig'}". Work is now in progress and a notification has been sent to your dashboard!`,
           read: false,
           route: `/(app)/gig/${acceptedData.gigId}`,
           entityId: applicationId,
@@ -639,6 +674,8 @@ export async function acceptApplication(applicationId: string, businessId?: stri
     if (error.message && (
       error.message.includes('Unauthorized') ||
       error.message.includes('Cannot accept') ||
+      error.message.includes('cannot be accepted twice') ||
+      error.message.includes('already been accepted') ||
       error.message.includes('not found')
     )) {
       throw error;

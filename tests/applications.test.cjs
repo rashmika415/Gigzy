@@ -600,14 +600,37 @@ test('TEST 18: Accepting an application sends an in-app notification to the yout
     availabilityConfirmed: true,
   });
 
+  // Verify application submission dispatched notification to business owner
+  assert.equal(sentNotifications[0].userId, 'biz-1');
+  assert.equal(sentNotifications[0].type, 'application');
+  assert.match(sentNotifications[0].title, /New Applicant/i);
+
   await service.acceptApplication(app.id, 'biz-1');
 
   // Verify notification was dispatched to youth-1
+  assert.equal(sentNotifications.length, 2);
+  assert.equal(sentNotifications[1].userId, 'youth-1');
+  assert.equal(sentNotifications[1].type, 'application');
+  assert.match(sentNotifications[1].title, /Accepted/i);
+  assert.match(sentNotifications[1].body, /Graphic Designer Needed/i);
+});
+
+test('TEST 20: Submitting an application sends an in-app notification to the business owner', async () => {
+  const { service, sentNotifications } = setupApplicationService();
+
+  await service.createApplication({
+    gigId: 'gig-open-1',
+    youthId: 'youth-2',
+    message: 'Hello I am interested in this design task',
+    availabilityConfirmed: true,
+  });
+
   assert.equal(sentNotifications.length, 1);
-  assert.equal(sentNotifications[0].userId, 'youth-1');
+  assert.equal(sentNotifications[0].userId, 'biz-1');
   assert.equal(sentNotifications[0].type, 'application');
-  assert.match(sentNotifications[0].title, /Accepted/i);
+  assert.match(sentNotifications[0].title, /New Applicant/i);
   assert.match(sentNotifications[0].body, /Graphic Designer Needed/i);
+  assert.equal(sentNotifications[0].route, '/(app)/applications');
 });
 
 test('TEST 19: Accepting an application transitions gig status to in-progress and records assigned youth', async () => {
@@ -635,4 +658,52 @@ test('TEST 19: Accepting an application transitions gig status to in-progress an
   assert.equal(updatedGig.status, 'in-progress');
   assert.equal(updatedGig.assignedYouthId, 'youth-1');
   assert.equal(updatedGig.acceptedApplicationId, app.id);
+});
+
+test('TEST 21: A youth cannot be accepted twice for a gig and another applicant cannot be accepted once gig is in-progress', async () => {
+  const { service, collections } = setupApplicationService();
+
+  // Create two applications for the same gig
+  const app1 = await service.createApplication({
+    gigId: 'gig-open-1',
+    youthId: 'youth-1',
+    message: 'Youth 1 ready',
+    availabilityConfirmed: true,
+  });
+
+  // Accept first applicant
+  await service.acceptApplication(app1.id, 'biz-1');
+  assert.equal(collections.gigs.get('gig-open-1').status, 'in-progress');
+
+  // Attempting to accept the same application again should fail
+  await assert.rejects(
+    async () => {
+      await service.acceptApplication(app1.id, 'biz-1');
+    },
+    (err) => {
+      return (
+        err.message.includes('Cannot accept an application that is already accepted') ||
+        err.message.includes('A youth cannot be accepted twice for this gig')
+      );
+    }
+  );
+
+  // Attempting to accept another applicant for this in-progress gig should also fail
+  collections.applications.set('app-2', {
+    id: 'app-2',
+    gigId: 'gig-open-1',
+    youthId: 'youth-2',
+    businessId: 'biz-1',
+    status: 'pending',
+    createdAt: Date.now(),
+  });
+
+  await assert.rejects(
+    async () => {
+      await service.acceptApplication('app-2', 'biz-1');
+    },
+    (err) => {
+      return err.message.includes('This gig has already been accepted and is in progress. A youth cannot be accepted twice for this gig.');
+    }
+  );
 });

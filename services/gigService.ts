@@ -259,10 +259,50 @@ export async function createGig(
 }
 
 /**
+ * Deduplicates an array of gigs by their unique ID and content signature.
+ * Prevents duplicate gigs or duplicate snapshots from rendering multiple times.
+ */
+export function deduplicateGigs(gigs: Gig[]): Gig[] {
+  if (!Array.isArray(gigs)) return [];
+  const seenIds = new Set<string>();
+  const seenSignatures = new Set<string>();
+  const result: Gig[] = [];
+
+  for (const gig of gigs) {
+    if (!gig) continue;
+    const id = gig.id || (gig as any)._id;
+    if (id) {
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+    }
+
+    // Check duplicate signature (same creator, same normalized title, same date and location)
+    const creator = gig.postedBy?.uid || (gig as any).clientId || '';
+    const titleNorm = (gig.title || '').trim().toLowerCase();
+    const date = (gig.date || '').trim();
+    const location = (gig.location || '').trim().toLowerCase();
+    const signature = `${creator}::${titleNorm}::${date}::${location}`;
+
+    if (creator && titleNorm && seenSignatures.has(signature)) {
+      continue;
+    }
+    if (creator && titleNorm) {
+      seenSignatures.add(signature);
+    }
+
+    result.push(gig);
+  }
+
+  return result;
+}
+
+/**
  * Sorts an array of gigs in memory by createdAt descending with fallback for pending server timestamps.
+ * Also deduplicates the list to ensure no duplicate gigs are returned.
  */
 function sortGigsDesc(gigs: Gig[]): Gig[] {
-  return [...gigs].sort((a, b) => {
+  const unique = deduplicateGigs(gigs);
+  return unique.sort((a, b) => {
     const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt || Date.now()).getTime();
     const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt || Date.now()).getTime();
     return timeB - timeA;
@@ -376,7 +416,7 @@ export function calculateBusinessGigStats(gigs: Gig[]): BusinessGigStats {
  * Filters and sorts an array of gigs in memory according to specified filter criteria.
  */
 export function filterAndSortGigs(gigs: Gig[], options: GigFilterOptions): Gig[] {
-  let result = [...gigs];
+  let result = deduplicateGigs(gigs);
 
   // 1. Filter by Status
   if (options.status && options.status !== 'all') {

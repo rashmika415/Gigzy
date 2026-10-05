@@ -62,6 +62,7 @@ function setup() {
       if (name === 'firebase/firestore') return firestore;
       if (name === '../FirebaseConfig') return { db: {} };
       if (name === './discoveryFilters') return require('./helpers/load-ts.cjs')('../services/discoveryFilters.ts');
+      if (name === './notificationService') return { sendNotification: async () => {} };
       throw new Error(`Unexpected import: ${name}`);
     },
     console: { error: () => {} },
@@ -132,4 +133,19 @@ test('live feed forwards database errors', () => {
   app.service.subscribeToRecentGigs(10, () => {}, (error) => { message = error.message; });
   app.fail();
   assert.match(message, /Permission denied/);
+});
+
+test('deduplicateGigs removes duplicate IDs and identical content signatures', () => {
+  const app = setup();
+  const rawList = [
+    { id: 'gig-1', title: 'Dog Walker', postedBy: { uid: 'biz-1' }, date: '2026-10-10', location: 'Colombo' },
+    { id: 'gig-1', title: 'Dog Walker', postedBy: { uid: 'biz-1' }, date: '2026-10-10', location: 'Colombo' }, // duplicate id
+    { id: 'gig-2', title: 'Dog Walker', postedBy: { uid: 'biz-1' }, date: '2026-10-10', location: 'Colombo' }, // identical content signature
+    { id: 'gig-3', title: 'Website Designer', postedBy: { uid: 'biz-1' }, date: '2026-10-15', location: 'Remote' },
+  ];
+
+  const unique = app.service.deduplicateGigs(rawList);
+  assert.equal(unique.length, 2);
+  assert.equal(unique[0].id, 'gig-1');
+  assert.equal(unique[1].id, 'gig-3');
 });
