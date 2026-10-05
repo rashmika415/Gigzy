@@ -6,9 +6,9 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { prepareProfilePhoto } from '../../services/profilePhoto';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db, storage } from '../../FirebaseConfig';
+import { db } from '../../FirebaseConfig';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { GIG_CATEGORIES } from '../../types/gig';
@@ -177,7 +177,7 @@ export default function EditProfile() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        await uploadImageToFirebase(result.assets[0]);
+        await prepareSelectedPhoto(result.assets[0]);
       }
     } catch (e) {
       console.error(e);
@@ -185,53 +185,15 @@ export default function EditProfile() {
     }
   };
 
-  const uploadImageToFirebase = async (asset: ImagePicker.ImagePickerAsset) => {
+  const prepareSelectedPhoto = async (asset: ImagePicker.ImagePickerAsset) => {
     if (!user) return;
     setUploadingImage(true);
-    let blob: (Blob & { close?: () => void }) | undefined;
     try {
-      const response = await fetch(asset.uri);
-      blob = await response.blob();
-      if (blob.size === 0 || blob.size >= 5 * 1024 * 1024) {
-        Alert.alert(t("Upload Failed"), t("Choose a non-empty image smaller than 5 MB."));
-        return;
-      }
-      // Prefer the actual selected/cropped file's type over its original filename.
-      const contentType = blob.type?.startsWith('image/') ? blob.type : asset.mimeType;
-      if (!contentType?.startsWith('image/')) {
-        Alert.alert(t("Upload Failed"), t("This image format could not be identified. Please choose a JPEG or PNG image."));
-        return;
-      }
-      
-      // Save file name with a timestamp to avoid native caching issues
-      const extension = contentType === 'image/jpeg' ? 'jpg' : contentType.split('/')[1].replace(/[^a-zA-Z0-9]/g, '');
-      const filename = `avatar_${Date.now()}.${extension}`;
-      const storageRef = ref(storage, `profiles/${user.uid}/${filename}`);
-      
-      await uploadBytes(storageRef, blob, { contentType });
-      const downloadURL = await getDownloadURL(storageRef);
-      
-      setPhotoURL(downloadURL);
+      setPhotoURL(await prepareProfilePhoto(asset.uri));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e: any) {
-      // Firebase keeps the underlying HTTP failure outside its generic message.
-      // Log only diagnostics, not the whole error (which may contain request data).
-      console.warn('Profile image upload failed', {
-        code: e?.code,
-        bucket: storage.app.options.storageBucket,
-        serverResponse: e?.serverResponse ?? e?.customData?.serverResponse ?? null,
-      });
-      const messages: Record<string, string> = {
-        'storage/unauthenticated': 'Please sign in again before uploading your photo.',
-        'storage/unauthorized': 'Your photo upload was denied. Please contact support.',
-        'storage/bucket-not-found': 'Photo uploads are not configured yet. Please contact support.',
-        'storage/project-not-found': 'Photo uploads are not configured yet. Please contact support.',
-        'storage/quota-exceeded': 'Photo uploads are temporarily unavailable. Please try again later.',
-        'storage/retry-limit-exceeded': 'The upload timed out. Check your connection and try again.',
-      };
-      Alert.alert(t("Upload Failed"), t(messages[e?.code] ?? "Could not upload your photo. Please try again. If the problem continues, contact support."));
+    } catch (error) {
+      Alert.alert(t("Photo Error"), t(error instanceof Error ? error.message : "Could not prepare this photo. Please try another image."));
     } finally {
-      blob?.close?.();
       setUploadingImage(false);
     }
   };
@@ -295,7 +257,7 @@ export default function EditProfile() {
 
   // Handle Save Profile
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || uploadingImage || saving) return;
     
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -392,7 +354,7 @@ export default function EditProfile() {
             <TouchableOpacity
               onPress={handleSave}
               style={[styles.headerButton, saving && styles.disabledButton]}
-              disabled={saving}
+              disabled={saving || uploadingImage}
               activeOpacity={0.7}
             >
               {saving ? (
@@ -415,7 +377,7 @@ export default function EditProfile() {
             <TouchableOpacity
               onPress={handlePickImage}
               style={styles.photoContainer}
-              disabled={uploadingImage}
+              disabled={uploadingImage || saving}
               activeOpacity={0.8}
             >
               {photoURL ? (
@@ -439,7 +401,7 @@ export default function EditProfile() {
               )}
             </TouchableOpacity>
             <Text style={styles.photoHelperText}>
-              {isYouth ? t("Tap to upload profile photo") : t("Tap to upload business logo")}
+              {isYouth ? t("Choose profile photo, then tap Save") : t("Choose business logo, then tap Save")}
             </Text>
           </View>
 
@@ -667,7 +629,7 @@ export default function EditProfile() {
             <TouchableOpacity
               style={[styles.saveButton, saving && styles.disabledButton]}
               onPress={handleSave}
-              disabled={saving}
+              disabled={saving || uploadingImage}
               activeOpacity={0.8}
             >
               {saving ? (

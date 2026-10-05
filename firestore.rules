@@ -11,6 +11,12 @@ service cloud.firestore {
           || currentUser().data.get('suspended', false) != true);
     }
     function validRole() { return request.resource.data.role in ['freelancer', 'client']; }
+    function validProfilePhoto() {
+      let photo = request.resource.data.get('photoURL', '');
+      return photo is string && photo.size() <= 100000
+        && (photo == '' || photo.matches('https://.*')
+          || photo.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+'));
+    }
     function protectedUserFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
         'role', 'isVerified', 'suspended', 'suspensionReason',
@@ -19,12 +25,13 @@ service cloud.firestore {
     }
     match /users/{userId} {
       allow read: if signedIn();
-      allow create: if owns(userId) && validRole()
+      allow create: if owns(userId) && validRole() && validProfilePhoto()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.get('suspended', false) != true
         && request.resource.data.get('isVerified', false) != true;
-      allow update: if isAdmin() || (owns(userId) && active() && protectedUserFieldsUnchanged());
+      allow update: if isAdmin() || (owns(userId) && active() && protectedUserFieldsUnchanged()
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || validProfilePhoto()));
       allow delete: if false;
       match /savedGigs/{gigId} {
         allow read: if owns(userId) && active();
