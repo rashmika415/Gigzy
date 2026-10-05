@@ -19,6 +19,7 @@ import {
 import type { QueryDocumentSnapshot, QueryConstraint } from 'firebase/firestore';
 import { categoryId, distanceKm, matchesDiscoveryFilters, validCoordinates, validDate, validTime } from './discoveryFilters';
 import { db } from '../FirebaseConfig';
+import { sendNotification } from './notificationService';
 import {
   Gig,
   GigInput,
@@ -258,10 +259,50 @@ export async function createGig(
 }
 
 /**
+ * Deduplicates an array of gigs by their unique ID and content signature.
+ * Prevents duplicate gigs or duplicate snapshots from rendering multiple times.
+ */
+export function deduplicateGigs(gigs: Gig[]): Gig[] {
+  if (!Array.isArray(gigs)) return [];
+  const seenIds = new Set<string>();
+  const seenSignatures = new Set<string>();
+  const result: Gig[] = [];
+
+  for (const gig of gigs) {
+    if (!gig) continue;
+    const id = gig.id || (gig as any)._id;
+    if (id) {
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+    }
+
+    // Check duplicate signature (same creator, same normalized title, same date and location)
+    const creator = gig.postedBy?.uid || (gig as any).clientId || '';
+    const titleNorm = (gig.title || '').trim().toLowerCase();
+    const date = (gig.date || '').trim();
+    const location = (gig.location || '').trim().toLowerCase();
+    const signature = `${creator}::${titleNorm}::${date}::${location}`;
+
+    if (creator && titleNorm && seenSignatures.has(signature)) {
+      continue;
+    }
+    if (creator && titleNorm) {
+      seenSignatures.add(signature);
+    }
+
+    result.push(gig);
+  }
+
+  return result;
+}
+
+/**
  * Sorts an array of gigs in memory by createdAt descending with fallback for pending server timestamps.
+ * Also deduplicates the list to ensure no duplicate gigs are returned.
  */
 function sortGigsDesc(gigs: Gig[]): Gig[] {
-  return [...gigs].sort((a, b) => {
+  const unique = deduplicateGigs(gigs);
+  return unique.sort((a, b) => {
     const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt || Date.now()).getTime();
     const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt || Date.now()).getTime();
     return timeB - timeA;
@@ -375,7 +416,7 @@ export function calculateBusinessGigStats(gigs: Gig[]): BusinessGigStats {
  * Filters and sorts an array of gigs in memory according to specified filter criteria.
  */
 export function filterAndSortGigs(gigs: Gig[], options: GigFilterOptions): Gig[] {
-  let result = [...gigs];
+  let result = deduplicateGigs(gigs);
 
   // 1. Filter by Status
   if (options.status && options.status !== 'all') {
@@ -527,14 +568,92 @@ export async function updateGig(
 
 /**
  * Updates the status of a gig (e.g. 'open' -> 'in-progress' -> 'completed' -> 'cancelled').
+ * Also synchronizes applicant applications and delivers in-app notifications.
  */
 export async function updateGigStatus(gigId: string, status: GigStatus): Promise<void> {
   try {
     const docRef = doc(db, 'gigs', gigId);
+
+    // 1. Fetch current gig info for notifications
+    let gigTitle = '';
+    try {
+      const currentSnap = await getDoc(docRef);
+      if (currentSnap.exists()) {
+        const gigData = currentSnap.data();
+        gigTitle = gigData.title || '';
+      }
+    } catch {}
+
+    // 2. Update the gig document
     await updateDoc(docRef, {
       status,
       updatedAt: serverTimestamp(),
     });
+
+    // 3. Find associated applications to notify applicants & update status
+    try {
+      const appsSnap = await getDocs(
+        query(collection(db, 'applications'), where('gigId', '==', gigId))
+      );
+
+      for (const appDoc of appsSnap.docs) {
+        const appData = appDoc.data();
+        const youthId = appData.youthId;
+        if (!youthId) continue;
+
+        let newAppStatus: string | null = null;
+        let notifTitle = '';
+        let notifBody = '';
+
+        if (status === 'in-progress') {
+          newAppStatus = 'accepted';
+          notifTitle = 'Application Accepted! 🎉';
+          notifBody = `Great news! The business owner has started work on "${gigTitle || 'your gig'}". Your application was accepted!`;
+        } else if (status === 'completed') {
+          newAppStatus = 'completed';
+          notifTitle = 'Gig Completed! ✅';
+          notifBody = `The gig "${gigTitle || 'your gig'}" has been marked as completed. Thank you for your work!`;
+        } else if (status === 'cancelled') {
+          newAppStatus = 'rejected';
+          notifTitle = 'Gig Cancelled ℹ️';
+          notifBody = `The gig "${gigTitle || 'your gig'}" was cancelled by the business owner.`;
+        } else if (status === 'open') {
+          notifTitle = 'Gig Reopened 📢';
+          notifBody = `The gig "${gigTitle || 'your gig'}" is now open for applications.`;
+        }
+
+        // Update application document status if relevant
+        if (newAppStatus) {
+          try {
+            await updateDoc(doc(db, 'applications', appDoc.id), {
+              status: newAppStatus,
+              updatedAt: serverTimestamp(),
+            });
+          } catch (appErr) {
+            console.warn('Could not update application document status:', appErr);
+          }
+        }
+
+        // Send in-app notification to the youth freelancer
+        if (notifTitle) {
+          try {
+            await sendNotification(youthId, {
+              userId: youthId,
+              type: 'application',
+              title: notifTitle,
+              body: notifBody,
+              read: false,
+              route: `/(app)/gig/${gigId}`,
+              entityId: appDoc.id,
+            });
+          } catch (notifErr) {
+            console.warn('Could not send gig status notification:', notifErr);
+          }
+        }
+      }
+    } catch (appsErr) {
+      console.warn('Could not sync applications on gig status change:', appsErr);
+    }
   } catch (error: any) {
     console.error('Firestore updateGigStatus error:', error);
     throw new Error(parseFirebaseError(error));

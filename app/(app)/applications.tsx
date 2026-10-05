@@ -19,14 +19,19 @@ import type { Application, ApplicationFilterStatus } from '../../types/applicati
 import {
   subscribeToMyApplications,
   getMyApplications,
+  subscribeToBusinessApplications,
+  getApplicationsForBusiness,
 } from '../../services/applicationService';
 import {
   ApplicationCard,
   ApplicationDetailModal,
+  ApplicantCard,
+  ApplicantDetailModal,
 } from '../../components/applications';
 
 export default function MyApplicationsScreen() {
   const { user, userData } = useAuth();
+  const isBusiness = userData?.role === 'client';
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,8 +39,9 @@ export default function MyApplicationsScreen() {
   const [activeFilter, setActiveFilter] = useState<ApplicationFilterStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [selectedApplicant, setSelectedApplicant] = useState<Application | null>(null);
 
-  // Real-time synchronization of current youth's applications
+  // Real-time synchronization of applications (freelancer youth or business client)
   useEffect(() => {
     if (!user) {
       setLoading(false);
@@ -45,30 +51,34 @@ export default function MyApplicationsScreen() {
     setLoading(true);
     setErrorMsg('');
 
-    const unsubscribe = subscribeToMyApplications(
-      user.uid,
-      (apps) => {
-        setApplications(apps);
-        setLoading(false);
-        setErrorMsg('');
-      },
-      (error) => {
-        setErrorMsg(error.message || 'Failed to load applications.');
-        setLoading(false);
-      }
-    );
+    const onUpdate = (apps: Application[]) => {
+      setApplications(apps);
+      setLoading(false);
+      setErrorMsg('');
+    };
+
+    const onError = (error: Error) => {
+      setErrorMsg(error.message || 'Failed to load applications.');
+      setLoading(false);
+    };
+
+    const unsubscribe = isBusiness
+      ? subscribeToBusinessApplications(user.uid, onUpdate, onError)
+      : subscribeToMyApplications(user.uid, onUpdate, onError);
 
     return () => {
       unsubscribe();
     };
-  }, [user]);
+  }, [user, isBusiness]);
 
   // Pull-to-refresh handler
   const handleRefresh = async () => {
     if (!user) return;
     setRefreshing(true);
     try {
-      const fresh = await getMyApplications(user.uid);
+      const fresh = isBusiness
+        ? await getApplicationsForBusiness(user.uid)
+        : await getMyApplications(user.uid);
       setApplications(fresh);
       setErrorMsg('');
     } catch (err: any) {
@@ -82,10 +92,13 @@ export default function MyApplicationsScreen() {
   const counts = useMemo(() => {
     return {
       all: applications.length,
-      pending: applications.filter((a) => a.status === 'pending').length,
-      accepted: applications.filter((a) => a.status === 'accepted').length,
-      rejected: applications.filter((a) => a.status === 'rejected').length,
-      completed: applications.filter((a) => a.status === 'completed').length,
+      pending: applications.filter((a) => (a.status || '').toLowerCase() === 'pending').length,
+      accepted: applications.filter((a) => {
+        const s = (a.status || '').toLowerCase();
+        return s === 'accepted' || s === 'approved';
+      }).length,
+      rejected: applications.filter((a) => (a.status || '').toLowerCase() === 'rejected').length,
+      completed: applications.filter((a) => (a.status || '').toLowerCase() === 'completed').length,
     };
   }, [applications]);
 
@@ -93,16 +106,24 @@ export default function MyApplicationsScreen() {
   const filteredApplications = useMemo(() => {
     return applications.filter((app) => {
       // 1. Status Filter
-      if (activeFilter !== 'all' && app.status !== activeFilter) {
-        return false;
+      if (activeFilter !== 'all') {
+        const appStatus = (app.status || '').toLowerCase();
+        const targetFilter = activeFilter.toLowerCase();
+        if (targetFilter === 'accepted') {
+          if (appStatus !== 'accepted' && appStatus !== 'approved') return false;
+        } else if (appStatus !== targetFilter) {
+          return false;
+        }
       }
       // 2. Search Query Filter
       if (searchQuery.trim().length > 0) {
         const query = searchQuery.toLowerCase().trim();
         const titleMatch = (app.gigTitle || '').toLowerCase().includes(query);
         const businessMatch = (app.businessName || '').toLowerCase().includes(query);
+        const youthMatch = (app.youthName || '').toLowerCase().includes(query);
         const locationMatch = (app.gigLocation || '').toLowerCase().includes(query);
-        return titleMatch || businessMatch || locationMatch;
+        const skillsMatch = (app.youthSkills || []).some((s) => s.toLowerCase().includes(query));
+        return titleMatch || businessMatch || youthMatch || locationMatch || skillsMatch;
       }
       return true;
     });
@@ -123,7 +144,9 @@ export default function MyApplicationsScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerTitleWrap}>
-          <Text style={styles.headerTitle}>My Applications</Text>
+          <Text style={styles.headerTitle}>
+            {isBusiness ? 'Gig Applications' : 'My Applications'}
+          </Text>
         </View>
 
         <View style={{ width: 38 }} />
@@ -135,7 +158,11 @@ export default function MyApplicationsScreen() {
           <Ionicons name="search-outline" size={18} color={colors.textMuted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by gig title or business..."
+            placeholder={
+              isBusiness
+                ? 'Search by applicant, gig, or skill...'
+                : 'Search by gig title or business...'
+            }
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -188,7 +215,9 @@ export default function MyApplicationsScreen() {
       {loading ? (
         <View style={styles.centerBox}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Syncing your applications...</Text>
+          <Text style={styles.loadingText}>
+            {isBusiness ? 'Syncing received applications...' : 'Syncing your applications...'}
+          </Text>
         </View>
       ) : errorMsg ? (
         <View style={styles.centerBox}>
@@ -202,28 +231,48 @@ export default function MyApplicationsScreen() {
       ) : filteredApplications.length === 0 ? (
         <View style={styles.emptyBox}>
           <View style={styles.emptyIconBg}>
-            <Ionicons name="document-text-outline" size={36} color={colors.primary} />
+            <Ionicons
+              name={isBusiness ? 'people-outline' : 'document-text-outline'}
+              size={36}
+              color={colors.primary}
+            />
           </View>
           <Text style={styles.emptyTitle}>
             {searchQuery
               ? 'No matching applications'
               : activeFilter === 'all'
-              ? 'No applications yet'
+              ? isBusiness
+                ? 'No applicants yet'
+                : 'No applications yet'
               : `No ${activeFilter} applications`}
           </Text>
           <Text style={styles.emptySubtitle}>
             {activeFilter === 'all'
-              ? 'When you apply to gigs, your applications and their statuses will appear here.'
+              ? isBusiness
+                ? 'When youth freelancers apply to your gigs, their applications and details will appear here.'
+                : 'When you apply to gigs, your applications and their statuses will appear here.'
               : `You do not have any applications marked as "${activeFilter}".`}
           </Text>
           {activeFilter === 'all' && !searchQuery ? (
             <TouchableOpacity
               style={styles.exploreBtn}
-              onPress={() => router.push('/(app)/(tabs)/browse' as any)}
+              onPress={() =>
+                router.push(
+                  isBusiness
+                    ? ('/(app)/(tabs)/my-gigs' as any)
+                    : ('/(app)/(tabs)/browse' as any)
+                )
+              }
               activeOpacity={0.85}
             >
-              <Ionicons name="compass-outline" size={18} color={colors.primaryOnColor} />
-              <Text style={styles.exploreBtnText}>Browse Available Gigs</Text>
+              <Ionicons
+                name={isBusiness ? 'briefcase-outline' : 'compass-outline'}
+                size={18}
+                color={colors.primaryOnColor}
+              />
+              <Text style={styles.exploreBtnText}>
+                {isBusiness ? 'Manage Your Gigs' : 'Browse Available Gigs'}
+              </Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -231,12 +280,19 @@ export default function MyApplicationsScreen() {
         <FlatList
           data={filteredApplications}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ApplicationCard
-              application={item}
-              onPress={() => setSelectedApplication(item)}
-            />
-          )}
+          renderItem={({ item }) =>
+            isBusiness ? (
+              <ApplicantCard
+                application={item}
+                onPress={() => setSelectedApplicant(item)}
+              />
+            ) : (
+              <ApplicationCard
+                application={item}
+                onPress={() => setSelectedApplication(item)}
+              />
+            )
+          }
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -249,12 +305,32 @@ export default function MyApplicationsScreen() {
         />
       )}
 
-      {/* Application Detail View Modal */}
-      <ApplicationDetailModal
-        visible={!!selectedApplication}
-        application={selectedApplication}
-        onClose={() => setSelectedApplication(null)}
-      />
+      {/* Application Detail View Modal (Youth Freelancer View) */}
+      {!isBusiness && (
+        <ApplicationDetailModal
+          visible={!!selectedApplication}
+          application={selectedApplication}
+          onClose={() => setSelectedApplication(null)}
+        />
+      )}
+
+      {/* Applicant Detail View Modal with Accept/Reject Actions (Business Owner View) */}
+      {isBusiness && (
+        <ApplicantDetailModal
+          visible={!!selectedApplicant}
+          application={selectedApplicant}
+          businessId={user?.uid || ''}
+          onClose={() => setSelectedApplicant(null)}
+          onStatusChanged={(newStatus) => {
+            if (selectedApplicant) {
+              setSelectedApplicant({
+                ...selectedApplicant,
+                status: newStatus,
+              });
+            }
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }

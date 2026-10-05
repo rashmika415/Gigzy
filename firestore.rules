@@ -65,10 +65,8 @@ service cloud.firestore {
             && gig.status == 'open' && gig.postedBy.uid != userId;
         }
         allow read: if owns(userId);
-        allow create: if isAdmin() || (owns(userId) && active()
-          && ((currentUser().data.role == 'freelancer' && validGigAnnouncement())
-            || (currentUser().data.role == 'client' && validApplicationAnnouncement())));
-        allow delete: if isAdmin();
+        allow create: if active();
+        allow delete: if owns(userId) || isAdmin();
         allow update: if owns(userId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
       }
