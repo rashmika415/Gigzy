@@ -170,15 +170,14 @@ export default function EditProfile() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.7,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const localUri = result.assets[0].uri;
-        await uploadImageToFirebase(localUri);
+        await uploadImageToFirebase(result.assets[0]);
       }
     } catch (e) {
       console.error(e);
@@ -186,26 +185,53 @@ export default function EditProfile() {
     }
   };
 
-  const uploadImageToFirebase = async (uri: string) => {
+  const uploadImageToFirebase = async (asset: ImagePicker.ImagePickerAsset) => {
     if (!user) return;
     setUploadingImage(true);
+    let blob: (Blob & { close?: () => void }) | undefined;
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      const response = await fetch(asset.uri);
+      blob = await response.blob();
+      if (blob.size === 0 || blob.size >= 5 * 1024 * 1024) {
+        Alert.alert(t("Upload Failed"), t("Choose a non-empty image smaller than 5 MB."));
+        return;
+      }
+      // Prefer the actual selected/cropped file's type over its original filename.
+      const contentType = blob.type?.startsWith('image/') ? blob.type : asset.mimeType;
+      if (!contentType?.startsWith('image/')) {
+        Alert.alert(t("Upload Failed"), t("This image format could not be identified. Please choose a JPEG or PNG image."));
+        return;
+      }
       
       // Save file name with a timestamp to avoid native caching issues
-      const filename = `avatar_${Date.now()}.jpg`;
+      const extension = contentType === 'image/jpeg' ? 'jpg' : contentType.split('/')[1].replace(/[^a-zA-Z0-9]/g, '');
+      const filename = `avatar_${Date.now()}.${extension}`;
       const storageRef = ref(storage, `profiles/${user.uid}/${filename}`);
       
-      await uploadBytes(storageRef, blob);
+      await uploadBytes(storageRef, blob, { contentType });
       const downloadURL = await getDownloadURL(storageRef);
       
       setPhotoURL(downloadURL);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: any) {
-      console.error(e);
-      Alert.alert(t("Upload Failed"), t("Failed to upload photo to Firebase Storage. Please try again."));
+      // Firebase keeps the underlying HTTP failure outside its generic message.
+      // Log only diagnostics, not the whole error (which may contain request data).
+      console.warn('Profile image upload failed', {
+        code: e?.code,
+        bucket: storage.app.options.storageBucket,
+        serverResponse: e?.serverResponse ?? e?.customData?.serverResponse ?? null,
+      });
+      const messages: Record<string, string> = {
+        'storage/unauthenticated': 'Please sign in again before uploading your photo.',
+        'storage/unauthorized': 'Your photo upload was denied. Please contact support.',
+        'storage/bucket-not-found': 'Photo uploads are not configured yet. Please contact support.',
+        'storage/project-not-found': 'Photo uploads are not configured yet. Please contact support.',
+        'storage/quota-exceeded': 'Photo uploads are temporarily unavailable. Please try again later.',
+        'storage/retry-limit-exceeded': 'The upload timed out. Check your connection and try again.',
+      };
+      Alert.alert(t("Upload Failed"), t(messages[e?.code] ?? "Could not upload your photo. Please try again. If the problem continues, contact support."));
     } finally {
+      blob?.close?.();
       setUploadingImage(false);
     }
   };

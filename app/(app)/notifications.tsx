@@ -12,6 +12,7 @@ import { AppNotification, NotificationType } from '../../types/notification';
 import { borderRadius, colors, spacing } from '../../constants/theme';
 
 const ICONS: Record<NotificationType, keyof typeof Ionicons.glyphMap> = {
+  gig_posted: 'briefcase-outline',
   gig_match: 'briefcase-outline', application: 'document-text-outline', message: 'chatbubble-outline',
   review: 'star-outline', endorsement: 'ribbon-outline', system: 'notifications-outline',
 };
