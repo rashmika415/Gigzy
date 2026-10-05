@@ -84,34 +84,40 @@ service cloud.firestore {
         allow update, delete: if active() && resource.data.senderId == request.auth.uid;
       }
     }
-    match /applications/{applicationId} {
-      function isApplicant() {
-        return signedIn() && resource != null && request.auth.uid == resource.data.youthId;
+    match /conversations/{conversationId} {
+      function isParticipant() {
+        return request.auth.uid == resource.data.youthId
+          || request.auth.uid == resource.data.businessId
+          || (resource.data.keys().hasAny(['participants']) && request.auth.uid in resource.data.participants);
       }
-      function isGigOwner() {
-        return signedIn() && resource != null && request.auth.uid == resource.data.businessId;
+      function willBeParticipant() {
+        return request.auth.uid == request.resource.data.youthId
+          || request.auth.uid == request.resource.data.businessId
+          || (request.resource.data.keys().hasAny(['participants']) && request.auth.uid in request.resource.data.participants);
       }
-      function willBeApplicant() {
-        return signedIn() && request.auth.uid == request.resource.data.youthId;
+
+      allow read: if active() && isParticipant();
+      allow create: if active() && willBeParticipant();
+      allow update: if active() && (isParticipant() || willBeParticipant());
+      allow delete: if isAdmin() || (active() && isParticipant());
+
+      match /messages/{messageId} {
+        function parentConv() {
+          return get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+        }
+        function isConvParticipant() {
+          return request.auth.uid == parentConv().youthId
+            || request.auth.uid == parentConv().businessId
+            || (parentConv().keys().hasAny(['participants']) && request.auth.uid in parentConv().participants);
+        }
+
+        allow read: if active() && isConvParticipant();
+        allow create: if active() && request.resource.data.senderId == request.auth.uid && isConvParticipant();
+        allow update: if active() && isConvParticipant()
+          && (resource.data.senderId == request.auth.uid
+              || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt', 'readBy']));
+        allow delete: if active() && resource.data.senderId == request.auth.uid;
       }
-
-      allow read: if active() && (resource == null || isApplicant() || isGigOwner() || isAdmin());
-
-      allow create: if active() && willBeApplicant()
-        && currentUser().data.get('role', '') in ['freelancer', 'youth']
-        && request.resource.data.status == 'pending'
-        && request.resource.data.availabilityConfirmed == true
-        && request.resource.data.message is string
-        && request.resource.data.message.size() >= 5
-        && exists(/databases/$(database)/documents/gigs/$(request.resource.data.gigId))
-        && get(/databases/$(database)/documents/gigs/$(request.resource.data.gigId)).data.status == 'open';
-
-      allow update: if active() && isGigOwner()
-        && resource != null && resource.data.status == 'pending'
-        && (request.resource.data.status in ['accepted', 'rejected'])
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
-
-      allow delete: if isAdmin();
     }
   }
 }

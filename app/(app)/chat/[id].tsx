@@ -47,9 +47,9 @@ function formatDateDivider(timestamp: any): string {
 }
 
 export default function ChatRoomScreen() {
-  const { t } = useTranslation();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const chatId = Array.isArray(id) ? id[0] : id;
+  const params = useLocalSearchParams<{ id?: string; conversationId?: string }>();
+  const rawId = params.conversationId || params.id;
+  const chatId = Array.isArray(rawId) ? rawId[0] : (rawId || '');
 
   const { user, userData } = useAuth();
   const [chat, setChat] = useState<Chat | null>(null);
