@@ -1,5 +1,7 @@
+import { Text } from '../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { sendPasswordResetEmail } from 'firebase/auth';
@@ -18,6 +20,7 @@ function getFirebaseError(code: string): string {
 }
 
 export default function ForgotPassword() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,22 +44,22 @@ export default function ForgotPassword() {
     }
   };
 
-  return <AuthScreen title={sent ? 'Check your inbox' : 'A fresh start'} eyebrow="LET'S GET YOU BACK IN" compact backTo="login"
-    subtitle={sent ? 'Follow the link in your email to choose a new password.' : 'Forgot your password? We will help you get back to your next opportunity.'}>
+  return <AuthScreen title={sent ? t("Check your inbox") : t("A fresh start")} eyebrow={t("LET'S GET YOU BACK IN")} compact backTo="login"
+    subtitle={sent ? t("Follow the link in your email to choose a new password.") : t("Forgot your password? We will help you get back to your next opportunity.")}>
     {sent ? <View style={authStyles.form}>
       <View style={styles.success}><Ionicons name="mail-open-outline" size={28} color={authColors.primary} />
-        <Text style={authStyles.paragraph}>If an account exists for {email.trim()}, you will receive a password reset link. Check your spam folder too.</Text>
+        <Text style={authStyles.paragraph}>{t("If an account exists for")}{email.trim()}{t(", you will receive a password reset link. Check your spam folder too.")}</Text>
       </View>
-      <AuthButton title="Back to sign in" onPress={() => router.replace('/(auth)/login')} />
-      <TouchableOpacity accessibilityRole="button" style={styles.retry} onPress={() => { setSent(false); setError(''); }}><Text style={authStyles.link}>Try another email address</Text></TouchableOpacity>
+      <AuthButton title={t("Back to sign in")} onPress={() => router.replace('/(auth)/login')} />
+      <TouchableOpacity accessibilityRole="button" style={styles.retry} onPress={() => { setSent(false); setError(''); }}><Text style={authStyles.link}>{t("Try another email address")}</Text></TouchableOpacity>
     </View> : <View style={authStyles.form}>
-      <AuthField label="Email address" icon="mail-outline" value={email} onChangeText={value => { setEmail(value); setError(''); }}
+      <AuthField label={t("Email address")} icon="mail-outline" value={email} onChangeText={value => { setEmail(value); setError(''); }}
         placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" editable={!loading}
         returnKeyType="send" onSubmitEditing={handleSendResetLink} />
-      <AuthError message={error} />
-      <AuthButton title="Send reset link" onPress={handleSendResetLink} loading={loading} />
-      <View style={authStyles.footer}><Text style={authStyles.footerText}>Remember your password?</Text>
-        <TouchableOpacity accessibilityRole="link" style={authStyles.footerLink} onPress={() => router.replace('/(auth)/login')}><Text style={authStyles.link}>Sign in</Text></TouchableOpacity>
+      <AuthError message={t(error ?? "")} />
+      <AuthButton title={t("Send reset link")} onPress={handleSendResetLink} loading={loading} />
+      <View style={authStyles.footer}><Text style={authStyles.footerText}>{t("Remember your password?")}</Text>
+        <TouchableOpacity accessibilityRole="link" style={authStyles.footerLink} onPress={() => router.replace('/(auth)/login')}><Text style={authStyles.link}>{t("Sign in")}</Text></TouchableOpacity>
       </View>
     </View>}
   </AuthScreen>;

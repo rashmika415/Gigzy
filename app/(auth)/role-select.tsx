@@ -1,4 +1,6 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Text } from '../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthScreen } from '../../components/auth/AuthUI';
@@ -10,17 +12,18 @@ const ROLES = [
   { key: 'business', title: 'Hire talent', subtitle: 'Post a gig and connect with motivated people in your community.', icon: 'storefront-outline' },
 ] as const;
 export default function RoleSelect() {
-  return <AuthScreen title="How will you use Gigzy?" subtitle="Choose your path. We will take care of the next step." eyebrow="A PLACE FOR YOUR NEXT MOVE" compact>
+  const { t } = useTranslation();
+  return <AuthScreen title={t("How will you use Gigzy?")} subtitle={t("Choose your path. We will take care of the next step.")} eyebrow={t("A PLACE FOR YOUR NEXT MOVE")} compact>
     <View style={styles.roles}>
-      {ROLES.map(role => <TouchableOpacity key={role.key} accessibilityRole="button" accessibilityLabel={role.title}
+      {ROLES.map(role => <TouchableOpacity key={role.key} accessibilityRole="button" accessibilityLabel={t(role.title)}
         onPress={() => router.push({ pathname: '/(auth)/register', params: { role: role.key } })} activeOpacity={0.8} style={styles.card}>
         <View style={styles.icon}><Ionicons name={role.icon} size={23} color={palette.primary} /></View>
-        <View style={styles.copy}><Text style={styles.title}>{role.title}</Text><Text style={styles.subtitle}>{role.subtitle}</Text></View>
+        <View style={styles.copy}><Text style={styles.title}>{t(role.title)}</Text><Text style={styles.subtitle}>{t(role.subtitle)}</Text></View>
         <Ionicons name="arrow-forward" size={19} color={palette.primary} />
       </TouchableOpacity>)}
     </View>
-    <View style={authStyles.footer}><Text style={authStyles.footerText}>Already have an account?</Text>
-      <TouchableOpacity style={authStyles.footerLink} accessibilityRole="link" onPress={() => router.push('/(auth)/login')}><Text style={authStyles.link}>Sign in</Text></TouchableOpacity>
+    <View style={authStyles.footer}><Text style={authStyles.footerText}>{t("Already have an account?")}</Text>
+      <TouchableOpacity style={authStyles.footerLink} accessibilityRole="link" onPress={() => router.push('/(auth)/login')}><Text style={authStyles.link}>{t("Sign in")}</Text></TouchableOpacity>
     </View>
   </AuthScreen>;
 }

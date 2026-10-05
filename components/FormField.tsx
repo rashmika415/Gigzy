@@ -1,14 +1,7 @@
+import { Text, TextInput } from './LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  Platform,
-  ViewStyle,
-  TextInputProps,
-  Animated,
-} from 'react-native';
+import { View, StyleSheet, Platform, ViewStyle, TextInputProps, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../constants/theme';
 
@@ -41,6 +34,7 @@ export default function FormField({
   onBlur,
   ...inputProps
 }: FormFieldProps) {
+  const { t } = useTranslation();
   const borderAnim = useState(() => new Animated.Value(0))[0];
 
   const handleFocus = (e: any) => {
@@ -74,7 +68,7 @@ export default function FormField({
       {/* Label */}
       <View style={styles.labelRow}>
         <Text style={styles.label}>
-          {label}
+          {t(label)}
           {required && <Text style={styles.asterisk}> *</Text>}
         </Text>
         {charCount && (
@@ -107,6 +101,7 @@ export default function FormField({
           onFocus={handleFocus}
           onBlur={handleBlur}
           {...inputProps}
+          placeholder={inputProps.placeholder ? t(inputProps.placeholder) : undefined}
         />
       </Animated.View>
 
@@ -114,10 +109,10 @@ export default function FormField({
       {error ? (
         <View style={styles.errorRow}>
           <Ionicons name="alert-circle" size={13} color={colors.error} />
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{t(error ?? "")}</Text>
         </View>
       ) : hint ? (
-        <Text style={styles.hintText}>{hint}</Text>
+        <Text style={styles.hintText}>{t(hint ?? "")}</Text>
       ) : null}
     </View>
   );
