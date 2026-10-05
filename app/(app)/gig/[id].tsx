@@ -18,6 +18,7 @@ import { colors, spacing, borderRadius } from '../../../constants/theme';
 import { subscribeToGig } from '../../../services/gigService';
 import { getOrCreateChat } from '../../../services/chatService';
 import { StatusPill, Chip, LoadingState, ErrorState } from '../../../components';
+import CloseGigButton from '../../../components/CloseGigButton';
 import BookmarkButton from '../../../components/BookmarkButton';
 import { distanceKm, validCoordinates } from '../../../services/discoveryFilters';
 import { getCurrentCoordinates } from '../../../services/locationService';
@@ -116,6 +117,11 @@ export default function GigDetailScreen() {
       return;
     }
 
+    if (gig.status !== 'open') {
+      Alert.alert('Gig Closed', 'This gig is no longer accepting applications.');
+      return;
+    }
+
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
     setStartingChat(true);
 
@@ -198,6 +204,8 @@ export default function GigDetailScreen() {
             </View>
             <StatusPill status={gig.status} />
           </View>
+
+          <CloseGigButton gig={gig} />
 
           {/* Title */}
           <Text style={styles.gigTitle}>{gig.title}</Text>
@@ -312,7 +320,7 @@ export default function GigDetailScreen() {
               </TouchableOpacity>
               <Text style={styles.posterCardEmail}>{gig.postedBy.email}</Text>
             </View>
-            {!gigOwner && role === 'freelancer' && (
+            {!gigOwner && role === 'freelancer' && gig.status === 'open' && (
               <TouchableOpacity
                 style={styles.posterChatBtn}
                 onPress={handleContactBusiness}
