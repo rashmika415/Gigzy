@@ -1,27 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
+import { Text } from '../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
+import { useEffect, useState } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../../FirebaseConfig';
-import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import { AuthButton, AuthCheckbox, AuthError, AuthField, AuthScreen } from '../../components/auth/AuthUI';
+import { authColors, authStyles } from '../../constants/authTheme';
+import { fonts } from '../../constants/theme';
 
 type Role = 'youth' | 'business';
 
 const ROLE_LABEL: Record<Role, string> = {
-  youth: 'Looking for work',
-  business: 'Hiring',
+  youth: 'Find work',
+  business: 'Hire talent',
 };
 
 // The account's stored role uses the app-wide vocabulary consumed by
@@ -47,6 +41,7 @@ function isValidPassword(password: string): boolean {
 }
 
 export default function Register() {
+  const { t } = useTranslation();
   const { role: roleParam } = useLocalSearchParams<{ role?: string }>();
   const role: Role = roleParam === 'business' ? 'business' : 'youth';
 
@@ -60,14 +55,13 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [notifyOnMatch, setNotifyOnMatch] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleRegister = async () => {
+    if (loading) return;
     if (!fullName.trim() || !email.trim() || !password || !confirmPassword) {
       setError('Please fill in all fields.');
       return;
@@ -108,371 +102,38 @@ export default function Register() {
     }
   };
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <MaterialIcons name="arrow-back" size={20} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create account</Text>
+  return <AuthScreen title={t("Your next chapter starts here")} subtitle={role === 'business' ? t("Find the right local talent for your business.") : t("Find flexible work. Build skills. Make your next move.")}
+    eyebrow={t("MAKE ROOM FOR OPPORTUNITY")} compact backTo="role-select">
+    <View style={authStyles.form}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t("Change account role")} disabled={loading} style={styles.role}
+        onPress={() => router.replace('/(auth)/role-select')}>
+        <View style={styles.roleLabel}><Ionicons name={role === 'business' ? 'storefront-outline' : 'briefcase-outline'} size={18} color={authColors.primary} />
+          <Text style={styles.roleText}>{t(ROLE_LABEL[role])}</Text></View>
+        <Text style={styles.change}>{t("Change")}</Text>
+      </TouchableOpacity>
+      <AuthField label={t("Full name")} icon="person-outline" value={fullName} onChangeText={value => { setFullName(value); setError(''); }}
+        placeholder={t("Your full name")} autoCapitalize="words" autoCorrect={false} autoComplete="name" textContentType="name" editable={!loading} />
+      <AuthField label={t("Email address")} icon="mail-outline" value={email} onChangeText={value => { setEmail(value); setError(''); }}
+        placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress" editable={!loading} />
+      <AuthField label={t("Password")} icon="lock-closed-outline" password value={password} onChangeText={value => { setPassword(value); setError(''); }}
+        placeholder={t("Create a password")} autoCapitalize="none" autoComplete="new-password" textContentType="newPassword" editable={!loading} hint={t("At least 8 characters, including one number.")} />
+      <AuthField label={t("Confirm password")} icon="lock-closed-outline" password value={confirmPassword} onChangeText={value => { setConfirmPassword(value); setError(''); }}
+        placeholder={t("Re-enter your password")} autoCapitalize="none" autoComplete="new-password" textContentType="newPassword" editable={!loading}
+        error={confirmPassword && password !== confirmPassword ? 'Passwords do not match.' : undefined} />
+      <View style={styles.checkboxes}>
+        <AuthCheckbox checked={agreedToTerms} onPress={() => { setAgreedToTerms(value => !value); setError(''); }} disabled={loading}>{t("I am 16 or older and agree to the Terms of Use and Privacy Policy.")}</AuthCheckbox>
+        <AuthCheckbox checked={notifyOnMatch} onPress={() => setNotifyOnMatch(value => !value)} disabled={loading}>{t("Send me an alert when a gig matches my skills.")}</AuthCheckbox>
       </View>
-
-      <ScrollView
-        style={styles.flex}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity
-          style={styles.rolePanel}
-          onPress={() => router.back()}
-          activeOpacity={0.8}
-        >
-          <View style={styles.rolePanelLeft}>
-            <MaterialIcons name="person" size={16} color={colors.primary} />
-            <Text style={styles.rolePanelText}>{ROLE_LABEL[role]}</Text>
-          </View>
-          <Text style={styles.changeText}>CHANGE</Text>
-        </TouchableOpacity>
-
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Full name</Text>
-            <TextInput
-              style={styles.input}
-              value={fullName}
-              onChangeText={(t) => { setFullName(t); setError(''); }}
-              placeholder="Your full name"
-              placeholderTextColor={colors.placeholder}
-              autoCapitalize="words"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={(t) => { setEmail(t); setError(''); }}
-              placeholder="you@example.com"
-              placeholderTextColor={colors.placeholder}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
-            <View style={styles.passwordWrapper}>
-              <TextInput
-                style={[styles.input, styles.passwordInput]}
-                value={password}
-                onChangeText={(t) => { setPassword(t); setError(''); }}
-                placeholder="Enter a password"
-                placeholderTextColor={colors.placeholder}
-                secureTextEntry={!showPassword}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword((v) => !v)}
-                style={styles.showButton}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.showButtonText}>{showPassword ? 'HIDE' : 'SHOW'}</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.hintText}>At least 8 characters, with one number.</Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Confirm password</Text>
-            <View style={styles.passwordWrapper}>
-              <TextInput
-                style={[styles.input, styles.passwordInput]}
-                value={confirmPassword}
-                onChangeText={(t) => { setConfirmPassword(t); setError(''); }}
-                placeholder="Re-enter your password"
-                placeholderTextColor={colors.placeholder}
-                secureTextEntry={!showConfirm}
-              />
-              <TouchableOpacity
-                onPress={() => setShowConfirm((v) => !v)}
-                style={styles.showButton}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.showButtonText}>{showConfirm ? 'HIDE' : 'SHOW'}</Text>
-              </TouchableOpacity>
-            </View>
-            {confirmPassword.length > 0 && password !== confirmPassword && (
-              <Text style={styles.matchError}>{"Passwords don't match"}</Text>
-            )}
-          </View>
-
-          <View style={styles.checkboxes}>
-            <TouchableOpacity
-              style={styles.checkboxRow}
-              onPress={() => setAgreedToTerms((v) => !v)}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
-                {agreedToTerms && <MaterialIcons name="check" size={13} color={colors.background} />}
-              </View>
-              <Text style={styles.checkboxLabel}>
-                I am 16 or older and I agree to the Terms of Use and Privacy Policy.
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.checkboxRow}
-              onPress={() => setNotifyOnMatch((v) => !v)}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.checkbox, notifyOnMatch && styles.checkboxChecked]}>
-                {notifyOnMatch && <MaterialIcons name="check" size={13} color={colors.background} />}
-              </View>
-              <Text style={styles.checkboxLabel}>
-                Send me an alert when a gig matches my skills.
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {error ? (
-            <View style={styles.errorBox}>
-              <MaterialIcons name="warning" size={18} color={colors.error} style={styles.errorIcon} />
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
-
-      <View style={styles.fixedBottomBar}>
-        <TouchableOpacity
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-          onPress={handleRegister}
-          disabled={loading}
-          activeOpacity={0.9}
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.primaryOnColor} size="small" />
-          ) : (
-            <Text style={styles.submitText}>Create account</Text>
-          )}
-        </TouchableOpacity>
-        <Text style={styles.footerText}>
-          Already have an account?{' '}
-          <Text style={styles.footerLink} onPress={() => router.push('/(auth)/login')}>
-            Log in
-          </Text>
-        </Text>
-      </View>
-    </KeyboardAvoidingView>
-  );
+      <AuthError message={t(error ?? "")} />
+      <AuthButton title={t("Create account")} onPress={handleRegister} loading={loading} />
+    </View>
+    <View style={authStyles.footer}><Text style={authStyles.footerText}>{t("Already part of Gigzy?")}</Text>
+      <TouchableOpacity style={authStyles.footerLink} accessibilityRole="link" onPress={() => router.replace('/(auth)/login')} disabled={loading}><Text style={authStyles.link}>{t("Sign in")}</Text></TouchableOpacity>
+    </View>
+  </AuthScreen>;
 }
-
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.background },
-
-  header: {
-    height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceBorderSubtle,
-  },
-  backButton: {
-    position: 'absolute',
-    left: spacing.md,
-    padding: spacing.sm,
-    zIndex: 1,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontFamily: fonts.headingSemiBold,
-    fontSize: 20,
-    lineHeight: 26,
-    letterSpacing: -1,
-    color: colors.text,
-  },
-
-  scrollContent: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg,
-    gap: spacing.lg,
-  },
-
-  rolePanel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.sm + 1,
-    paddingHorizontal: spacing.sm + 1,
-  },
-  rolePanelLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingLeft: spacing.xs,
-  },
-  rolePanelText: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.text,
-  },
-  changeText: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 11,
-    letterSpacing: 1.1,
-    color: '#ADC9EE',
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-  },
-
-  form: { gap: spacing.lg },
-  inputGroup: { gap: spacing.xs },
-  label: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 11,
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    color: colors.textSecondary,
-  },
-  input: {
-    height: 48,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: 17,
-    fontFamily: fonts.body,
-    fontSize: 16,
-    color: colors.text,
-  },
-  passwordWrapper: { justifyContent: 'center' },
-  passwordInput: { paddingRight: 60 },
-  showButton: {
-    position: 'absolute',
-    right: spacing.md,
-  },
-  showButtonText: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 11,
-    letterSpacing: 1.1,
-    color: colors.primary,
-  },
-  hintText: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.textSecondary,
-  },
-  matchError: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.errorText,
-  },
-
-  checkboxes: { gap: spacing.md },
-  checkboxRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    alignItems: 'flex-start',
-  },
-  checkbox: {
-    width: 16,
-    height: 16,
-    marginTop: 4,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: colors.placeholder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  checkboxLabel: {
-    flex: 1,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.textSecondary,
-  },
-
-  errorBox: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    backgroundColor: colors.errorLight,
-    borderWidth: 1,
-    borderColor: colors.errorBorder,
-    borderRadius: borderRadius.sm,
-    padding: 13,
-  },
-  errorIcon: { marginTop: 1 },
-  errorText: {
-    flex: 1,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.errorText,
-  },
-
-  bottomSpacer: { height: 128 },
-
-  fixedBottomBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(13, 21, 21, 0.95)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(111, 216, 199, 0.1)',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md + 1,
-    paddingBottom: spacing.md,
-    gap: spacing.md,
-  },
-  submitButton: {
-    height: 48,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitButtonDisabled: { opacity: 0.7 },
-  submitText: {
-    fontFamily: fonts.headingSemiBold,
-    fontSize: 20,
-    lineHeight: 26,
-    color: colors.primaryOnColor,
-  },
-  footerText: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  footerLink: {
-    fontFamily: fonts.bodyMedium,
-    color: colors.primary,
-  },
+  role: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, minHeight: 52, padding: 14, backgroundColor: authColors.mint, borderRadius: 13, marginBottom: 2 },
+  roleLabel: { flexDirection: 'row', alignItems: 'center', gap: 9 }, roleText: { fontFamily: fonts.bodyMedium, fontSize: 14, color: authColors.primaryDark },
+  change: { fontFamily: fonts.bodyMedium, fontSize: 13, color: authColors.primary }, checkboxes: { gap: 4 },
 });

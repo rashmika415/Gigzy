@@ -1,23 +1,13 @@
+import { formatDate, formatTime } from '../../../localization/format';
+import { translate } from "../../../localization/i18n";
+import { Text, TextInput } from '../../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from "react-native";
+import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { borderRadius, colors, spacing } from "../../../constants/theme";
 import { useAuth } from "../../../context/AuthContext";
 import {
@@ -38,18 +28,18 @@ import {
 function formatMessageTime(timestamp: any): string {
   if (!timestamp) return "";
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return formatTime(date);
 }
 
 function formatDateDivider(timestamp: any): string {
   if (!timestamp) return "";
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
   const now = new Date();
-  if (date.toDateString() === now.toDateString()) return "Today";
+  if (date.toDateString() === now.toDateString()) return translate("Today");
   const yesterday = new Date();
   yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return date.toLocaleDateString("en-US", {
+  if (date.toDateString() === yesterday.toDateString()) return translate("Yesterday");
+  return formatDate(date, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -57,8 +47,9 @@ function formatDateDivider(timestamp: any): string {
 }
 
 export default function ChatRoomScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const chatId = Array.isArray(id) ? id[0] : id;
+  const params = useLocalSearchParams<{ id?: string; conversationId?: string }>();
+  const rawId = params.conversationId || params.id;
+  const chatId = Array.isArray(rawId) ? rawId[0] : (rawId || '');
 
   const { user, userData } = useAuth();
   const [chat, setChat] = useState<Chat | null>(null);
@@ -196,7 +187,7 @@ export default function ChatRoomScreen() {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (err: any) {
-      Alert.alert("Send Error", err.message || "Failed to send message.");
+      Alert.alert(t("Send Error"), err.message || t("Failed to send message."));
     } finally {
       setSending(false);
       setUploadingImage(false);
@@ -209,8 +200,8 @@ export default function ChatRoomScreen() {
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permissionResult.granted) {
         Alert.alert(
-          "Permission Required",
-          "Please enable photos permission to send images.",
+          t("Permission Required"),
+          t("Please enable photos permission to send images."),
         );
         return;
       }
@@ -227,8 +218,8 @@ export default function ChatRoomScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         } catch {}
       }
-    } catch (err) {
-      Alert.alert("Error", "Unable to pick image.");
+    } catch {
+      Alert.alert(t("Error"), t("Unable to pick image."));
     }
   };
 
@@ -344,8 +335,8 @@ export default function ChatRoomScreen() {
                   size={14}
                   color={
                     item.readBy?.length > 1
-                      ? colors.primary
-                      : "rgba(0, 55, 49, 0.6)"
+                      ? colors.primaryOnColor
+                      : "rgba(255, 255, 255, 0.8)"
                   }
                   style={styles.checkIcon}
                 />
@@ -394,7 +385,7 @@ export default function ChatRoomScreen() {
 
           <View style={styles.headerNameBlock}>
             <Text style={styles.headerName} numberOfLines={1}>
-              {otherParticipant.fullName || "User"}
+              {otherParticipant.fullName || t("User")}
             </Text>
             <View style={styles.headerRoleRow}>
               <View
@@ -406,7 +397,7 @@ export default function ChatRoomScreen() {
                 ]}
               />
               <Text style={styles.headerRoleText}>
-                {isOtherBusiness ? "Business Client" : "Youth Freelancer"}
+                {isOtherBusiness ? t("Business Client") : t("Youth Freelancer")}
               </Text>
             </View>
           </View>
@@ -443,23 +434,21 @@ export default function ChatRoomScreen() {
               {chat.gigTitle}
             </Text>
             <Text style={styles.gigBannerSubtitle}>
-              {chat.gigPay
-                ? `$${chat.gigPay} ${chat.gigPayType === "hourly" ? "/ hr" : "Fixed Budget"}`
-                : "Gig Details"}
-              {chat.gigCategory ? ` • ${chat.gigCategory}` : ""}
+              {chat.gigPay ? t("${{value0}} {{value1}}", { value0: chat.gigPay, value1: chat.gigPayType === "hourly" ? t("/ hr") : t("Fixed Budget") }) : t("Gig Details")}
+              {chat.gigCategory ? t(" • {{value0}}", { value0: chat.gigCategory }) : ""}
             </Text>
           </View>
           <TouchableOpacity
             style={styles.gigBannerAction}
             onPress={() => {
               Alert.alert(
-                "Related Gig",
-                `${chat.gigTitle}\nBudget: $${chat.gigPay || "N/A"}\nCategory: ${chat.gigCategory || "General"}`,
-                [{ text: "Close" }],
+                t("Related Gig"),
+                t("{{value0}}\nBudget: ${{value1}}\nCategory: {{value2}}", { value0: chat.gigTitle, value1: chat.gigPay || t("N/A"), value2: chat.gigCategory || t("General") }),
+                [{ text: t("Close") }],
               );
             }}
           >
-            <Text style={styles.gigBannerActionText}>Details</Text>
+            <Text style={styles.gigBannerActionText}>{t("Details")}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -473,7 +462,7 @@ export default function ChatRoomScreen() {
         {loading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingSubtext}>Loading conversation...</Text>
+            <Text style={styles.loadingSubtext}>{t("Loading conversation...")}</Text>
           </View>
         ) : (
           <FlatList
@@ -495,11 +484,8 @@ export default function ChatRoomScreen() {
                   size={48}
                   color={colors.surfaceBorder}
                 />
-                <Text style={styles.emptyChatTitle}>No messages yet</Text>
-                <Text style={styles.emptyChatSub}>
-                  Send a friendly greeting or use one of the quick replies below
-                  to get started!
-                </Text>
+                <Text style={styles.emptyChatTitle}>{t("No messages yet")}</Text>
+                <Text style={styles.emptyChatSub}>{t("Send a friendly greeting or use one of the quick replies below to get started!")}</Text>
               </View>
             }
           />
@@ -513,8 +499,8 @@ export default function ChatRoomScreen() {
               style={styles.previewThumb}
             />
             <View style={styles.previewInfo}>
-              <Text style={styles.previewTitle}>Image ready to send</Text>
-              <Text style={styles.previewSub}>Add a message or hit send</Text>
+              <Text style={styles.previewTitle}>{t("Image ready to send")}</Text>
+              <Text style={styles.previewSub}>{t("Add a message or hit send")}</Text>
             </View>
             <TouchableOpacity
               style={styles.removeImageBtn}
@@ -537,7 +523,7 @@ export default function ChatRoomScreen() {
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.quickReplyChip}
-                onPress={() => handleSend(item.text)}
+                onPress={() => handleSend(t(item.text))}
                 activeOpacity={0.8}
               >
                 <Ionicons
@@ -547,7 +533,7 @@ export default function ChatRoomScreen() {
                   style={{ marginRight: 4 }}
                 />
                 <Text style={styles.quickReplyText} numberOfLines={1}>
-                  {item.text}
+                  {t(item.text)}
                 </Text>
               </TouchableOpacity>
             )}
@@ -567,7 +553,7 @@ export default function ChatRoomScreen() {
 
           <TextInput
             style={styles.textInput}
-            placeholder="Type a message..."
+            placeholder={t("Type a message...")}
             placeholderTextColor={colors.placeholder}
             value={inputText}
             onChangeText={setInputText}
@@ -668,8 +654,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerAvatarBusiness: {
-    backgroundColor: "rgba(44, 73, 104, 0.3)",
-    borderColor: "#7BA6D6",
+    backgroundColor: colors.accentLight,
+    borderColor: "#2C4968",
   },
   headerAvatarImg: {
     width: 40,
@@ -717,7 +703,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   roleDotBusiness: {
-    backgroundColor: "#7BA6D6",
+    backgroundColor: "#2C4968",
   },
   headerRoleText: {
     fontSize: 11,
@@ -730,9 +716,9 @@ const styles = StyleSheet.create({
   gigBanner: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(111, 216, 199, 0.08)",
+    backgroundColor: colors.primaryLight,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(111, 216, 199, 0.2)",
+    borderBottomColor: colors.surfaceBorder,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     gap: spacing.sm,
@@ -765,7 +751,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: borderRadius.sm,
     borderWidth: 1,
-    borderColor: "rgba(111, 216, 199, 0.3)",
+    borderColor: colors.surfaceBorder,
   },
   gigBannerActionText: {
     fontSize: 11,
@@ -854,7 +840,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   bubbleAvatarBusiness: {
-    backgroundColor: "rgba(44, 73, 104, 0.3)",
+    backgroundColor: colors.accentLight,
   },
   bubbleAvatarText: {
     fontSize: 11,
@@ -914,7 +900,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   timeTextMe: {
-    color: "rgba(0, 55, 49, 0.75)",
+    color: "rgba(255, 255, 255, 0.8)",
   },
   timeTextOther: {
     color: colors.textMuted,
@@ -966,7 +952,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surfaceElevated,
-    borderColor: "rgba(111, 216, 199, 0.25)",
+    borderColor: colors.surfaceBorder,
     borderWidth: 1,
     borderRadius: borderRadius.full,
     paddingHorizontal: 12,
