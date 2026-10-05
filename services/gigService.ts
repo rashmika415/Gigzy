@@ -15,10 +15,11 @@ import {
   setDoc,
   startAfter,
   getDocsFromServer,
+  runTransaction,
 } from 'firebase/firestore';
 import type { QueryDocumentSnapshot, QueryConstraint } from 'firebase/firestore';
 import { categoryId, distanceKm, matchesDiscoveryFilters, validCoordinates, validDate, validTime } from './discoveryFilters';
-import { db } from '../FirebaseConfig';
+import { auth, db } from '../FirebaseConfig';
 import {
   Gig,
   GigInput,
@@ -542,14 +543,30 @@ export async function getBrowsePage(
 export async function updateGigStatus(gigId: string, status: GigStatus): Promise<void> {
   try {
     const docRef = doc(db, 'gigs', gigId);
-    await updateDoc(docRef, {
-      status,
-      updatedAt: serverTimestamp(),
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('Please log in to manage your gigs.');
+    await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(docRef);
+      if (!snapshot.exists()) throw new Error('Gig not found.');
+      const gig = snapshot.data();
+      if (gig.postedBy?.uid !== uid) {
+        throw new Error('Only the business owner who posted this gig can change its status.');
+      }
+      if (gig.status === status) return;
+      if (status === 'closed' && gig.status !== 'open') {
+        throw new Error('Only open gigs can be closed.');
+      }
+      transaction.update(docRef, { status, updatedAt: serverTimestamp() });
     });
   } catch (error: any) {
     console.error('Firestore updateGigStatus error:', error);
     throw new Error(parseFirebaseError(error));
   }
+}
+
+/** Close an open gig after the server verifies ownership and current status. */
+export async function closeGig(gigId: string): Promise<void> {
+  await updateGigStatus(gigId, 'closed');
 }
 
 /**

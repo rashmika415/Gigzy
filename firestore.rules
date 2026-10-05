@@ -105,8 +105,16 @@ service cloud.firestore {
         && request.resource.data.description is string && request.resource.data.description.size() >= 20
         && request.resource.data.pay is number && request.resource.data.pay > 0
         && request.resource.data.status == 'open';
-      allow update: if active() && (resource.data.postedBy.uid == request.auth.uid
-        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount']));
+      allow update: if active() && (
+        (resource.data.postedBy.uid == request.auth.uid
+          && currentUser().data.role == 'client'
+          && request.resource.data.postedBy == resource.data.postedBy
+          && (request.resource.data.status != 'closed'
+            || resource.data.status in ['open', 'closed']))
+        || (resource.data.status == 'open'
+          && request.resource.data.status == 'open'
+          && getAfter(/databases/$(database)/documents/gigs/$(gigId)).data.status == 'open'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount'])));
       allow delete: if active() && resource.data.postedBy.uid == request.auth.uid;
     }
     match /chats/{chatId} {

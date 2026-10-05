@@ -1,3 +1,4 @@
+import CloseGigButton from '../../../components/CloseGigButton';
 import AppBanner from '../../../components/AppBanner';
 import { STATUS_STYLES } from '../../../components/StatusPill';
 import { Ionicons } from "@expo/vector-icons";
@@ -839,6 +840,8 @@ export default function MyGigs() {
                         </Text>
                       </View>
                     </View>
+
+                    <CloseGigButton gig={gig} />
 
                     {/* Card Actions Footer */}
                     <View style={styles.cardActionsFooter}>
