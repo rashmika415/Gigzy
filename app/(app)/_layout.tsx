@@ -4,7 +4,7 @@ import { colors } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { SavedGigsProvider } from '../../context/SavedGigsContext';
 import { registerDeviceForPush } from '../../services/pushNotificationService';
-import { subscribeToGigAnnouncements } from '../../services/notificationService';
+import { subscribeToGigAnnouncements, subscribeToApplicationAnnouncements } from '../../services/notificationService';
 
 /**
  * App layout — wraps the tab navigator and all stack-pushed screens.
@@ -23,6 +23,13 @@ export default function AppLayout() {
   const { user, userData, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    if (loading || !user?.uid || userData?.role !== 'client' || userData?.suspended) return;
+    return subscribeToApplicationAnnouncements(user.uid, error => {
+      console.warn('Application notification sync failed:', error.message);
+    });
+  }, [loading, user?.uid, userData?.role, userData?.suspended]);
 
   useEffect(() => {
     if (loading || !user?.uid || userData?.role !== 'freelancer' || userData?.suspended) return;

@@ -1,5 +1,12 @@
 # Free-plan gig notifications
 
+Business owners also listen to applications addressed to their account and create
+one in-app notification per application. The notification names the applicant and
+opens the gig for reviewing applicants. Existing applications are included on first
+login. The gig's actual owner is checked before writing; rules enforce the same
+ownership check. Read status survives app restarts. This also works on Spark and
+syncs only while the business app is open or when reopened.
+
 No Cloud Functions or billing upgrade is required. The youth app listens to the
 20 most recently created gigs and creates announcements for open gigs in its own
 users/{uid}/notifications collection. Recent existing gigs are included for the demo.

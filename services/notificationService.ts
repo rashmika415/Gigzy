@@ -9,9 +9,48 @@ import {
   serverTimestamp,
   updateDoc,
   writeBatch,
+  where,
 } from 'firebase/firestore';
 import { db } from '../FirebaseConfig';
 import { AppNotification } from '../types/notification';
+
+// No paid backend: business owners sync notifications from their applications.
+export function subscribeToApplicationAnnouncements(userId: string, onError: (error: Error) => void) {
+  let stopped = false;
+  const pending = new Set<string>();
+  const completed = new Set<string>();
+  const unsubscribe = onSnapshot(
+    query(collection(db, 'applications'), where('businessId', '==', userId)),
+    snapshot => {
+      for (const application of snapshot.docs) {
+        if (pending.has(application.id) || completed.has(application.id)) continue;
+        pending.add(application.id);
+        const notification = doc(db, 'users', userId, 'notifications', `application-${application.id}`);
+        void runTransaction(db, async transaction => {
+          if (stopped || (await transaction.get(notification)).exists()) return;
+          const current = await transaction.get(application.ref);
+          const data = current.data();
+          if (!data || data.businessId !== userId || data.youthId === userId || !data.gigId) return;
+          const gig = await transaction.get(doc(db, 'gigs', data.gigId));
+          if (stopped || gig.data()?.postedBy?.uid !== userId) return;
+          transaction.set(notification, {
+            userId,
+            type: 'application',
+            title: 'New gig application',
+            body: `${data.youthName || 'A youth user'} applied to your gig.`,
+            read: false,
+            route: `/(app)/gig/${data.gigId}`,
+            entityId: application.id,
+            createdAt: serverTimestamp(),
+          });
+        }).then(() => { completed.add(application.id); })
+          .catch(error => { if (!stopped) onError(error); })
+          .finally(() => { pending.delete(application.id); });
+      }
+    }, onError,
+  );
+  return () => { stopped = true; unsubscribe(); };
+}
 
 // Spark-plan fallback: a youth client creates only its own validated announcements.
 export function subscribeToGigAnnouncements(userId: string, onError: (error: Error) => void) {
