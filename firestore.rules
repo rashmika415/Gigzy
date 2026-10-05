@@ -37,8 +37,23 @@ service cloud.firestore {
         allow delete: if owns(userId) && active();
       }
       match /notifications/{notificationId} {
+        function validGigAnnouncement() {
+          let data = request.resource.data;
+          let gig = get(/databases/$(database)/documents/gigs/$(data.entityId)).data;
+          return data.keys().hasOnly(['userId', 'type', 'title', 'body', 'read', 'route', 'entityId', 'createdAt'])
+            && notificationId == 'gig-posted-' + data.entityId
+            && data.userId == userId
+            && data.type == 'gig_posted'
+            && data.title == 'New gig posted'
+            && data.body == gig.title
+            && data.route == '/(app)/gig/' + data.entityId
+            && data.read == false && data.createdAt == request.time
+            && gig.status == 'open' && gig.postedBy.uid != userId;
+        }
         allow read: if owns(userId);
-        allow create, delete: if isAdmin();
+        allow create: if isAdmin() || (owns(userId) && active()
+          && currentUser().data.role == 'freelancer' && validGigAnnouncement());
+        allow delete: if isAdmin();
         allow update: if owns(userId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
       }
