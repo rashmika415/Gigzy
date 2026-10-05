@@ -33,6 +33,7 @@ export default function ApplicantListModal({
 }: ApplicantListModalProps) {
   const [applicants, setApplicants] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState<ApplicationFilterStatus>('all');
   const [selectedApplicant, setSelectedApplicant] = useState<Application | null>(null);
 
@@ -40,14 +41,19 @@ export default function ApplicantListModal({
     if (!visible || !gigId) return;
 
     setLoading(true);
+    setLoadError('');
+
     const unsubscribe = subscribeToGigApplicants(
       gigId,
-      (apps) => {
+      businessId,
+      (apps: Application[]) => {
         setApplicants(apps);
         setLoading(false);
+        setLoadError('');
       },
-      (error) => {
+      (error: Error) => {
         console.error('Error fetching applicants:', error);
+        setLoadError(error.message || 'Failed to load applicants.');
         setLoading(false);
       }
     );
@@ -55,7 +61,25 @@ export default function ApplicantListModal({
     return () => {
       unsubscribe();
     };
-  }, [visible, gigId]);
+  }, [visible, gigId, businessId]);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setLoadError('');
+    subscribeToGigApplicants(
+      gigId,
+      businessId,
+      (apps: Application[]) => {
+        setApplicants(apps);
+        setLoading(false);
+        setLoadError('');
+      },
+      (error: Error) => {
+        setLoadError(error.message || 'Failed to load applicants.');
+        setLoading(false);
+      }
+    );
+  };
 
   const filteredApplicants = applicants.filter((app) => {
     if (filter === 'all') return true;
@@ -141,6 +165,17 @@ export default function ApplicantListModal({
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.loadingText}>Loading applicants...</Text>
+          </View>
+        ) : loadError ? (
+          <View style={styles.emptyContainer}>
+            <View style={[styles.emptyIconBg, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+              <Ionicons name="alert-circle-outline" size={36} color={colors.error} />
+            </View>
+            <Text style={styles.emptyTitle}>Unable to Load Applicants</Text>
+            <Text style={styles.emptySubtitle}>{loadError}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={handleRetry}>
+              <Text style={styles.retryBtnText}>Try Again</Text>
+            </TouchableOpacity>
           </View>
         ) : filteredApplicants.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -303,5 +338,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 280,
+  },
+  retryBtn: {
+    marginTop: spacing.md,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  retryBtnText: {
+    color: colors.primaryOnColor,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

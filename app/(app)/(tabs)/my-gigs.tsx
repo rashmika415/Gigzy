@@ -12,6 +12,7 @@ import { borderRadius, colors, shadows, spacing } from "../../../constants/theme
 import { useAuth } from "../../../context/AuthContext";
 import {
     calculateBusinessGigStats,
+    deduplicateGigs,
     deleteGig,
     filterAndSortGigs,
     getGigsByClient,
@@ -109,20 +110,23 @@ export default function MyGigs() {
     }
   };
 
+  // Deduplicate gigs to prevent duplicate listings
+  const uniqueGigs = useMemo(() => deduplicateGigs(allGigs), [allGigs]);
+
   // 2. Computed Business Stats
   const stats: BusinessGigStats = useMemo(() => {
-    return calculateBusinessGigStats(allGigs);
-  }, [allGigs]);
+    return calculateBusinessGigStats(uniqueGigs);
+  }, [uniqueGigs]);
 
   // 3. Filtered & Sorted Gigs
   const filteredGigs = useMemo(() => {
-    return filterAndSortGigs(allGigs, {
+    return filterAndSortGigs(uniqueGigs, {
       status: selectedStatus,
       category: selectedCategory,
       searchQuery: searchQuery,
       sortBy: sortBy,
     });
-  }, [allGigs, selectedStatus, selectedCategory, searchQuery, sortBy]);
+  }, [uniqueGigs, selectedStatus, selectedCategory, searchQuery, sortBy]);
 
   // Status change handler
   const handleOpenStatusModal = (gig: Gig) => {

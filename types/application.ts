@@ -26,6 +26,8 @@ export interface Application {
   youthPhotoURL?: string;
   youthSkills?: string[];
   youthBio?: string;
+  youthRatingAverage?: number;
+  youthRatingCount?: number;
 }
 
 export interface CreateApplicationInput {
@@ -46,6 +48,8 @@ export interface CreateApplicationInput {
   youthPhotoURL?: string;
   youthSkills?: string[];
   youthBio?: string;
+  youthRatingAverage?: number;
+  youthRatingCount?: number;
 }
 
 export interface ApplicationStats {

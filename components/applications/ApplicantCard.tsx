@@ -55,9 +55,20 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
           <Text style={styles.youthName} numberOfLines={1}>
             {application.youthName || 'Youth Freelancer'}
           </Text>
-          {appliedDate ? (
-            <Text style={styles.appliedDate}>Applied {appliedDate}</Text>
-          ) : null}
+          <View style={styles.metaRow}>
+            {appliedDate ? (
+              <Text style={styles.appliedDate}>Applied {appliedDate}</Text>
+            ) : null}
+            {application.youthRatingAverage && application.youthRatingAverage > 0 ? (
+              <View style={styles.ratingBadge}>
+                <Ionicons name="star" size={11} color="#F59E0B" />
+                <Text style={styles.ratingText}>
+                  {application.youthRatingAverage.toFixed(1)}
+                  {application.youthRatingCount ? ` (${application.youthRatingCount})` : ''}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
 
         {/* Status Pill */}
@@ -165,7 +176,26 @@ const styles = StyleSheet.create({
   appliedDate: {
     fontSize: 12,
     color: colors.textMuted,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     marginTop: 2,
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  ratingText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#D97706',
   },
   statusPill: {
     flexDirection: 'row',

@@ -9,87 +9,23 @@ import {
   serverTimestamp,
   updateDoc,
   writeBatch,
-  where,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from '../FirebaseConfig';
 import { AppNotification } from '../types/notification';
 
-// No paid backend: business owners sync notifications from their applications.
-export function subscribeToApplicationAnnouncements(userId: string, onError: (error: Error) => void) {
-  let stopped = false;
-  const pending = new Set<string>();
-  const completed = new Set<string>();
-  const unsubscribe = onSnapshot(
-    query(collection(db, 'applications'), where('businessId', '==', userId)),
-    snapshot => {
-      for (const application of snapshot.docs) {
-        if (pending.has(application.id) || completed.has(application.id)) continue;
-        pending.add(application.id);
-        const notification = doc(db, 'users', userId, 'notifications', `application-${application.id}`);
-        void runTransaction(db, async transaction => {
-          if (stopped || (await transaction.get(notification)).exists()) return;
-          const current = await transaction.get(application.ref);
-          const data = current.data();
-          if (!data || data.businessId !== userId || data.youthId === userId || !data.gigId) return;
-          const gig = await transaction.get(doc(db, 'gigs', data.gigId));
-          if (stopped || gig.data()?.postedBy?.uid !== userId) return;
-          transaction.set(notification, {
-            userId,
-            type: 'application',
-            title: 'New gig application',
-            body: `${data.youthName || 'A youth user'} applied to your gig.`,
-            read: false,
-            route: `/(app)/gig/${data.gigId}`,
-            entityId: application.id,
-            createdAt: serverTimestamp(),
-          });
-        }).then(() => { completed.add(application.id); })
-          .catch(error => { if (!stopped) onError(error); })
-          .finally(() => { pending.delete(application.id); });
-      }
-    }, onError,
-  );
-  return () => { stopped = true; unsubscribe(); };
-}
-
-// Spark-plan fallback: a youth client creates only its own validated announcements.
-export function subscribeToGigAnnouncements(userId: string, onError: (error: Error) => void) {
-  let stopped = false;
-  const pending = new Set<string>();
-  const completed = new Set<string>();
-  const unsubscribe = onSnapshot(
-    query(collection(db, 'gigs'), orderBy('createdAt', 'desc'), limit(20)),
-    snapshot => {
-      for (const gig of snapshot.docs) {
-        if (gig.data().status !== 'open' || gig.data().postedBy?.uid === userId ||
-            pending.has(gig.id) || completed.has(gig.id)) continue;
-        pending.add(gig.id);
-        const notification = doc(db, 'users', userId, 'notifications', `gig-posted-${gig.id}`);
-        void runTransaction(db, async transaction => {
-          if (stopped) return;
-          if ((await transaction.get(notification)).exists()) return;
-          // Re-read so a gig closed/deleted during delivery is not announced.
-          const current = await transaction.get(gig.ref);
-          const data = current.data();
-          if (stopped || !data || data.status !== 'open' || data.postedBy?.uid === userId) return;
-          transaction.set(notification, {
-            userId,
-            type: 'gig_posted',
-            title: 'New gig posted',
-            body: data.title,
-            read: false,
-            route: `/(app)/gig/${gig.id}`,
-            entityId: gig.id,
-            createdAt: serverTimestamp(),
-          });
-        }).then(() => { completed.add(gig.id); })
-          .catch(error => { if (!stopped) onError(error); })
-          .finally(() => { pending.delete(gig.id); });
-      }
-    },
-    onError,
-  );
-  return () => { stopped = true; unsubscribe(); };
+export async function sendNotification(
+  userId: string,
+  notification: Omit<AppNotification, 'id'>,
+): Promise<string> {
+  const notifRef = doc(collection(db, 'users', userId, 'notifications'));
+  await setDoc(notifRef, {
+    ...notification,
+    userId,
+    read: false,
+    createdAt: serverTimestamp(),
+  });
+  return notifRef.id;
 }
 
 export function subscribeToNotifications(

@@ -465,7 +465,10 @@ export default function GigDetailScreen() {
         onClose={() => setShowApplyModal(false)}
         onSuccess={() => {
           setShowApplyModal(false);
-          Alert.alert(t("Success"), t("Application submitted successfully."));
+          try {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch {}
+          router.replace('/(app)/(tabs)/home' as any);
         }}
       />
 
