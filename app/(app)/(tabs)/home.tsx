@@ -3,7 +3,7 @@ import { Text } from '../../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
 import AppBanner, { AppPhoto } from '../../../components/AppBanner';
 import React, { useEffect, useState } from 'react';
-import { View, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Image, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -19,6 +19,7 @@ export default function Home() {
   const { user, userData } = useAuth();
   const firstName = userData?.fullName?.split(' ')[0] ?? user?.displayName?.split(' ')[0] ?? 'there';
   const role = userData?.role ?? 'freelancer';
+  const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
 
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [loadingGigs, setLoadingGigs] = useState(true);
@@ -224,9 +225,16 @@ export default function Home() {
               onPress={() => router.push('/(app)/(tabs)/profile' as any)}
               activeOpacity={0.8}
             >
-              <Text style={styles.avatarText}>
+              {userData?.photoURL && failedPhoto !== userData.photoURL ? (
+                <Image
+                  source={{ uri: userData.photoURL }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                  onError={() => setFailedPhoto(userData.photoURL ?? null)}
+                />
+              ) : <Text style={styles.avatarText}>
                 {(firstName?.[0] ?? '?').toUpperCase()}
-              </Text>
+              </Text>}
             </TouchableOpacity>
           </View>
         </View>
@@ -641,6 +649,11 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 18,
