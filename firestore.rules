@@ -38,7 +38,8 @@ service cloud.firestore {
       }
       match /notifications/{notificationId} {
         allow read: if owns(userId);
-        allow create, delete: if isAdmin();
+        allow create: if active();
+        allow delete: if owns(userId) || isAdmin();
         allow update: if owns(userId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
       }

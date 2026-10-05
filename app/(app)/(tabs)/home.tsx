@@ -2,17 +2,21 @@ import { formatNumber } from '../../../localization/format';
 import { Text } from '../../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
 import AppBanner, { AppPhoto } from '../../../components/AppBanner';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../../FirebaseConfig';
 import { useAuth } from '../../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../../constants/theme';
 import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig } from '../../../services/gigService';
 import { subscribeToUserChats, getOrCreateChat } from '../../../services/chatService';
 import { Gig } from '../../../types/gig';
-import { subscribeToNotifications } from '../../../services/notificationService';
+import { subscribeToNotifications, sendNotification } from '../../../services/notificationService';
+import { subscribeToMyApplications } from '../../../services/applicationService';
+import type { Application } from '../../../types/application';
 
 export default function Home() {
   const { t } = useTranslation();
@@ -26,6 +30,8 @@ export default function Home() {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [startingChatGigId, setStartingChatGigId] = useState<string | null>(null);
+  const [myApplications, setMyApplications] = useState<Application[]>([]);
+  const [acceptedApplications, setAcceptedApplications] = useState<Application[]>([]);
 
   // Real-time unread messages listener
   useEffect(() => {
@@ -47,6 +53,113 @@ export default function Home() {
       setUnreadNotificationCount(items.filter((item) => !item.read).length);
     }, () => {});
   }, [user]);
+
+  const notifiedAppIdsRef = useRef<Set<string>>(new Set());
+
+  // Real-time listener for youth's applications
+  useEffect(() => {
+    if (!user || role === 'client') {
+      setMyApplications([]);
+      setAcceptedApplications([]);
+      return;
+    }
+
+    const unsub = subscribeToMyApplications(
+      user.uid,
+      (apps) => {
+        setMyApplications(apps);
+      },
+      () => {}
+    );
+    return () => unsub();
+  }, [user, role]);
+
+  // Real-time calculation and cross-referencing of accepted applications
+  useEffect(() => {
+    if (!user || role === 'client') {
+      setAcceptedApplications([]);
+      return;
+    }
+
+    const currentUserId = user.uid;
+    let isMounted = true;
+
+    async function evaluateAcceptedGigs() {
+      if (myApplications.length === 0) {
+        if (isMounted) setAcceptedApplications([]);
+        return;
+      }
+
+      const directlyAccepted = myApplications.filter((a) => {
+        const st = (a.status || '').toLowerCase();
+        return st === 'accepted' || st === 'approved';
+      });
+
+      const acceptedAppIds = new Set(directlyAccepted.map((a) => a.id));
+      const additionalAccepted: Application[] = [];
+
+      for (const app of myApplications) {
+        if (acceptedAppIds.has(app.id)) continue;
+
+        let gigStatus = '';
+        let gigData: any = null;
+
+        const matchingGig = gigs.find((g) => g.id === app.gigId);
+        if (matchingGig) {
+          gigStatus = matchingGig.status;
+          gigData = matchingGig;
+        } else if (app.gigId) {
+          try {
+            const gSnap = await getDoc(doc(db, 'gigs', app.gigId));
+            if (gSnap.exists()) {
+              gigData = gSnap.data();
+              gigStatus = gigData.status;
+            }
+          } catch {}
+        }
+
+        if (gigStatus === 'in-progress' || gigStatus === 'filled' || gigData?.assignedYouthId === currentUserId) {
+          const acceptedApp: Application = {
+            ...app,
+            status: 'accepted',
+            gigTitle: app.gigTitle || gigData?.title || 'Gig',
+            businessName: app.businessName || gigData?.postedBy?.fullName || 'Business Owner',
+            gigPay: app.gigPay !== undefined ? app.gigPay : (gigData?.pay ?? null),
+            gigPayType: app.gigPayType || gigData?.payType || 'fixed',
+            gigLocation: app.gigLocation || gigData?.location || '',
+          };
+          additionalAccepted.push(acceptedApp);
+          acceptedAppIds.add(app.id);
+
+          // Dispatch in-app notification to youth if not already notified in this session
+          if (!notifiedAppIdsRef.current.has(app.id)) {
+            notifiedAppIdsRef.current.add(app.id);
+            try {
+              await sendNotification(currentUserId, {
+                userId: currentUserId,
+                type: 'application',
+                title: 'Application Accepted! 🎉',
+                body: `Congratulations! Your application for "${acceptedApp.gigTitle}" was accepted. The gig is now in progress.`,
+                read: false,
+                route: `/(app)/gig/${app.gigId}`,
+                entityId: app.id,
+              });
+            } catch {}
+          }
+        }
+      }
+
+      if (isMounted) {
+        setAcceptedApplications([...directlyAccepted, ...additionalAccepted]);
+      }
+    }
+
+    void evaluateAcceptedGigs();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, role, myApplications, gigs]);
 
   // Real-time Firestore synchronization
   useEffect(() => {
@@ -165,6 +278,56 @@ export default function Home() {
     }
   };
 
+  const handleChatForApplication = async (app: Application) => {
+    if (!user) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    setStartingChatGigId(app.gigId);
+
+    try {
+      const currentParticipant = {
+        uid: user.uid,
+        fullName: userData?.fullName || user.displayName || 'Freelancer',
+        photoURL: userData?.photoURL || '',
+        role: (userData?.role as any) || 'freelancer',
+        email: user.email || '',
+      };
+
+      const businessParticipant = {
+        uid: app.businessId,
+        fullName: app.businessName || 'Business Owner',
+        photoURL: '',
+        role: 'client' as const,
+        email: '',
+      };
+
+      const gigObj: Partial<Gig> = {
+        id: app.gigId,
+        title: app.gigTitle || 'Gig',
+        pay: app.gigPay || 0,
+        payType: app.gigPayType || 'fixed',
+        location: app.gigLocation || '',
+        postedBy: {
+          uid: app.businessId,
+          fullName: app.businessName || 'Business Owner',
+          email: '',
+        },
+      };
+
+      const chat = await getOrCreateChat(currentParticipant, businessParticipant, gigObj as Gig);
+      router.push({
+        pathname: '/(app)/chat/[id]',
+        params: { id: chat.id },
+      } as any);
+    } catch (err: any) {
+      Alert.alert(t("Chat Error"), err.message || t("Failed to start conversation."));
+    } finally {
+      setStartingChatGigId(null);
+    }
+  };
+
   const getRoleLabel = () => {
     if (role === 'admin') return 'Platform Admin';
     if (role === 'client') return 'Business Owner';
@@ -233,6 +396,88 @@ export default function Home() {
 
         {/* Business Owner / Post Gig CTA Banner — only visible to clients */}
         {role !== 'client' && <AppBanner kind="youth" title={t("Your next opportunity starts here.")} description={t("Find local gigs that fit your skills and your schedule.")} action="Explore gigs" onPress={() => router.push('/(app)/(tabs)/browse')} />}
+
+        {/* Youth Accepted Gigs Spotlight — displays when business owner accepts an application */}
+        {role !== 'client' && acceptedApplications.length > 0 && (
+          <View style={styles.acceptedSectionContainer}>
+            <View style={styles.acceptedSectionHeader}>
+              <View style={styles.acceptedTitleRow}>
+                <Ionicons name="checkmark-circle" size={20} color="#059669" />
+                <Text style={styles.acceptedSectionTitle}>
+                  {t("Accepted Gigs")} ({acceptedApplications.length})
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => router.push('/(app)/applications' as any)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.acceptedViewAllText}>{t("View All")} →</Text>
+              </TouchableOpacity>
+            </View>
+
+            {acceptedApplications.map((app) => (
+              <View key={app.id} style={styles.acceptedGigCard}>
+                <View style={styles.acceptedCardTopRow}>
+                  <View style={styles.acceptedStatusBadge}>
+                    <Ionicons name="sparkles" size={12} color="#059669" />
+                    <Text style={styles.acceptedStatusText}>{t("Application Accepted!")}</Text>
+                  </View>
+                  {app.gigPay ? (
+                    <Text style={styles.acceptedPayText}>
+                      ${app.gigPay}{app.gigPayType === 'hourly' ? '/hr' : ' fixed'}
+                    </Text>
+                  ) : null}
+                </View>
+
+                <Text style={styles.acceptedGigTitle} numberOfLines={1}>
+                  {app.gigTitle || t("Gig Title")}
+                </Text>
+
+                <View style={styles.acceptedBusinessRow}>
+                  <Ionicons name="business-outline" size={14} color={colors.textSecondary} />
+                  <Text style={styles.acceptedBusinessText} numberOfLines={1}>
+                    {app.businessName || t("Business Owner")}
+                  </Text>
+                  {app.gigLocation ? (
+                    <>
+                      <Text style={styles.acceptedDot}>•</Text>
+                      <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
+                      <Text style={styles.acceptedLocationText} numberOfLines={1}>
+                        {app.gigLocation}
+                      </Text>
+                    </>
+                  ) : null}
+                </View>
+
+                <View style={styles.acceptedActionsRow}>
+                  <TouchableOpacity
+                    style={styles.acceptedChatBtn}
+                    onPress={() => handleChatForApplication(app)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="chatbubble-ellipses" size={16} color={colors.primaryOnColor} />
+                    <Text style={styles.acceptedChatBtnText}>{t("Message Business")}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.acceptedDetailsBtn}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(app)/gig/[id]',
+                        params: { id: app.gigId },
+                      } as any)
+                    }
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="open-outline" size={16} color={colors.primary} />
+                    <Text style={styles.acceptedDetailsBtnText}>{t("View Gig")}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
         {role === 'client' && (
         <View style={styles.ctaCard}>
           <View style={{ marginBottom: spacing.md }}><AppPhoto kind="business" /></View>
@@ -279,16 +524,22 @@ export default function Home() {
         <View style={styles.statsRow}>
           {[
             {
-              label: role === 'client' ? 'Gigs Posted' : 'Latest Gigs',
-              value: gigs.length.toString(),
-              emoji: '💼',
-              onPress: role === 'client' ? () => router.push('/(app)/(tabs)/my-gigs' as any) : undefined,
+              label: role === 'client' ? 'Gigs Posted' : 'Accepted Gigs',
+              value: role === 'client' ? gigs.length.toString() : acceptedApplications.length.toString(),
+              emoji: role === 'client' ? '💼' : '🎉',
+              onPress: role === 'client'
+                ? () => router.push('/(app)/(tabs)/my-gigs' as any)
+                : () => router.push('/(app)/applications' as any),
             },
             {
-              label: role === 'client' ? 'Total Value' : 'Listed Pay',
-              value: `$${formatNumber(gigs.reduce((acc, g) => acc + (g.pay || 0), 0))}`,
-              emoji: '💰',
-              onPress: role === 'client' ? () => router.push('/(app)/(tabs)/my-gigs' as any) : undefined,
+              label: role === 'client' ? 'Total Value' : 'My Applications',
+              value: role === 'client'
+                ? `$${formatNumber(gigs.reduce((acc, g) => acc + (g.pay || 0), 0))}`
+                : myApplications.length.toString(),
+              emoji: role === 'client' ? '💰' : '📋',
+              onPress: role === 'client'
+                ? () => router.push('/(app)/(tabs)/my-gigs' as any)
+                : () => router.push('/(app)/applications' as any),
             },
             { label: t("Rating"), value: userData?.ratingCount ? (userData.ratingAverage ?? 0).toFixed(1) : '\u2014', emoji: '⭐', onPress: undefined },
           ].map((stat) => (
@@ -1097,5 +1348,132 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: colors.primary,
+  },
+  acceptedSectionContainer: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  acceptedSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  acceptedTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  acceptedSectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  acceptedViewAllText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  acceptedGigCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: '#059669',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  acceptedCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  acceptedStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  acceptedStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  acceptedPayText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  acceptedGigTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  acceptedBusinessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: spacing.md,
+  },
+  acceptedBusinessText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  acceptedDot: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  acceptedLocationText: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  acceptedActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  acceptedChatBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    paddingVertical: 10,
+    borderRadius: borderRadius.md,
+  },
+  acceptedChatBtnText: {
+    color: colors.primaryOnColor,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  acceptedDetailsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: borderRadius.md,
+  },
+  acceptedDetailsBtnText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

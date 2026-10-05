@@ -7,9 +7,24 @@ import {
   serverTimestamp,
   updateDoc,
   writeBatch,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from '../FirebaseConfig';
 import { AppNotification } from '../types/notification';
+
+export async function sendNotification(
+  userId: string,
+  notification: Omit<AppNotification, 'id'>,
+): Promise<string> {
+  const notifRef = doc(collection(db, 'users', userId, 'notifications'));
+  await setDoc(notifRef, {
+    ...notification,
+    userId,
+    read: false,
+    createdAt: serverTimestamp(),
+  });
+  return notifRef.id;
+}
 
 export function subscribeToNotifications(
   userId: string,

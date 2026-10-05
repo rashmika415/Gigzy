@@ -177,6 +177,15 @@ export default function ApplicantDetailModal({
                   {application.youthName || 'Youth Freelancer'}
                 </Text>
                 <Text style={styles.appliedDate}>Applied on {appliedDateStr}</Text>
+                {application.youthRatingAverage && application.youthRatingAverage > 0 ? (
+                  <View style={styles.detailRatingBadge}>
+                    <Ionicons name="star" size={13} color="#F59E0B" />
+                    <Text style={styles.detailRatingText}>
+                      {application.youthRatingAverage.toFixed(1)} Rating
+                      {application.youthRatingCount ? ` (${application.youthRatingCount} reviews)` : ''}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             </View>
 
@@ -421,6 +430,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textMuted,
     marginTop: 2,
+  },
+  detailRatingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: borderRadius.sm,
+    marginTop: 4,
+  },
+  detailRatingText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D97706',
   },
   statusBanner: {
     flexDirection: 'row',

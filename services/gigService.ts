@@ -19,6 +19,7 @@ import {
 import type { QueryDocumentSnapshot, QueryConstraint } from 'firebase/firestore';
 import { categoryId, distanceKm, matchesDiscoveryFilters, validCoordinates, validDate, validTime } from './discoveryFilters';
 import { db } from '../FirebaseConfig';
+import { sendNotification } from './notificationService';
 import {
   Gig,
   GigInput,
@@ -527,14 +528,92 @@ export async function updateGig(
 
 /**
  * Updates the status of a gig (e.g. 'open' -> 'in-progress' -> 'completed' -> 'cancelled').
+ * Also synchronizes applicant applications and delivers in-app notifications.
  */
 export async function updateGigStatus(gigId: string, status: GigStatus): Promise<void> {
   try {
     const docRef = doc(db, 'gigs', gigId);
+
+    // 1. Fetch current gig info for notifications
+    let gigTitle = '';
+    try {
+      const currentSnap = await getDoc(docRef);
+      if (currentSnap.exists()) {
+        const gigData = currentSnap.data();
+        gigTitle = gigData.title || '';
+      }
+    } catch {}
+
+    // 2. Update the gig document
     await updateDoc(docRef, {
       status,
       updatedAt: serverTimestamp(),
     });
+
+    // 3. Find associated applications to notify applicants & update status
+    try {
+      const appsSnap = await getDocs(
+        query(collection(db, 'applications'), where('gigId', '==', gigId))
+      );
+
+      for (const appDoc of appsSnap.docs) {
+        const appData = appDoc.data();
+        const youthId = appData.youthId;
+        if (!youthId) continue;
+
+        let newAppStatus: string | null = null;
+        let notifTitle = '';
+        let notifBody = '';
+
+        if (status === 'in-progress') {
+          newAppStatus = 'accepted';
+          notifTitle = 'Application Accepted! 🎉';
+          notifBody = `Great news! The business owner has started work on "${gigTitle || 'your gig'}". Your application was accepted!`;
+        } else if (status === 'completed') {
+          newAppStatus = 'completed';
+          notifTitle = 'Gig Completed! ✅';
+          notifBody = `The gig "${gigTitle || 'your gig'}" has been marked as completed. Thank you for your work!`;
+        } else if (status === 'cancelled') {
+          newAppStatus = 'rejected';
+          notifTitle = 'Gig Cancelled ℹ️';
+          notifBody = `The gig "${gigTitle || 'your gig'}" was cancelled by the business owner.`;
+        } else if (status === 'open') {
+          notifTitle = 'Gig Reopened 📢';
+          notifBody = `The gig "${gigTitle || 'your gig'}" is now open for applications.`;
+        }
+
+        // Update application document status if relevant
+        if (newAppStatus) {
+          try {
+            await updateDoc(doc(db, 'applications', appDoc.id), {
+              status: newAppStatus,
+              updatedAt: serverTimestamp(),
+            });
+          } catch (appErr) {
+            console.warn('Could not update application document status:', appErr);
+          }
+        }
+
+        // Send in-app notification to the youth freelancer
+        if (notifTitle) {
+          try {
+            await sendNotification(youthId, {
+              userId: youthId,
+              type: 'application',
+              title: notifTitle,
+              body: notifBody,
+              read: false,
+              route: `/(app)/gig/${gigId}`,
+              entityId: appDoc.id,
+            });
+          } catch (notifErr) {
+            console.warn('Could not send gig status notification:', notifErr);
+          }
+        }
+      }
+    } catch (appsErr) {
+      console.warn('Could not sync applications on gig status change:', appsErr);
+    }
   } catch (error: any) {
     console.error('Firestore updateGigStatus error:', error);
     throw new Error(parseFirebaseError(error));
