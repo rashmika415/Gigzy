@@ -1,27 +1,14 @@
+import { Text, TextInput } from '../../components/LocalizedText';
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  SafeAreaView,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  Image,
-  Modal,
-  BackHandler,
-} from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image, Modal, BackHandler } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { prepareProfilePhoto } from '../../services/profilePhoto';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db, storage } from '../../FirebaseConfig';
+import { db } from '../../FirebaseConfig';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { GIG_CATEGORIES } from '../../types/gig';
@@ -36,6 +23,7 @@ const AVAILABILITY_OPTIONS = [
 ];
 
 export default function EditProfile() {
+  const { t } = useTranslation();
   const { user, userData } = useAuth();
 
   // Initialization flag
@@ -70,7 +58,7 @@ export default function EditProfile() {
   const isYouth = role === 'freelancer';
 
   // Load existing profile data
-  useEffect(() => {
+  // Initialize once when the asynchronous profile arrives; later edits stay intact.
     if (userData && !isInitialized) {
       setFullName(userData.fullName || '');
       setPhone(userData.phone || '');
@@ -86,7 +74,7 @@ export default function EditProfile() {
       setAddress(userData.address || '');
       setIsInitialized(true);
     }
-  }, [userData, isInitialized]);
+
 
   // Compute unsaved changes dynamically
   const checkHasUnsavedChanges = () => {
@@ -126,12 +114,12 @@ export default function EditProfile() {
   const handleCancel = () => {
     if (hasUnsavedChanges) {
       Alert.alert(
-        'Discard Unsaved Changes?',
-        'You have unsaved changes in your profile form. Are you sure you want to discard them?',
+        t("Discard Unsaved Changes?"),
+        t("You have unsaved changes in your profile form. Are you sure you want to discard them?"),
         [
-          { text: 'Keep Editing', style: 'cancel' },
+          { text: t("Keep Editing"), style: 'cancel' },
           {
-            text: 'Discard',
+            text: t("Discard"),
             style: 'destructive',
             onPress: () => router.back(),
           },
@@ -147,12 +135,12 @@ export default function EditProfile() {
     const onBackPress = () => {
       if (hasUnsavedChanges) {
         Alert.alert(
-          'Discard Unsaved Changes?',
-          'You have unsaved changes in your profile form. Are you sure you want to discard them?',
+          t("Discard Unsaved Changes?"),
+          t("You have unsaved changes in your profile form. Are you sure you want to discard them?"),
           [
-            { text: 'Keep Editing', style: 'cancel' },
+            { text: t("Keep Editing"), style: 'cancel' },
             {
-              text: 'Discard',
+              text: t("Discard"),
               style: 'destructive',
               onPress: () => router.back(),
             },
@@ -165,7 +153,7 @@ export default function EditProfile() {
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [hasUnsavedChanges]);
+  }, [hasUnsavedChanges, t]);
 
   // Image Picking and Uploading
   const handlePickImage = async () => {
@@ -175,48 +163,36 @@ export default function EditProfile() {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Permissions Required',
-          'We need access to your photos to upload a profile photo/logo. Please enable it in settings.'
+          t("Permissions Required"),
+          t("We need access to your photos to upload a profile photo/logo. Please enable it in settings.")
         );
         return;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.7,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const localUri = result.assets[0].uri;
-        await uploadImageToFirebase(localUri);
+        await prepareSelectedPhoto(result.assets[0]);
       }
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Failed to pick image.');
+      Alert.alert(t("Error"), t("Failed to pick image."));
     }
   };
 
-  const uploadImageToFirebase = async (uri: string) => {
+  const prepareSelectedPhoto = async (asset: ImagePicker.ImagePickerAsset) => {
     if (!user) return;
     setUploadingImage(true);
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      
-      // Save file name with a timestamp to avoid native caching issues
-      const filename = `avatar_${Date.now()}.jpg`;
-      const storageRef = ref(storage, `profiles/${user.uid}/${filename}`);
-      
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
-      
-      setPhotoURL(downloadURL);
+      setPhotoURL(await prepareProfilePhoto(asset.uri));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e: any) {
-      console.error(e);
-      Alert.alert('Upload Failed', 'Failed to upload photo to Firebase Storage. Please try again.');
+    } catch (error) {
+      Alert.alert(t("Photo Error"), t(error instanceof Error ? error.message : "Could not prepare this photo. Please try another image."));
     } finally {
       setUploadingImage(false);
     }
@@ -281,13 +257,13 @@ export default function EditProfile() {
 
   // Handle Save Profile
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || uploadingImage || saving) return;
     
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     if (!validateForm()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert('Validation Error', 'Please correct the errors in the form before saving.');
+      Alert.alert(t("Validation Error"), t("Please correct the errors in the form before saving."));
       return;
     }
 
@@ -339,7 +315,7 @@ export default function EditProfile() {
 
     } catch (e: any) {
       console.error(e);
-      Alert.alert('Save Failed', parseFirebaseError(e));
+      Alert.alert(t("Save Failed"), parseFirebaseError(e));
     } finally {
       setSaving(false);
     }
@@ -372,19 +348,19 @@ export default function EditProfile() {
               style={styles.headerButton}
               activeOpacity={0.7}
             >
-              <Text style={styles.headerButtonText}>Cancel</Text>
+              <Text style={styles.headerButtonText}>{t("Cancel")}</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Edit Profile</Text>
+            <Text style={styles.headerTitle}>{t("Edit Profile")}</Text>
             <TouchableOpacity
               onPress={handleSave}
               style={[styles.headerButton, saving && styles.disabledButton]}
-              disabled={saving}
+              disabled={saving || uploadingImage}
               activeOpacity={0.7}
             >
               {saving ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Text style={[styles.headerButtonText, styles.saveText]}>Save</Text>
+                <Text style={[styles.headerButtonText, styles.saveText]}>{t("Save")}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -392,7 +368,7 @@ export default function EditProfile() {
           {/* Success Banner */}
           {successMsg ? (
             <View style={styles.successBox}>
-              <Text style={styles.successText}>{successMsg}</Text>
+              <Text style={styles.successText}>{t(successMsg)}</Text>
             </View>
           ) : null}
 
@@ -401,7 +377,7 @@ export default function EditProfile() {
             <TouchableOpacity
               onPress={handlePickImage}
               style={styles.photoContainer}
-              disabled={uploadingImage}
+              disabled={uploadingImage || saving}
               activeOpacity={0.8}
             >
               {photoURL ? (
@@ -420,12 +396,12 @@ export default function EditProfile() {
                 </View>
               ) : (
                 <View style={styles.cameraIconContainer}>
-                  <Ionicons name="camera" size={16} color="#000" />
+                  <Ionicons name="camera" size={16} color={colors.primaryOnColor} />
                 </View>
               )}
             </TouchableOpacity>
             <Text style={styles.photoHelperText}>
-              {isYouth ? 'Tap to upload profile photo' : 'Tap to upload business logo'}
+              {isYouth ? t("Choose profile photo, then tap Save") : t("Choose business logo, then tap Save")}
             </Text>
           </View>
 
@@ -436,7 +412,7 @@ export default function EditProfile() {
               <View>
                 {/* Full Name */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Full Name *</Text>
+                  <Text style={styles.label}>{t("Full Name *")}</Text>
                   <TextInput
                     style={[styles.input, errors.fullName && styles.inputErrorBorder]}
                     value={fullName}
@@ -444,55 +420,55 @@ export default function EditProfile() {
                       setFullName(text);
                       setErrors((prev) => ({ ...prev, fullName: undefined }));
                     }}
-                    placeholder="Enter your full name"
+                    placeholder={t("Enter your full name")}
                     placeholderTextColor={colors.textMuted}
                   />
-                  {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
+                  {errors.fullName && <Text style={styles.errorText}>{t(errors.fullName ?? "")}</Text>}
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Age *</Text>
+                  <Text style={styles.label}>{t("Age *")}</Text>
                   <TextInput
                     style={[styles.input, errors.age && styles.inputErrorBorder]}
                     value={age}
                     onChangeText={(text) => { setAge(text.replace(/[^0-9]/g, '')); setErrors((prev) => ({ ...prev, age: undefined })); }}
-                    placeholder="Your age (16–35)"
+                    placeholder={t("Your age (16–35)")}
                     placeholderTextColor={colors.textMuted}
                     keyboardType="number-pad"
                     maxLength={2}
                   />
-                  {errors.age && <Text style={styles.errorText}>{errors.age}</Text>}
+                  {errors.age && <Text style={styles.errorText}>{t(errors.age ?? "")}</Text>}
                 </View>
 
                 {/* Phone Number */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Phone Number</Text>
+                  <Text style={styles.label}>{t("Phone Number")}</Text>
                   <TextInput
                     style={styles.input}
                     value={phone}
                     onChangeText={setPhone}
-                    placeholder="Enter your phone number"
+                    placeholder={t("Enter your phone number")}
                     placeholderTextColor={colors.textMuted}
                     keyboardType="phone-pad"
                   />
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Location *</Text>
+                  <Text style={styles.label}>{t("Location *")}</Text>
                   <TextInput
                     style={[styles.input, errors.location && styles.inputErrorBorder]}
                     value={location}
                     onChangeText={(text) => { setLocation(text); setErrors((prev) => ({ ...prev, location: undefined })); }}
-                    placeholder="e.g. Colombo, Sri Lanka"
+                    placeholder={t("e.g. Colombo, Sri Lanka")}
                     placeholderTextColor={colors.textMuted}
                   />
-                  {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
+                  {errors.location && <Text style={styles.errorText}>{t(errors.location ?? "")}</Text>}
                 </View>
 
                 {/* Bio */}
                 <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
-                    <Text style={styles.label}>Bio</Text>
+                    <Text style={styles.label}>{t("Bio")}</Text>
                     <Text style={styles.charCount}>{bio.length}/500</Text>
                   </View>
                   <TextInput
@@ -502,18 +478,18 @@ export default function EditProfile() {
                       setBio(text);
                       setErrors((prev) => ({ ...prev, bio: undefined }));
                     }}
-                    placeholder="Tell us about yourself, your background, and goals..."
+                    placeholder={t("Tell us about yourself, your background, and goals...")}
                     placeholderTextColor={colors.textMuted}
                     multiline
                     numberOfLines={4}
                     maxLength={500}
                   />
-                  {errors.bio && <Text style={styles.errorText}>{errors.bio}</Text>}
+                  {errors.bio && <Text style={styles.errorText}>{t(errors.bio ?? "")}</Text>}
                 </View>
 
                 {/* Skills */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Skills / Specialties *</Text>
+                  <Text style={styles.label}>{t("Skills / Specialties *")}</Text>
                   <TextInput
                     style={[styles.input, errors.skills && styles.inputErrorBorder]}
                     value={skills}
@@ -521,22 +497,22 @@ export default function EditProfile() {
                       setSkills(text);
                       setErrors((prev) => ({ ...prev, skills: undefined }));
                     }}
-                    placeholder="Comma separated: e.g. Design, Coding, Delivery"
+                    placeholder={t("Comma separated: e.g. Design, Coding, Delivery")}
                     placeholderTextColor={colors.textMuted}
                   />
-                  <Text style={styles.fieldHelp}>Separate skills with commas (e.g. Design, Painting, Sales)</Text>
-                  {errors.skills && <Text style={styles.errorText}>{errors.skills}</Text>}
+                  <Text style={styles.fieldHelp}>{t("Separate skills with commas (e.g. Design, Painting, Sales)")}</Text>
+                  {errors.skills && <Text style={styles.errorText}>{t(errors.skills ?? "")}</Text>}
                 </View>
 
                 {/* Availability Selection */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Availability *</Text>
+                  <Text style={styles.label}>{t("Availability *")}</Text>
                   <View style={styles.chipsContainer}>
                     {AVAILABILITY_OPTIONS.map((option) => {
                       const isSelected = availability === option;
                       return (
                         <TouchableOpacity
-                          key={option}
+                          key={t(option)}
                           onPress={() => {
                             setAvailability(option);
                             setErrors((prev) => ({ ...prev, availability: undefined }));
@@ -549,13 +525,13 @@ export default function EditProfile() {
                           activeOpacity={0.7}
                         >
                           <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
-                            {option}
+                            {t(option)}
                           </Text>
                         </TouchableOpacity>
                       );
                     })}
                   </View>
-                  {errors.availability && <Text style={styles.errorText}>{errors.availability}</Text>}
+                  {errors.availability && <Text style={styles.errorText}>{t(errors.availability ?? "")}</Text>}
                 </View>
               </View>
             ) : (
@@ -563,7 +539,7 @@ export default function EditProfile() {
               <View>
                 {/* Business Name */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Business Name *</Text>
+                  <Text style={styles.label}>{t("Business Name *")}</Text>
                   <TextInput
                     style={[styles.input, errors.businessName && styles.inputErrorBorder]}
                     value={businessName}
@@ -571,15 +547,15 @@ export default function EditProfile() {
                       setBusinessName(text);
                       setErrors((prev) => ({ ...prev, businessName: undefined }));
                     }}
-                    placeholder="Enter business name"
+                    placeholder={t("Enter business name")}
                     placeholderTextColor={colors.textMuted}
                   />
-                  {errors.businessName && <Text style={styles.errorText}>{errors.businessName}</Text>}
+                  {errors.businessName && <Text style={styles.errorText}>{t(errors.businessName ?? "")}</Text>}
                 </View>
 
                 {/* Business Category Selection */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Business Category *</Text>
+                  <Text style={styles.label}>{t("Business Category *")}</Text>
                   <TouchableOpacity
                     style={[styles.input, styles.selectorInput, errors.businessCategory && styles.inputErrorBorder]}
                     onPress={() => {
@@ -589,16 +565,16 @@ export default function EditProfile() {
                     activeOpacity={0.7}
                   >
                     <Text style={[styles.selectorText, !businessCategory && styles.selectorTextPlaceholder]}>
-                      {businessCategory || 'Select Business Category'}
+                      {businessCategory || t("Select Business Category")}
                     </Text>
                     <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
                   </TouchableOpacity>
-                  {errors.businessCategory && <Text style={styles.errorText}>{errors.businessCategory}</Text>}
+                  {errors.businessCategory && <Text style={styles.errorText}>{t(errors.businessCategory ?? "")}</Text>}
                 </View>
 
                 {/* Contact/Location */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Business Address *</Text>
+                  <Text style={styles.label}>{t("Business Address *")}</Text>
                   <TextInput
                     style={[styles.input, errors.address && styles.inputErrorBorder]}
                     value={address}
@@ -606,20 +582,20 @@ export default function EditProfile() {
                       setAddress(text);
                       setErrors((prev) => ({ ...prev, address: undefined }));
                     }}
-                    placeholder="Street, city, country"
+                    placeholder={t("Street, city, country")}
                     placeholderTextColor={colors.textMuted}
                   />
-                  {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
+                  {errors.address && <Text style={styles.errorText}>{t(errors.address ?? "")}</Text>}
                 </View>
 
                 {/* Contact Phone */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Contact Phone</Text>
+                  <Text style={styles.label}>{t("Contact Phone")}</Text>
                   <TextInput
                     style={styles.input}
                     value={phone}
                     onChangeText={setPhone}
-                    placeholder="Enter business contact phone"
+                    placeholder={t("Enter business contact phone")}
                     placeholderTextColor={colors.textMuted}
                     keyboardType="phone-pad"
                   />
@@ -628,7 +604,7 @@ export default function EditProfile() {
                 {/* Business Details */}
                 <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
-                    <Text style={styles.label}>Business Description *</Text>
+                    <Text style={styles.label}>{t("Business Description *")}</Text>
                     <Text style={styles.charCount}>{businessDetails.length}/1000</Text>
                   </View>
                   <TextInput
@@ -638,13 +614,13 @@ export default function EditProfile() {
                       setBusinessDetails(text);
                       setErrors((prev) => ({ ...prev, businessDetails: undefined }));
                     }}
-                    placeholder="Detail what your business does and why freelancers should work with you (min 20 characters)..."
+                    placeholder={t("Detail what your business does and why freelancers should work with you (min 20 characters)...")}
                     placeholderTextColor={colors.textMuted}
                     multiline
                     numberOfLines={6}
                     maxLength={1000}
                   />
-                  {errors.businessDetails && <Text style={styles.errorText}>{errors.businessDetails}</Text>}
+                  {errors.businessDetails && <Text style={styles.errorText}>{t(errors.businessDetails ?? "")}</Text>}
                 </View>
               </View>
             )}
@@ -653,13 +629,13 @@ export default function EditProfile() {
             <TouchableOpacity
               style={[styles.saveButton, saving && styles.disabledButton]}
               onPress={handleSave}
-              disabled={saving}
+              disabled={saving || uploadingImage}
               activeOpacity={0.8}
             >
               {saving ? (
-                <ActivityIndicator size="small" color="#000" />
+                <ActivityIndicator size="small" color={colors.primaryOnColor} />
               ) : (
-                <Text style={styles.saveButtonText}>Save Profile Changes</Text>
+                <Text style={styles.saveButtonText}>{t("Save Profile Changes")}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -676,7 +652,7 @@ export default function EditProfile() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Category</Text>
+              <Text style={styles.modalTitle}>{t("Select Category")}</Text>
               <TouchableOpacity onPress={() => setShowCategoryModal(false)} style={styles.modalCloseIcon}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
@@ -703,7 +679,7 @@ export default function EditProfile() {
                     style={styles.modalItemIcon}
                   />
                   <Text style={[styles.modalItemText, businessCategory === cat.name && styles.modalItemTextActive]}>
-                    {cat.name}
+                    {t(cat.name)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -943,17 +919,17 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   saveButtonText: {
-    color: '#000',
+    color: colors.primaryOnColor,
     fontSize: 16,
     fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#0f1322',
+    backgroundColor: colors.surface,
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
     maxHeight: '65%',
@@ -965,7 +941,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.lg,
     borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: colors.surfaceBorder,
   },
   modalTitle: {
     fontSize: 18,
@@ -983,7 +959,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: colors.surfaceBorder,
   },
   modalItemActive: {
     backgroundColor: 'rgba(245, 158, 11, 0.04)',

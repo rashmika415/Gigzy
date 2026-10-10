@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { colors } from '../../constants/theme';
+import { authColors } from '../../constants/authTheme';
 
 export default function AuthLayout() {
   return (
@@ -7,7 +7,7 @@ export default function AuthLayout() {
       screenOptions={{
         headerShown: false,
         animation: 'fade',
-        contentStyle: { backgroundColor: colors.background },
+        contentStyle: { backgroundColor: authColors.background },
       }}
     />
   );

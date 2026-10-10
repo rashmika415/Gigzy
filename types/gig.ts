@@ -1,6 +1,8 @@
 export type PayType = 'fixed' | 'hourly';
 export type LocationType = 'remote' | 'on-site' | 'hybrid';
-export type GigStatus = 'open' | 'in-progress' | 'completed' | 'cancelled';
+export type GigStatus = 'open' | 'filled' | 'closed' | 'in-progress' | 'completed' | 'cancelled';
+
+export interface Coordinates { latitude: number; longitude: number }
 
 export interface GigCategory {
   id: string;
@@ -28,6 +30,9 @@ export interface Gig {
   pay: number;
   payType: PayType;
   date: string;
+  time?: string;
+  coordinates?: Coordinates;
+  distanceKm?: number;
   location: string;
   locationType: LocationType;
   skills: string[];
@@ -39,6 +44,8 @@ export interface Gig {
   };
   applicantsCount: number;
   viewsCount?: number;
+  assignedYouthId?: string;
+  acceptedApplicationId?: string;
   searchKeywords?: string[];
   createdAt: any;
   updatedAt?: any;
@@ -51,6 +58,8 @@ export interface GigInput {
   pay: string; // Form input string, parsed to number on submit
   payType: PayType;
   date: string;
+  time?: string;
+  coordinates?: Coordinates;
   location: string;
   locationType: LocationType;
   skills: string[];
@@ -93,5 +102,16 @@ export interface GigFilterOptions {
   category?: string;
   searchQuery?: string;
   sortBy?: GigSortOption;
+  locationType?: LocationType | 'all';
+  minPay?: number;
+  maxPay?: number;
+  payType?: PayType | 'all';
+  dateFrom?: string;
+  dateTo?: string;
+  timeFrom?: string;
+  timeTo?: string;
+  weekendsOnly?: boolean;
+  origin?: Coordinates;
+  radiusKm?: number;
 }
 
