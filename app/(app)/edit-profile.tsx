@@ -6,9 +6,9 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { prepareProfilePhoto } from '../../services/profilePhoto';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db, storage } from '../../FirebaseConfig';
+import { db } from '../../FirebaseConfig';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { GIG_CATEGORIES } from '../../types/gig';
@@ -170,15 +170,14 @@ export default function EditProfile() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.7,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const localUri = result.assets[0].uri;
-        await uploadImageToFirebase(localUri);
+        await prepareSelectedPhoto(result.assets[0]);
       }
     } catch (e) {
       console.error(e);
@@ -186,25 +185,14 @@ export default function EditProfile() {
     }
   };
 
-  const uploadImageToFirebase = async (uri: string) => {
+  const prepareSelectedPhoto = async (asset: ImagePicker.ImagePickerAsset) => {
     if (!user) return;
     setUploadingImage(true);
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      
-      // Save file name with a timestamp to avoid native caching issues
-      const filename = `avatar_${Date.now()}.jpg`;
-      const storageRef = ref(storage, `profiles/${user.uid}/${filename}`);
-      
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
-      
-      setPhotoURL(downloadURL);
+      setPhotoURL(await prepareProfilePhoto(asset.uri));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e: any) {
-      console.error(e);
-      Alert.alert(t("Upload Failed"), t("Failed to upload photo to Firebase Storage. Please try again."));
+    } catch (error) {
+      Alert.alert(t("Photo Error"), t(error instanceof Error ? error.message : "Could not prepare this photo. Please try another image."));
     } finally {
       setUploadingImage(false);
     }
@@ -269,7 +257,7 @@ export default function EditProfile() {
 
   // Handle Save Profile
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || uploadingImage || saving) return;
     
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -366,7 +354,7 @@ export default function EditProfile() {
             <TouchableOpacity
               onPress={handleSave}
               style={[styles.headerButton, saving && styles.disabledButton]}
-              disabled={saving}
+              disabled={saving || uploadingImage}
               activeOpacity={0.7}
             >
               {saving ? (
@@ -389,7 +377,7 @@ export default function EditProfile() {
             <TouchableOpacity
               onPress={handlePickImage}
               style={styles.photoContainer}
-              disabled={uploadingImage}
+              disabled={uploadingImage || saving}
               activeOpacity={0.8}
             >
               {photoURL ? (
@@ -413,7 +401,7 @@ export default function EditProfile() {
               )}
             </TouchableOpacity>
             <Text style={styles.photoHelperText}>
-              {isYouth ? t("Tap to upload profile photo") : t("Tap to upload business logo")}
+              {isYouth ? t("Choose profile photo, then tap Save") : t("Choose business logo, then tap Save")}
             </Text>
           </View>
 
@@ -641,7 +629,7 @@ export default function EditProfile() {
             <TouchableOpacity
               style={[styles.saveButton, saving && styles.disabledButton]}
               onPress={handleSave}
-              disabled={saving}
+              disabled={saving || uploadingImage}
               activeOpacity={0.8}
             >
               {saving ? (

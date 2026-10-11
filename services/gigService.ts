@@ -15,10 +15,11 @@ import {
   setDoc,
   startAfter,
   getDocsFromServer,
+  runTransaction,
 } from 'firebase/firestore';
 import type { QueryDocumentSnapshot, QueryConstraint } from 'firebase/firestore';
 import { categoryId, distanceKm, matchesDiscoveryFilters, validCoordinates, validDate, validTime } from './discoveryFilters';
-import { db } from '../FirebaseConfig';
+import { auth, db } from '../FirebaseConfig';
 import {
   Gig,
   GigInput,
@@ -89,10 +90,14 @@ export interface CreateGigResult {
   syncStatus: 'synced' | 'pending';
 }
 
+export interface UpdateGigResult {
+  syncStatus: 'synced' | 'pending';
+}
+
 /**
  * Validates all fields of a gig form with timezone-safe date checking.
  */
-export function validateGigForm(form: GigInput): { isValid: boolean; errors: GigValidationErrors } {
+export function validateGigForm(form: GigInput, isEdit = false): { isValid: boolean; errors: GigValidationErrors } {
   const errors: GigValidationErrors = {};
 
   // Title validation
@@ -149,7 +154,7 @@ export function validateGigForm(form: GigInput): { isValid: boolean; errors: Gig
 
       if (isNaN(year) || isNaN(month) || isNaN(day) || month < 1 || month > 12 || day < 1 || day > 31) {
         errors.date = 'Please provide a valid date (YYYY-MM-DD).';
-      } else {
+      } else if (!isEdit) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const gigDay = new Date(year, month - 1, day, 0, 0, 0, 0);
@@ -253,6 +258,61 @@ export async function createGig(
     return { id: docRef.id, syncStatus };
   } catch (error: any) {
     console.error('Firestore createGig error:', error);
+    throw new Error(parseFirebaseError(error));
+  }
+}
+
+/**
+ * Updates all details of an existing gig document in Cloud Firestore.
+ */
+export async function updateGig(
+  gigId: string,
+  input: GigInput,
+): Promise<UpdateGigResult> {
+  const { isValid, errors } = validateGigForm(input, true);
+  if (!isValid) {
+    const firstError = Object.values(errors)[0];
+    throw new Error(firstError || 'Validation failed. Please check form inputs.');
+  }
+
+  const numericPay = parseFloat(input.pay.replace(/[^0-9.]/g, ''));
+  const finalLocation =
+    input.locationType === 'remote'
+      ? input.location.trim() || 'Remote (Work from Anywhere)'
+      : input.location.trim();
+
+  const cleanSkills = input.skills.filter((s) => s.trim().length > 0);
+  const keywords = generateSearchKeywords(input.title, input.category, cleanSkills, finalLocation);
+
+  const updatedData: Record<string, any> = {
+    title: input.title.trim(),
+    description: input.description.trim(),
+    category: input.category.trim(),
+    categoryId: categoryId(input.category),
+    pay: numericPay,
+    payType: input.payType,
+    date: input.date.trim(),
+    location: finalLocation,
+    locationType: input.locationType,
+    skills: cleanSkills,
+    searchKeywords: keywords,
+    updatedAt: serverTimestamp(),
+  };
+
+  if (input.time) {
+    updatedData.time = input.time;
+  }
+  if (input.locationType !== 'remote' && input.coordinates) {
+    updatedData.coordinates = input.coordinates;
+  }
+
+  try {
+    const docRef = doc(db, 'gigs', gigId);
+    const write = updateDoc(docRef, updatedData);
+    const syncStatus = await waitForWrite(write, 20000);
+    return { syncStatus };
+  } catch (error: any) {
+    console.error('Firestore updateGig error:', error);
     throw new Error(parseFirebaseError(error));
   }
 }
@@ -483,14 +543,30 @@ export async function getBrowsePage(
 export async function updateGigStatus(gigId: string, status: GigStatus): Promise<void> {
   try {
     const docRef = doc(db, 'gigs', gigId);
-    await updateDoc(docRef, {
-      status,
-      updatedAt: serverTimestamp(),
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('Please log in to manage your gigs.');
+    await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(docRef);
+      if (!snapshot.exists()) throw new Error('Gig not found.');
+      const gig = snapshot.data();
+      if (gig.postedBy?.uid !== uid) {
+        throw new Error('Only the business owner who posted this gig can change its status.');
+      }
+      if (gig.status === status) return;
+      if (status === 'closed' && gig.status !== 'open') {
+        throw new Error('Only open gigs can be closed.');
+      }
+      transaction.update(docRef, { status, updatedAt: serverTimestamp() });
     });
   } catch (error: any) {
     console.error('Firestore updateGigStatus error:', error);
     throw new Error(parseFirebaseError(error));
   }
+}
+
+/** Close an open gig after the server verifies ownership and current status. */
+export async function closeGig(gigId: string): Promise<void> {
+  await updateGigStatus(gigId, 'closed');
 }
 
 /**
