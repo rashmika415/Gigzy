@@ -151,14 +151,14 @@ export default function GigDetailScreen() {
     );
   }
 
-  if (error || !gig) {
+  if (error || !gig || gig.moderationRemoved) {
     return (
       <SafeAreaView style={styles.container}>
         <Header onBack={() => router.back()} />
         <View style={styles.padH}>
           <ErrorState
-            title={gig === null && !error ? tr("Gig not found") : tr("Failed to load gig")}
-            message={error || tr("This gig may have been removed or does not exist.")}
+            title={gig?.moderationRemoved ? tr('Gig removed by a moderator') : gig === null && !error ? tr("Gig not found") : tr("Failed to load gig")}
+            message={gig?.moderationRemoved ? tr('This gig is no longer available. Existing applications remain in your application history.') : error || tr("This gig may have been removed or does not exist.")}
             onRetry={error ? () => setRetry(value => value + 1) : undefined}
           />
         </View>

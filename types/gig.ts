@@ -49,6 +49,8 @@ export interface Gig {
   searchKeywords?: string[];
   createdAt: any;
   updatedAt?: any;
+  moderationRemoved?: boolean;
+  moderationReason?: string;
 }
 
 export interface GigInput {

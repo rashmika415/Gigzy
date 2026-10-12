@@ -38,10 +38,13 @@ function RootLayoutNav() {
     }
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inAdminGroup = segments[0] === '(admin)';
 
     if (!user && !inAuthGroup) {
       // Not logged in → send to welcome screen
-      router.replace('/(auth)/welcome');
+      router.replace(inAdminGroup ? '/(auth)/login' : '/(auth)/welcome');
+    } else if (user && userData && userData.role === 'admin' && !userData.suspended && !inAdminGroup) {
+      router.replace('/(admin)/dashboard');
     } else if (user && userData && inAuthGroup) {
       // Logged in → send to app home
       router.replace('/(app)/(tabs)/home');

@@ -8,6 +8,11 @@ const gig = (overrides = {}) => ({
   pay: 200, payType: 'fixed', date: '2026-10-10', time: '10:30', status: 'open', skills: ['React'],
   createdAt: 1, applicantsCount: 0, ...overrides,
 });
+test('moderator-removed gigs stay out of discovery even without a status filter', () => {
+  assert.equal(filters.matchesDiscoveryFilters(gig({ status: 'closed', moderationRemoved: true }), {}), false);
+  assert.equal(filters.matchesDiscoveryFilters(gig({ moderationRemoved: true }), { status: 'all' }), false);
+  assert.equal(filters.matchesDiscoveryFilters(gig(), {}), true);
+});
 function setup(rows) {
   const queries = [];
   let fail = false;
