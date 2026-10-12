@@ -1,17 +1,9 @@
+import { formatDate as localizedDate } from '../../localization/format';
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React, { useState } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  SafeAreaView,
-  Image,
-  Alert,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
+import { Modal, View, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView, Image, Alert, ActivityIndicator, Platform } from 'react-native';
+import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius } from '../../constants/theme';
@@ -37,7 +29,7 @@ function formatDate(timestamp: any): string {
     : new Date(timestamp);
 
   if (isNaN(date.getTime())) return 'Recently';
-  return date.toLocaleDateString(undefined, {
+  return localizedDate(date, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -52,6 +44,7 @@ export default function ApplicantDetailModal({
   onStatusChanged,
   onAccepted,
 }: ApplicantDetailModalProps) {
+  useTranslation();
   const [acting, setActing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -77,8 +70,8 @@ export default function ApplicantDetailModal({
         onAccepted(application);
       } else {
         Alert.alert(
-          'Application Accepted! 🎉',
-          `You have accepted ${application.youthName || 'this applicant'} for "${application.gigTitle || 'this gig'}". Work is now in progress and a notification has been sent to the youth freelancer's dashboard.`
+          tr("Application Accepted! 🎉"),
+          tr("You have accepted {{value0}} for \"{{value1}}\". Work is now in progress and a notification has been sent to the youth freelancer's dashboard.", { value0: application.youthName || 'this applicant', value1: application.gigTitle || 'this gig' })
         );
       }
       if (onStatusChanged) onStatusChanged('accepted');
@@ -95,12 +88,12 @@ export default function ApplicantDetailModal({
       void executeAccept();
     } else {
       Alert.alert(
-        'Accept Application',
-        `Are you sure you want to accept ${application.youthName || 'this applicant'} for "${application.gigTitle || 'this gig'}"?`,
+        tr("Accept Application"),
+        tr("Are you sure you want to accept {{value0}} for \"{{value1}}\"?", { value0: application.youthName || 'this applicant', value1: application.gigTitle || 'this gig' }),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: tr("Cancel"), style: 'cancel' },
           {
-            text: 'Accept Applicant',
+            text: tr("Accept Applicant"),
             style: 'default',
             onPress: () => void executeAccept(),
           },
@@ -111,12 +104,12 @@ export default function ApplicantDetailModal({
 
   const handleReject = () => {
     Alert.alert(
-      'Reject Application',
-      `Are you sure you want to reject this application from ${application.youthName || 'this applicant'}?`,
+      tr("Reject Application"),
+      tr("Are you sure you want to reject this application from {{value0}}?", { value0: application.youthName || 'this applicant' }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: tr("Cancel"), style: 'cancel' },
         {
-          text: 'Reject',
+          text: tr("Reject"),
           style: 'destructive',
           onPress: async () => {
             setActing(true);
@@ -129,7 +122,7 @@ export default function ApplicantDetailModal({
               try {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
               } catch {}
-              Alert.alert('Application Rejected', 'The application has been rejected.');
+              Alert.alert(tr("Application Rejected"), tr("The application has been rejected."));
               if (onStatusChanged) onStatusChanged('rejected');
               onClose();
             } catch (err: any) {
@@ -157,11 +150,11 @@ export default function ApplicantDetailModal({
             style={styles.closeBtn}
             onPress={onClose}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel="Close applicant details"
+            accessibilityLabel={tr("Close applicant details")}
           >
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Applicant Details</Text>
+          <Text style={styles.headerTitle}>{tr("Applicant Details")}</Text>
           <View style={{ width: 38 }} />
         </View>
 
@@ -174,7 +167,7 @@ export default function ApplicantDetailModal({
           {errorMsg ? (
             <View style={styles.errorBox}>
               <Ionicons name="alert-circle" size={18} color={colors.error} />
-              <Text style={styles.errorText}>{errorMsg}</Text>
+              <Text style={styles.errorText}>{tr(errorMsg)}</Text>
             </View>
           ) : null}
 
@@ -190,15 +183,14 @@ export default function ApplicantDetailModal({
               )}
               <View style={styles.nameWrap}>
                 <Text style={styles.youthName}>
-                  {application.youthName || 'Youth Freelancer'}
+                  {application.youthName || tr("Youth Freelancer")}
                 </Text>
-                <Text style={styles.appliedDate}>Applied on {appliedDateStr}</Text>
+                <Text style={styles.appliedDate}>{tr("Applied on")}{' '}{appliedDateStr}</Text>
                 {application.youthRatingAverage && application.youthRatingAverage > 0 ? (
                   <View style={styles.detailRatingBadge}>
                     <Ionicons name="star" size={13} color="#F59E0B" />
                     <Text style={styles.detailRatingText}>
-                      {application.youthRatingAverage.toFixed(1)} Rating
-                      {application.youthRatingCount ? ` (${application.youthRatingCount} reviews)` : ''}
+                      {application.youthRatingAverage.toFixed(1)}{' '}{tr("Rating")}{application.youthRatingCount ? tr(" ({{value0}} reviews)", { value0: application.youthRatingCount }) : ''}
                     </Text>
                   </View>
                 ) : null}
@@ -213,15 +205,14 @@ export default function ApplicantDetailModal({
               ]}
             >
               <Ionicons name={statusTheme.icon} size={18} color={statusTheme.text} />
-              <Text style={[styles.statusBannerText, { color: statusTheme.text }]}>
-                Application Status: {statusTheme.label}
+              <Text style={[styles.statusBannerText, { color: statusTheme.text }]}>{tr("Application Status:")}{' '}{tr(statusTheme.label)}
               </Text>
             </View>
           </View>
 
           {/* Application Message Card */}
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>APPLICATION MESSAGE</Text>
+            <Text style={styles.cardLabel}>{tr("APPLICATION MESSAGE")}</Text>
             <View style={styles.messageBox}>
               <Ionicons
                 name="chatbubble-ellipses-outline"
@@ -230,28 +221,26 @@ export default function ApplicantDetailModal({
                 style={{ marginTop: 2 }}
               />
               <Text style={styles.messageText}>
-                {application.message || 'No message provided.'}
+                {application.message || tr("No message provided.")}
               </Text>
             </View>
           </View>
 
           {/* Availability Card */}
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>AVAILABILITY CONFIRMATION</Text>
+            <Text style={styles.cardLabel}>{tr("AVAILABILITY CONFIRMATION")}</Text>
             <View style={styles.availabilityRow}>
               <View style={styles.checkCircle}>
                 <Ionicons name="checkmark" size={16} color="#059669" />
               </View>
-              <Text style={styles.availabilityText}>
-                Confirmed available on the required date and time.
-              </Text>
+              <Text style={styles.availabilityText}>{tr("Confirmed available on the required date and time.")}</Text>
             </View>
           </View>
 
           {/* Skills Card */}
           {application.youthSkills && application.youthSkills.length > 0 ? (
             <View style={styles.card}>
-              <Text style={styles.cardLabel}>SKILLS & SPECIALTIES</Text>
+              <Text style={styles.cardLabel}>{tr("SKILLS & SPECIALTIES")}</Text>
               <View style={styles.skillsWrap}>
                 {application.youthSkills.map((skill, idx) => (
                   <View key={idx} style={styles.skillBadge}>
@@ -266,15 +255,15 @@ export default function ApplicantDetailModal({
           {/* Bio Card */}
           {application.youthBio ? (
             <View style={styles.card}>
-              <Text style={styles.cardLabel}>BIO / BACKGROUND</Text>
+              <Text style={styles.cardLabel}>{tr("BIO / BACKGROUND")}</Text>
               <Text style={styles.bioText}>{application.youthBio}</Text>
             </View>
           ) : null}
 
           {/* Gig Context */}
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>GIG APPLIED FOR</Text>
-            <Text style={styles.gigTitle}>{application.gigTitle || 'Gig Title'}</Text>
+            <Text style={styles.cardLabel}>{tr("GIG APPLIED FOR")}</Text>
+            <Text style={styles.gigTitle}>{application.gigTitle || tr("Gig Title")}</Text>
             {application.gigLocation ? (
               <View style={styles.metaRow}>
                 <Ionicons name="location-outline" size={15} color={colors.textSecondary} />
@@ -286,7 +275,7 @@ export default function ApplicantDetailModal({
                 <Ionicons name="wallet-outline" size={15} color={colors.primary} />
                 <Text style={[styles.metaText, { color: colors.primary, fontWeight: '700' }]}>
                   ${application.gigPay}
-                  {application.gigPayType === 'hourly' ? '/hr' : ' fixed'}
+                  {application.gigPayType === 'hourly' ? tr("/hr") : tr(" fixed")}
                 </Text>
               </View>
             ) : null}
@@ -306,7 +295,7 @@ export default function ApplicantDetailModal({
                 ) : (
                   <>
                     <Ionicons name="close-circle-outline" size={18} color="#DC2626" />
-                    <Text style={styles.rejectBtnText}>Reject</Text>
+                    <Text style={styles.rejectBtnText}>{tr("Reject")}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -322,7 +311,7 @@ export default function ApplicantDetailModal({
                 ) : (
                   <>
                     <Ionicons name="checkmark-circle-outline" size={18} color={colors.primaryOnColor} />
-                    <Text style={styles.acceptBtnText}>Accept</Text>
+                    <Text style={styles.acceptBtnText}>{tr("Accept")}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -334,8 +323,7 @@ export default function ApplicantDetailModal({
                 size={20}
                 color={statusTheme.text}
               />
-              <Text style={[styles.finalizedNoticeText, { color: statusTheme.text }]}>
-                This application has already been {application.status}.
+              <Text style={[styles.finalizedNoticeText, { color: statusTheme.text }]}>{tr("This application has already been")}{' '}{tr(application.status)}.
               </Text>
             </View>
           )}

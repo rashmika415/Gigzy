@@ -1,3 +1,4 @@
+import { translate as tr } from '../../../localization/i18n';
 import { Text } from '../../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -238,8 +239,7 @@ export default function BrowseScreen() {
       {hasAnyFilter && (
         <View style={styles.filterInfoBar}>
           <Text style={styles.filterInfoText}>
-            <Text style={styles.filterInfoHighlight}>{filteredGigs.length}</Text>
-            {' '}{t("result")}{filteredGigs.length !== 1 ? t("s") : ''}
+            <Text style={styles.filterInfoHighlight}>{t("Results: {{count}}", { count: filteredGigs.length })}</Text>
             {selectedSort !== 'newest' ? t(" · {{value0}}", { value0: t(currentSortLabel) }) : ''}
           </Text>
           <TouchableOpacity onPress={handleClearFilters} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -251,7 +251,7 @@ export default function BrowseScreen() {
       <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}>
         <SegmentedControl options={[{ key: 'list', label: t("List") }, { key: 'map', label: t("Map") }]} selectedKey={viewMode} onSelect={key => { setViewMode(key); Keyboard.dismiss(); }} />
       </View>
-      {viewMode === 'map' ? <GigMap gigs={filteredGigs} loading={loading} error={error} refreshing={refreshing} loadingMore={loadingMore} hasMore={hasMore}
+      {viewMode === 'map' ? <GigMap gigs={filteredGigs} loading={loading} error={tr(error)} refreshing={refreshing} loadingMore={loadingMore} hasMore={hasMore}
         onRefresh={refresh} onLoadMore={loadMore} onGigPress={handleGigPress} onShowList={() => setViewMode('list')} /> : <FlatList
         data={filteredGigs}
         keyExtractor={item => item.id}

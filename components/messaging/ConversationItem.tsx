@@ -1,5 +1,9 @@
+import { formatDate as localizedDate } from '../../localization/format';
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { Conversation, ParticipantDetail } from '../../types/messaging';
@@ -24,7 +28,7 @@ function formatTimestamp(timestamp: any): string {
   if (diffHours < 24) return `${diffHours}h`;
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays}d`;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return localizedDate(date, { month: 'short', day: 'numeric' });
 }
 
 export default function ConversationItem({
@@ -32,6 +36,7 @@ export default function ConversationItem({
   currentUserId,
   onPress,
 }: ConversationItemProps) {
+  useTranslation();
   const otherUid =
     conversation.participants?.find((p) => p !== currentUserId) ||
     (conversation.youthId === currentUserId ? conversation.businessId : conversation.youthId) ||
@@ -80,11 +85,11 @@ export default function ConversationItem({
         <View style={styles.headerRow}>
           <View style={styles.nameBlock}>
             <Text style={[styles.name, isUnread && styles.nameBold]} numberOfLines={1}>
-              {other.fullName || 'User'}
+              {other.fullName || tr("User")}
             </Text>
             <View style={[styles.roleTag, isBusiness ? styles.roleTagBusiness : styles.roleTagYouth]}>
               <Text style={[styles.roleTagText, isBusiness ? styles.roleTagTextBusiness : styles.roleTagTextYouth]}>
-                {isBusiness ? 'Client' : 'Freelancer'}
+                {isBusiness ? tr("Client") : tr("Freelancer")}
               </Text>
             </View>
           </View>
@@ -105,7 +110,7 @@ export default function ConversationItem({
 
         <View style={styles.messageRow}>
           <Text style={[styles.previewText, isUnread && styles.previewTextUnread]} numberOfLines={1}>
-            {isSentByMe ? 'You: ' : ''}
+            {isSentByMe ? tr("You: ") : ''}
             {lastMessageText}
           </Text>
           {unreadCount > 0 && (

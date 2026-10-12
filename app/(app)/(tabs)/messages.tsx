@@ -1,3 +1,4 @@
+import { translate as tr } from '../../../localization/i18n';
 import { formatRelativeDate } from '../../../localization/format';
 import { Text, TextInput } from '../../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
@@ -140,7 +141,7 @@ export default function MessagesScreen() {
           <Text style={styles.headerTitle}>{t("Messages")}</Text>
           {totalUnread > 0 && (
             <View style={styles.headerUnreadBadge}>
-              <Text style={styles.headerUnreadText}>{totalUnread}{t("new")}</Text>
+              <Text style={styles.headerUnreadText}>{totalUnread}{' '}{t("new")}</Text>
             </View>
           )}
         </View>
@@ -320,7 +321,7 @@ export default function MessagesScreen() {
                       style={[styles.lastMessageText, unread > 0 && styles.lastMessageTextUnread]}
                       numberOfLines={1}
                     >
-                      {isSentByMe ? 'You: ' : ''}
+                      {isSentByMe ? tr("You: ") : ''}
                       {lastMsgPreview}
                     </Text>
 

@@ -1,5 +1,8 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React, { useState } from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, Alert, View } from 'react-native';
+import { TouchableOpacity, StyleSheet, ActivityIndicator, Alert, View } from 'react-native';
+import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { colors, borderRadius, spacing } from '../../constants/theme';
@@ -32,6 +35,7 @@ export default function ApplicationMessageButton({
   businessName,
   onSuccess,
 }: ApplicationMessageButtonProps) {
+  useTranslation();
   const [loading, setLoading] = useState(false);
 
   const isAccepted = status.toLowerCase() === 'accepted';
@@ -41,8 +45,8 @@ export default function ApplicationMessageButton({
   const handleOpenConversation = async () => {
     if (!isAccepted) {
       Alert.alert(
-        'Messaging Unavailable',
-        'Direct messaging opens once the application is accepted by the business.'
+        tr("Messaging Unavailable"),
+        tr("Direct messaging opens once the application is accepted by the business.")
       );
       return;
     }
@@ -70,7 +74,7 @@ export default function ApplicationMessageButton({
         } as any);
       }
     } catch (err: any) {
-      Alert.alert('Conversation Error', err.message || 'Could not start conversation.');
+      Alert.alert(tr("Conversation Error"), err.message || tr("Could not start conversation."));
     } finally {
       setLoading(false);
     }
@@ -80,7 +84,7 @@ export default function ApplicationMessageButton({
     return (
       <View style={styles.lockedContainer}>
         <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
-        <Text style={styles.lockedText}>Messaging unlocks upon acceptance</Text>
+        <Text style={styles.lockedText}>{tr("Messaging unlocks upon acceptance")}</Text>
       </View>
     );
   }
