@@ -1,11 +1,11 @@
 # Free-plan gig notifications
 
-Business owners also listen to applications addressed to their account and create
-one in-app notification per application. The notification names the applicant and
-opens the gig for reviewing applicants. Existing applications are included on first
-login. The gig's actual owner is checked before writing; rules enforce the same
-ownership check. Read status survives app restarts. This also works on Spark and
-syncs only while the business app is open or when reopened.
+Application submission creates one in-app notification for the business owner
+after the application commits. It includes the applicant name and gig title and
+opens the applications screen. The owner does not run an additional application
+announcement listener. For existing duplicates, the feed prefers the complete
+submission notification over the old generic listener copy and preserves read
+status. Existing applications are not backfilled on login.
 
 No Cloud Functions or billing upgrade is required. The youth app listens to the
 20 most recently created gigs and creates announcements for open gigs in its own

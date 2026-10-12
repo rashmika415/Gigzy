@@ -158,7 +158,7 @@ export async function createApplication(input: CreateApplicationInput): Promise<
       throw new Error('Failed to create application.');
     }
 
-    // Send in-app notification to business owner
+    // Send the complete application details once, after the application commits.
     const targetBusinessId = (createdApp as Application).businessId;
     if (targetBusinessId) {
       try {
