@@ -30,6 +30,7 @@ export function validDate(value: string): boolean {
 export function validTime(value: string): boolean { return /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
 
 export function matchesDiscoveryFilters(gig: Gig, options: GigFilterOptions): boolean {
+  if (gig.moderationRemoved) return false;
   if (options.status && options.status !== 'all' && gig.status !== options.status) return false;
   if (options.category && options.category !== 'all' && categoryId(gig.category) !== categoryId(options.category)) return false;
   const words = options.searchQuery?.trim().toLowerCase().split(/\s+/).filter(Boolean) ?? [];

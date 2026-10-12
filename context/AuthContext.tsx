@@ -62,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(safetyTimer);
       unsubscribeDoc?.();
       setUserData(null);
+      setLoading(!!firebaseUser);
       setUser(firebaseUser);
       
       if (firebaseUser) {

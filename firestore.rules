@@ -4,7 +4,7 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function owns(userId) { return signedIn() && request.auth.uid == userId; }
     function currentUser() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
-    function isAdmin() { return signedIn() && currentUser().data.role == 'admin'; }
+    function isAdmin() { return signedIn() && currentUser().data.role == 'admin' && currentUser().data.get('suspended', false) != true; }
     function active() {
       return signedIn() &&
         (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
@@ -38,7 +38,13 @@ service cloud.firestore {
         && request.resource.data.get('suspended', false) != true
         && request.resource.data.get('isVerified', false) != true
         && !request.resource.data.keys().hasAny(['referralCode']);
-      allow update: if isAdmin() || (owns(userId) && active() && protectedUserFieldsUnchanged() && validReferralCodeUpdate(userId)
+      allow update: if (isAdmin() && userId != request.auth.uid && resource.data.role != 'admin'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suspended', 'suspensionReason', 'updatedAt'])
+        && request.resource.data.suspended is bool
+        && request.resource.data.suspensionReason is string && request.resource.data.suspensionReason.size() <= 500
+        && (!request.resource.data.suspended || request.resource.data.suspensionReason.size() >= 5)
+        && request.resource.data.updatedAt == request.time)
+        || (owns(userId) && active() && protectedUserFieldsUnchanged() && validReferralCodeUpdate(userId)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || validProfilePhoto()));
       allow delete: if false;
       match /savedGigs/{gigId} {
@@ -132,7 +138,7 @@ service cloud.firestore {
     match /applications/{applicationId} {
       function participant() { return request.auth.uid == resource.data.youthId || request.auth.uid == resource.data.businessId; }
       allow get: if active() && (!exists(/databases/$(database)/documents/applications/$(applicationId)) || participant());
-      allow list: if active() && participant();
+      allow list: if isAdmin() || (active() && participant());
       allow create: if active() && currentUser().data.role == 'freelancer'
         && request.resource.data.youthId == request.auth.uid
         && applicationId == 'app_' + request.resource.data.gigId + '_' + request.auth.uid
@@ -165,8 +171,17 @@ service cloud.firestore {
         && request.resource.data.title is string && request.resource.data.title.size() >= 5
         && request.resource.data.description is string && request.resource.data.description.size() >= 20
         && request.resource.data.pay is number && request.resource.data.pay > 0
+        && !request.resource.data.keys().hasAny(['moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt'])
         && request.resource.data.status == 'open';
-      allow update: if active() && (
+      allow update: if (isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt', 'updatedAt'])
+        && request.resource.data.status == 'closed' && request.resource.data.moderationRemoved == true
+        && request.resource.data.moderationReason is string
+        && request.resource.data.moderationReason.size() >= 5 && request.resource.data.moderationReason.size() <= 500
+        && request.resource.data.moderatedBy == request.auth.uid
+        && request.resource.data.moderatedAt == request.time && request.resource.data.updatedAt == request.time)
+        || (active() && resource.data.get('moderationRemoved', false) != true
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt']) && (
         (resource.data.postedBy.uid == request.auth.uid
           && currentUser().data.role == 'client'
           && request.resource.data.postedBy == resource.data.postedBy
@@ -175,8 +190,8 @@ service cloud.firestore {
         || (resource.data.status == 'open'
           && request.resource.data.status == 'open'
           && getAfter(/databases/$(database)/documents/gigs/$(gigId)).data.status == 'open'
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount'])));
-      allow delete: if active() && resource.data.postedBy.uid == request.auth.uid;
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount']))));
+      allow delete: if active() && resource.data.get('moderationRemoved', false) != true && resource.data.postedBy.uid == request.auth.uid;
     }
     match /chats/{chatId} {
       allow read, update, delete: if active() && request.auth.uid in resource.data.participants;
