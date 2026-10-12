@@ -4,31 +4,90 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function owns(userId) { return signedIn() && request.auth.uid == userId; }
     function currentUser() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
-    function isAdmin() { return signedIn() && currentUser().data.role == 'admin'; }
+    function isAdmin() { return signedIn() && currentUser().data.role == 'admin' && currentUser().data.get('suspended', false) != true; }
     function active() {
       return signedIn() &&
         (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
           || currentUser().data.get('suspended', false) != true);
     }
     function validRole() { return request.resource.data.role in ['freelancer', 'client']; }
+    function validProfilePhoto() {
+      let photo = request.resource.data.get('photoURL', '');
+      return photo is string && photo.size() <= 100000
+        && (photo == '' || photo.matches('https://.*')
+          || photo.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+'));
+    }
     function protectedUserFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
         'role', 'isVerified', 'suspended', 'suspensionReason',
         'ratingAverage', 'ratingCount', 'skillBadges'
       ]);
     }
+    function validReferralCodeUpdate(userId) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['referralCode'])
+        || (!resource.data.keys().hasAny(['referralCode'])
+          && request.resource.data.referralCode is string
+          && request.resource.data.referralCode.matches('[A-Z0-9]{10}')
+          && getAfter(/databases/$(database)/documents/referralCodes/$(request.resource.data.referralCode)).data.ownerId == userId);
+    }
     match /users/{userId} {
       allow read: if signedIn();
-      allow create: if owns(userId) && validRole()
+      allow create: if owns(userId) && validRole() && validProfilePhoto()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.get('suspended', false) != true
-        && request.resource.data.get('isVerified', false) != true;
-      allow update: if isAdmin() || (owns(userId) && active() && protectedUserFieldsUnchanged());
+        && request.resource.data.get('isVerified', false) != true
+        && !request.resource.data.keys().hasAny(['referralCode']);
+      allow update: if (isAdmin() && userId != request.auth.uid && resource.data.role != 'admin'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suspended', 'suspensionReason', 'updatedAt'])
+        && request.resource.data.suspended is bool
+        && request.resource.data.suspensionReason is string && request.resource.data.suspensionReason.size() <= 500
+        && (!request.resource.data.suspended || request.resource.data.suspensionReason.size() >= 5)
+        && request.resource.data.updatedAt == request.time)
+        || (owns(userId) && active() && protectedUserFieldsUnchanged() && validReferralCodeUpdate(userId)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || validProfilePhoto()));
       allow delete: if false;
+      match /savedGigs/{gigId} {
+        allow read: if owns(userId) && active();
+        allow create: if owns(userId) && active() && currentUser().data.role == 'freelancer'
+          && request.resource.data.keys().hasOnly(['gigId', 'savedAt'])
+          && request.resource.data.gigId == gigId
+          && request.resource.data.savedAt == request.time
+          && exists(/databases/$(database)/documents/gigs/$(gigId));
+        allow update: if false;
+        allow delete: if owns(userId) && active();
+      }
       match /notifications/{notificationId} {
+        function validApplicationAnnouncement() {
+          let data = request.resource.data;
+          let application = get(/databases/$(database)/documents/applications/$(data.entityId)).data;
+          let gig = get(/databases/$(database)/documents/gigs/$(application.gigId)).data;
+          let name = application.get('youthName', '') != '' ? application.youthName : 'A youth user';
+          return data.keys().hasOnly(['userId', 'type', 'title', 'body', 'read', 'route', 'entityId', 'createdAt'])
+            && notificationId == 'application-' + data.entityId
+            && data.userId == userId && application.businessId == userId
+            && gig.postedBy.uid == userId && application.youthId != userId
+            && data.type == 'application' && data.title == 'New gig application'
+            && data.body == name + ' applied to your gig.'
+            && data.route == '/(app)/gig/' + application.gigId
+            && data.read == false && data.createdAt == request.time;
+        }
+        function validGigAnnouncement() {
+          let data = request.resource.data;
+          let gig = get(/databases/$(database)/documents/gigs/$(data.entityId)).data;
+          return data.keys().hasOnly(['userId', 'type', 'title', 'body', 'read', 'route', 'entityId', 'createdAt'])
+            && notificationId == 'gig-posted-' + data.entityId
+            && data.userId == userId
+            && data.type == 'gig_posted'
+            && data.title == 'New gig posted'
+            && data.body == gig.title
+            && data.route == '/(app)/gig/' + data.entityId
+            && data.read == false && data.createdAt == request.time
+            && gig.status == 'open' && gig.postedBy.uid != userId;
+        }
         allow read: if owns(userId);
-        allow create, delete: if isAdmin();
+        allow create: if active();
+        allow delete: if owns(userId) || isAdmin();
         allow update: if owns(userId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
       }
@@ -52,16 +111,87 @@ service cloud.firestore {
         allow read, create, update, delete: if owns(userId) && active();
       }
     }
+    match /referralCodes/{code} {
+      // Public lookup exposes only the code owner ID, never profile or contact data.
+      allow get: if true;
+      allow list: if false;
+      allow create: if active() && code.matches('[A-Z0-9]{10}')
+        && request.resource.data.keys().hasOnly(['ownerId', 'createdAt'])
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && !currentUser().data.keys().hasAny(['referralCode'])
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.referralCode == code;
+      allow update, delete: if false;
+    }
+    match /referrals/{newUserId} {
+      allow read: if signedIn() && (request.auth.uid == newUserId || resource.data.referrerId == request.auth.uid);
+      allow create: if owns(newUserId)
+        && !exists(/databases/$(database)/documents/users/$(newUserId))
+        && existsAfter(/databases/$(database)/documents/users/$(newUserId))
+        && request.resource.data.keys().hasOnly(['referrerId', 'referralCode', 'createdAt'])
+        && request.resource.data.referrerId != newUserId
+        && request.resource.data.referrerId == get(/databases/$(database)/documents/referralCodes/$(request.resource.data.referralCode)).data.ownerId
+        && get(/databases/$(database)/documents/users/$(request.resource.data.referrerId)).data.get('suspended', false) != true
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+    match /applications/{applicationId} {
+      function participant() { return request.auth.uid == resource.data.youthId || request.auth.uid == resource.data.businessId; }
+      allow get: if active() && (!exists(/databases/$(database)/documents/applications/$(applicationId)) || participant());
+      allow list: if isAdmin() || (active() && participant());
+      allow create: if active() && currentUser().data.role == 'freelancer'
+        && request.resource.data.youthId == request.auth.uid
+        && applicationId == 'app_' + request.resource.data.gigId + '_' + request.auth.uid
+        && request.resource.data.applicationId == applicationId
+        && request.resource.data.businessId == get(/databases/$(database)/documents/gigs/$(request.resource.data.gigId)).data.postedBy.uid
+        && request.resource.data.businessId != request.auth.uid
+        && get(/databases/$(database)/documents/gigs/$(request.resource.data.gigId)).data.status == 'open'
+        && getAfter(/databases/$(database)/documents/gigs/$(request.resource.data.gigId)).data.status == 'open'
+        && request.resource.data.status == 'pending'
+        && request.resource.data.message is string && request.resource.data.message.size() >= 5 && request.resource.data.message.size() <= 500
+        && request.resource.data.availabilityConfirmed == true
+        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+      allow update: if active() && request.auth.uid == resource.data.businessId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && ((resource.data.status == 'pending' && request.resource.data.status == 'rejected')
+          || (resource.data.status == 'pending' && request.resource.data.status == 'accepted'
+            && get(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.status == 'open'
+            && getAfter(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.assignedYouthId == resource.data.youthId
+            && getAfter(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.acceptedApplicationId == applicationId
+            && getAfter(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.status in ['in-progress', 'filled'])
+          || (resource.data.status == 'accepted' && request.resource.data.status == 'completed'
+            && getAfter(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.status == 'completed'));
+      allow delete: if false;
+    }
     match /gigs/{gigId} {
       allow read: if signedIn();
-      allow create: if active() && request.resource.data.postedBy.uid == request.auth.uid
+      allow create: if active() && currentUser().data.role == 'client'
+        && request.resource.data.postedBy.uid == request.auth.uid
         && request.resource.data.title is string && request.resource.data.title.size() >= 5
         && request.resource.data.description is string && request.resource.data.description.size() >= 20
         && request.resource.data.pay is number && request.resource.data.pay > 0
+        && !request.resource.data.keys().hasAny(['moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt'])
         && request.resource.data.status == 'open';
-      allow update: if active() && (resource.data.postedBy.uid == request.auth.uid
-        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount']));
-      allow delete: if active() && resource.data.postedBy.uid == request.auth.uid;
+      allow update: if (isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt', 'updatedAt'])
+        && request.resource.data.status == 'closed' && request.resource.data.moderationRemoved == true
+        && request.resource.data.moderationReason is string
+        && request.resource.data.moderationReason.size() >= 5 && request.resource.data.moderationReason.size() <= 500
+        && request.resource.data.moderatedBy == request.auth.uid
+        && request.resource.data.moderatedAt == request.time && request.resource.data.updatedAt == request.time)
+        || (active() && resource.data.get('moderationRemoved', false) != true
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt']) && (
+        (resource.data.postedBy.uid == request.auth.uid
+          && currentUser().data.role == 'client'
+          && request.resource.data.postedBy == resource.data.postedBy
+          && (request.resource.data.status != 'closed'
+            || resource.data.status in ['open', 'closed']))
+        || (resource.data.status == 'open'
+          && request.resource.data.status == 'open'
+          && getAfter(/databases/$(database)/documents/gigs/$(gigId)).data.status == 'open'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount']))));
+      allow delete: if active() && resource.data.get('moderationRemoved', false) != true && resource.data.postedBy.uid == request.auth.uid;
     }
     match /chats/{chatId} {
       allow read, update, delete: if active() && request.auth.uid in resource.data.participants;
@@ -71,6 +201,41 @@ service cloud.firestore {
         allow create: if active() && request.resource.data.senderId == request.auth.uid
           && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
         allow update, delete: if active() && resource.data.senderId == request.auth.uid;
+      }
+    }
+    match /conversations/{conversationId} {
+      function isParticipant() {
+        return request.auth.uid == resource.data.youthId
+          || request.auth.uid == resource.data.businessId
+          || (resource.data.keys().hasAny(['participants']) && request.auth.uid in resource.data.participants);
+      }
+      function willBeParticipant() {
+        return request.auth.uid == request.resource.data.youthId
+          || request.auth.uid == request.resource.data.businessId
+          || (request.resource.data.keys().hasAny(['participants']) && request.auth.uid in request.resource.data.participants);
+      }
+
+      allow read: if active() && isParticipant();
+      allow create: if active() && willBeParticipant();
+      allow update: if active() && (isParticipant() || willBeParticipant());
+      allow delete: if isAdmin() || (active() && isParticipant());
+
+      match /messages/{messageId} {
+        function parentConv() {
+          return get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+        }
+        function isConvParticipant() {
+          return request.auth.uid == parentConv().youthId
+            || request.auth.uid == parentConv().businessId
+            || (parentConv().keys().hasAny(['participants']) && request.auth.uid in parentConv().participants);
+        }
+
+        allow read: if active() && isConvParticipant();
+        allow create: if active() && request.resource.data.senderId == request.auth.uid && isConvParticipant();
+        allow update: if active() && isConvParticipant()
+          && (resource.data.senderId == request.auth.uid
+              || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt', 'readBy']));
+        allow delete: if active() && resource.data.senderId == request.auth.uid;
       }
     }
   }

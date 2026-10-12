@@ -15,13 +15,17 @@ import {
   HankenGrotesk_500Medium,
 } from '@expo-google-fonts/hanken-grotesk';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import LanguageProvider from '../localization/LanguageProvider';
+import { useFonts } from 'expo-font';
+import { NotoSansSinhala_400Regular, NotoSansSinhala_700Bold } from '@expo-google-fonts/noto-sans-sinhala';
+import { NotoSansTamil_400Regular, NotoSansTamil_700Bold } from '@expo-google-fonts/noto-sans-tamil';
 
 if (Platform.OS !== 'web') {
   SplashScreen.preventAutoHideAsync().catch(() => {});
 }
 
 function RootLayoutNav() {
-  const { user, loading } = useAuth();
+  const { user, userData, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -34,19 +38,22 @@ function RootLayoutNav() {
     }
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inAdminGroup = segments[0] === '(admin)';
 
     if (!user && !inAuthGroup) {
       // Not logged in → send to welcome screen
-      router.replace('/(auth)/welcome');
-    } else if (user && inAuthGroup) {
+      router.replace(inAdminGroup ? '/(auth)/login' : '/(auth)/welcome');
+    } else if (user && userData && userData.role === 'admin' && !userData.suspended && !inAdminGroup) {
+      router.replace('/(admin)/dashboard');
+    } else if (user && userData && inAuthGroup) {
       // Logged in → send to app home
-      router.replace('/(app)/home');
+      router.replace('/(app)/(tabs)/home');
     }
-  }, [user, loading, segments, router]);
+  }, [user, userData, loading, segments, router]);
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }} />
     </>
   );
@@ -55,14 +62,15 @@ function RootLayoutNav() {
 export default function RootLayout() {
   const [syneLoaded] = useSyneFonts({ Syne_600SemiBold, Syne_700Bold, Syne_800ExtraBold });
   const [hankenLoaded] = useHankenFonts({ HankenGrotesk_400Regular, HankenGrotesk_500Medium });
+  const [localFontsLoaded] = useFonts({ NotoSansSinhala_400Regular, NotoSansSinhala_700Bold, NotoSansTamil_400Regular, NotoSansTamil_700Bold });
 
-  if (!syneLoaded || !hankenLoaded) {
+  if (!syneLoaded || !hankenLoaded || !localFontsLoaded) {
     return null;
   }
 
   return (
-    <AuthProvider>
+    <LanguageProvider><AuthProvider>
       <RootLayoutNav />
-    </AuthProvider>
+    </AuthProvider></LanguageProvider>
   );
 }

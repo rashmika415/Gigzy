@@ -1,4 +1,5 @@
 export type NotificationType =
+  | 'gig_posted'
   | 'gig_match'
   | 'application'
   | 'message'

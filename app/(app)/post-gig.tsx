@@ -1,25 +1,17 @@
-import React, { useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ActivityIndicator,
-  Modal,
-  Animated,
-} from 'react-native';
-import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
+import AppBanner from '../../components/AppBanner';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator, Modal, Animated, Alert } from 'react-native';
+import { Text, TextInput } from '../../components/LocalizedText';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { GIG_CATEGORIES, GigInput, GigValidationErrors, LocationType } from '../../types/gig';
-import { createGig, validateGigForm } from '../../services/gigService';
+import { FormField, GigLocationField } from '../../components';
+import { createGig, updateGig, getGigById, validateGigForm } from '../../services/gigService';
 
 // Quick date helper presets
 const getFormattedDate = (offsetDays = 0): string => {
@@ -46,7 +38,14 @@ const BUDGET_PRESETS = ['50', '100', '250', '500', '1000'];
 type SubmissionStage = 'idle' | 'validating' | 'saving' | 'done';
 
 export default function PostGigScreen() {
+  useTranslation();
   const { user, userData } = useAuth();
+  const role = userData?.role;
+  const { editGigId, id, gigId } = useLocalSearchParams<{ editGigId?: string; id?: string; gigId?: string }>();
+  const targetGigId = editGigId || id || gigId;
+  const isEditMode = Boolean(targetGigId);
+
+  const [initialLoading, setInitialLoading] = useState(isEditMode);
 
   // Form State
   const [form, setForm] = useState<GigInput>({
@@ -84,6 +83,77 @@ export default function PostGigScreen() {
     };
   });
 
+  // Load existing gig details if in edit mode
+  useEffect(() => {
+    if (!targetGigId) return;
+
+    let isMounted = true;
+
+    async function loadGigForEditing() {
+      if (!isMounted) return;
+      setInitialLoading(true);
+      try {
+        const gig = await getGigById(targetGigId!);
+        if (!isMounted) return;
+
+        if (!gig) {
+          Alert.alert(tr("Gig Not Found"), tr("The gig you are trying to edit does not exist or has been removed."), [
+            { text: tr("Go Back"), onPress: () => router.back() },
+          ]);
+          return;
+        }
+
+        if (user && gig.postedBy?.uid && gig.postedBy.uid !== user.uid) {
+          Alert.alert(tr("Access Denied"), tr("Only the business owner who posted this gig can update it."), [
+            { text: tr("Go Back"), onPress: () => router.back() },
+          ]);
+          return;
+        }
+
+        setForm({
+          title: gig.title || '',
+          description: gig.description || '',
+          category: gig.category || '',
+          pay: gig.pay !== undefined ? String(gig.pay) : '',
+          payType: gig.payType || 'fixed',
+          date: gig.date || getFormattedDate(1),
+          time: gig.time || '',
+          location: gig.location || '',
+          locationType: gig.locationType || 'remote',
+          coordinates: gig.coordinates,
+          skills: Array.isArray(gig.skills) ? [...gig.skills] : [],
+        });
+
+        if (gig.date) {
+          const parts = gig.date.split('-');
+          if (parts.length === 3) {
+            const y = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10);
+            const d = parseInt(parts[2], 10);
+            if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+              setPickerDate({ year: y, month: m, day: d });
+            }
+          }
+        }
+      } catch (err: any) {
+        if (!isMounted) return;
+        Alert.alert(tr("Failed to Load"), err.message || tr("Could not load gig details for editing."), [
+          { text: tr("Go Back"), onPress: () => router.back() },
+        ]);
+      } finally {
+        if (isMounted) {
+          setInitialLoading(false);
+        }
+      }
+    }
+
+    void Promise.resolve().then(loadGigForEditing);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [targetGigId, user]);
+
   // Animation values
   const [buttonScale] = useState(() => new Animated.Value(1));
 
@@ -98,7 +168,7 @@ export default function PostGigScreen() {
     setForm(updatedForm);
 
     if (touched[field]) {
-      const { errors: newErrors } = validateGigForm(updatedForm);
+      const { errors: newErrors } = validateGigForm(updatedForm, isEditMode);
       setErrors((prev) => ({
         ...prev,
         [field]: newErrors[field],
@@ -108,7 +178,7 @@ export default function PostGigScreen() {
 
   const handleBlur = (field: keyof GigInput) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
-    const { errors: newErrors } = validateGigForm(form);
+    const { errors: newErrors } = validateGigForm(form, isEditMode);
     setErrors((prev) => ({
       ...prev,
       [field]: newErrors[field],
@@ -182,7 +252,7 @@ export default function PostGigScreen() {
     });
 
     setSubmissionStage('validating');
-    const { isValid, errors: validationErrors } = validateGigForm(form);
+    const { isValid, errors: validationErrors } = validateGigForm(form, isEditMode);
     setErrors(validationErrors);
 
     if (!isValid) {
@@ -199,7 +269,7 @@ export default function PostGigScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       } catch {}
       setSubmissionStage('idle');
-      setSubmitError('You must be signed in to post a gig. Please log in first.');
+      setSubmitError('You must be signed in to perform this action. Please log in first.');
       return;
     }
 
@@ -208,30 +278,39 @@ export default function PostGigScreen() {
     setSubmissionStage('saving');
 
     try {
-      if (!pendingGigId.current) {
-        pendingGigId.current = `gig_${user.uid}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-      }
-      const result = await createGig(form, {
-        uid: user.uid,
-        fullName: userData?.fullName || user.displayName || 'Business Owner',
-        email: userData?.email || user.email || '',
-      }, pendingGigId.current);
+      if (isEditMode && targetGigId) {
+        const result = await updateGig(targetGigId, form);
+        setCreatedGigId(targetGigId);
+        setSyncPending(result.syncStatus === 'pending');
+      } else {
+        if (!pendingGigId.current) {
+          pendingGigId.current = `gig_${user.uid}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+        }
+        const result = await createGig(form, {
+          uid: user.uid,
+          fullName: userData?.fullName || user.displayName || 'Business Owner',
+          email: userData?.email || user.email || '',
+        }, pendingGigId.current);
 
-      setCreatedGigId(result.id);
-      setSyncPending(result.syncStatus === 'pending');
-      pendingGigId.current = null;
+        setCreatedGigId(result.id);
+        setSyncPending(result.syncStatus === 'pending');
+        pendingGigId.current = null;
+      }
+
       setSubmissionStage('done');
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
       setShowSuccessModal(true);
     } catch (err: any) {
-      console.error('Error posting gig:', err);
+      console.error(isEditMode ? 'Error updating gig:' : 'Error posting gig:', err);
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       } catch {}
       setSubmissionStage('idle');
-      setSubmitError(err?.message || 'Failed to persist gig in database. Please check your connection and retry.');
+      setSubmitError(
+        err?.message || (isEditMode ? 'Failed to update gig in database. Please check your connection and retry.' : 'Failed to persist gig in database. Please check your connection and retry.')
+      );
     } finally {
       setLoading(false);
     }
@@ -259,11 +338,38 @@ export default function PostGigScreen() {
     setShowSuccessModal(false);
   };
 
+  useEffect(() => {
+    if (userData && role !== 'client') {
+      Alert.alert(
+        tr("Access Restricted"),
+        tr("Only business owners can post or update gigs. Switch to a business account to manage listings."),
+        [{ text: tr("OK"), onPress: () => router.back() }],
+      );
+    }
+  }, [userData, role]);
+
+  if (userData && role !== 'client') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 15 }}>{tr("Redirecting...")}</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (initialLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: spacing.md, color: colors.textSecondary, fontSize: 14, fontWeight: '500' }}>{tr("Loading gig details for editing...")}</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Background glowing decorations */}
-      <View style={styles.blob1} />
-      <View style={styles.blob2} />
+
+
 
       {/* Top Navigation Bar */}
       <View style={styles.navBar}>
@@ -276,8 +382,10 @@ export default function PostGigScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.navTitleContainer}>
-          <Text style={styles.navTitle}>Post a New Gig</Text>
-          <Text style={styles.navSubtitle}>Reach active freelancers & local youth</Text>
+          <Text style={styles.navTitle}>{isEditMode ? tr("Update Gig") : tr("Post a New Gig")}</Text>
+          <Text style={styles.navSubtitle}>
+            {isEditMode ? tr("Modify your gig listing details") : tr("Reach active freelancers & local youth")}
+          </Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -291,12 +399,29 @@ export default function PostGigScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          {isEditMode ? (
+            <AppBanner
+              compact
+              kind="business"
+              title={tr("Keep your gig details accurate.")}
+              description={tr("Changes will be saved to Firebase and updated across the platform.")}
+            />
+          ) : (
+            <AppBanner
+              compact
+              kind="business"
+              title={tr("Make room for local talent.")}
+              description={tr("Clear details help the right people find your gig.")}
+            />
+          )}
           {/* Submission Error Banner with Retry Option */}
           {submitError ? (
             <View style={styles.errorBanner}>
               <Ionicons name="alert-circle" size={20} color={colors.error} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.errorBannerTitle}>Unable to Post Gig</Text>
+                <Text style={styles.errorBannerTitle}>
+                  {isEditMode ? tr("Unable to Update Gig") : tr("Unable to Post Gig")}
+                </Text>
                 <Text style={styles.errorBannerText}>{submitError}</Text>
               </View>
               <TouchableOpacity
@@ -304,7 +429,7 @@ export default function PostGigScreen() {
                 onPress={handleSubmit}
                 activeOpacity={0.7}
               >
-                <Text style={styles.retryBannerBtnText}>Retry</Text>
+                <Text style={styles.retryBannerBtnText}>{tr("Retry")}</Text>
               </TouchableOpacity>
             </View>
           ) : null}
@@ -317,14 +442,13 @@ export default function PostGigScreen() {
               <View style={styles.sectionIconBadge}>
                 <Ionicons name="sparkles" size={16} color={colors.primary} />
               </View>
-              <Text style={styles.sectionTitle}>1. Gig Overview</Text>
+              <Text style={styles.sectionTitle}>{tr("1. Gig Overview")}</Text>
             </View>
 
             {/* Gig Title */}
             <View style={styles.fieldGroup}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>
-                  Gig Title <Text style={styles.requiredAsterisk}>*</Text>
+                <Text style={styles.label}>{tr("Gig Title")}<Text style={styles.requiredAsterisk}>*</Text>
                 </Text>
                 <Text style={styles.charCount}>{form.title.length}/100</Text>
               </View>
@@ -333,7 +457,7 @@ export default function PostGigScreen() {
                   styles.input,
                   touched.title && errors.title ? styles.inputError : null,
                 ]}
-                placeholder="e.g. Build Landing Page, Repair Kitchen Pipe, Yard Care..."
+                placeholder={tr("e.g. Build Landing Page, Repair Kitchen Pipe, Yard Care...")}
                 placeholderTextColor={colors.textMuted}
                 value={form.title}
                 onChangeText={(val) => handleChange('title', val)}
@@ -351,8 +475,7 @@ export default function PostGigScreen() {
 
             {/* Category Selector */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>
-                Category <Text style={styles.requiredAsterisk}>*</Text>
+              <Text style={styles.label}>{tr("Category")}<Text style={styles.requiredAsterisk}>*</Text>
               </Text>
               <View style={styles.categoriesGrid}>
                 {GIG_CATEGORIES.map((cat) => {
@@ -385,7 +508,7 @@ export default function PostGigScreen() {
                           isSelected && styles.categoryChipTextActive,
                         ]}
                       >
-                        {cat.name}
+                        {tr(cat.name)}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -408,14 +531,13 @@ export default function PostGigScreen() {
               <View style={styles.sectionIconBadge}>
                 <Ionicons name="document-text-outline" size={16} color={colors.primary} />
               </View>
-              <Text style={styles.sectionTitle}>2. Details & Requirements</Text>
+              <Text style={styles.sectionTitle}>{tr("2. Details & Requirements")}</Text>
             </View>
 
             {/* Description */}
             <View style={styles.fieldGroup}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>
-                  Detailed Description <Text style={styles.requiredAsterisk}>*</Text>
+                <Text style={styles.label}>{tr("Detailed Description")}<Text style={styles.requiredAsterisk}>*</Text>
                 </Text>
                 <Text style={styles.charCount}>{form.description.length}/2500</Text>
               </View>
@@ -424,7 +546,7 @@ export default function PostGigScreen() {
                   styles.textArea,
                   touched.description && errors.description ? styles.inputError : null,
                 ]}
-                placeholder="Explain the job scope, required deliverables, tools needed, and expectations..."
+                placeholder={tr("Explain the job scope, required deliverables, tools needed, and expectations...")}
                 placeholderTextColor={colors.textMuted}
                 value={form.description}
                 onChangeText={(val) => handleChange('description', val)}
@@ -445,11 +567,11 @@ export default function PostGigScreen() {
 
             {/* Skills & Tags */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Required Skills or Tags (Optional)</Text>
+              <Text style={styles.label}>{tr("Required Skills or Tags (Optional)")}</Text>
               <View style={styles.skillInputRow}>
                 <TextInput
                   style={[styles.input, styles.skillInputField]}
-                  placeholder="e.g. React, Fast Worker, Lift 40lbs..."
+                  placeholder={tr("e.g. React, Fast Worker, Lift 40lbs...")}
                   placeholderTextColor={colors.textMuted}
                   value={skillInput}
                   onChangeText={setSkillInput}
@@ -462,8 +584,8 @@ export default function PostGigScreen() {
                   disabled={loading}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="add" size={20} color="#080B14" />
-                  <Text style={styles.addSkillBtnText}>Add</Text>
+                  <Ionicons name="add" size={20} color={colors.primaryOnColor} />
+                  <Text style={styles.addSkillBtnText}>{tr("Add")}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -488,7 +610,7 @@ export default function PostGigScreen() {
 
               {/* Suggested Skills */}
               <View style={styles.suggestedSkillsContainer}>
-                <Text style={styles.suggestedTitle}>Suggested:</Text>
+                <Text style={styles.suggestedTitle}>{tr("Suggested:")}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.suggestedRow}>
                     {SUGGESTED_SKILLS.filter((s) => !form.skills.includes(s)).map((skill) => (
@@ -515,7 +637,7 @@ export default function PostGigScreen() {
               <View style={styles.sectionIconBadge}>
                 <Ionicons name="cash-outline" size={16} color={colors.primary} />
               </View>
-              <Text style={styles.sectionTitle}>3. Compensation</Text>
+              <Text style={styles.sectionTitle}>{tr("3. Compensation")}</Text>
             </View>
 
             {/* Pay Type Toggle */}
@@ -537,16 +659,14 @@ export default function PostGigScreen() {
                 <Ionicons
                   name="wallet-outline"
                   size={16}
-                  color={form.payType === 'fixed' ? '#080B14' : colors.textSecondary}
+                  color={form.payType === 'fixed' ? colors.primaryOnColor : colors.textSecondary}
                 />
                 <Text
                   style={[
                     styles.payTypeBtnText,
                     form.payType === 'fixed' && styles.payTypeBtnTextActive,
                   ]}
-                >
-                  Fixed Price ($)
-                </Text>
+                >{tr("Fixed Price ($)")}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -566,23 +686,21 @@ export default function PostGigScreen() {
                 <Ionicons
                   name="time-outline"
                   size={16}
-                  color={form.payType === 'hourly' ? '#080B14' : colors.textSecondary}
+                  color={form.payType === 'hourly' ? colors.primaryOnColor : colors.textSecondary}
                 />
                 <Text
                   style={[
                     styles.payTypeBtnText,
                     form.payType === 'hourly' && styles.payTypeBtnTextActive,
                   ]}
-                >
-                  Hourly Rate ($/hr)
-                </Text>
+                >{tr("Hourly Rate ($/hr)")}</Text>
               </TouchableOpacity>
             </View>
 
             {/* Pay Amount Input */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>
-                {form.payType === 'fixed' ? 'Total Gig Budget ($)' : 'Hourly Rate ($/hr)'}{' '}
+                {form.payType === 'fixed' ? tr("Total Gig Budget ($)") : tr("Hourly Rate ($/hr)")}{' '}
                 <Text style={styles.requiredAsterisk}>*</Text>
               </Text>
               <View
@@ -603,7 +721,7 @@ export default function PostGigScreen() {
                   keyboardType="decimal-pad"
                 />
                 <Text style={styles.currencySuffix}>
-                  {form.payType === 'fixed' ? 'USD' : 'USD / hr'}
+                  {form.payType === 'fixed' ? tr("USD") : tr("USD / hr")}
                 </Text>
               </View>
               {touched.pay && errors.pay && (
@@ -615,7 +733,7 @@ export default function PostGigScreen() {
 
               {/* Quick Budget Presets */}
               <View style={styles.budgetPresetsRow}>
-                <Text style={styles.budgetPresetsLabel}>Quick pick:</Text>
+                <Text style={styles.budgetPresetsLabel}>{tr("Quick pick:")}</Text>
                 {BUDGET_PRESETS.map((preset) => (
                   <TouchableOpacity
                     key={preset}
@@ -654,12 +772,11 @@ export default function PostGigScreen() {
               <View style={styles.sectionIconBadge}>
                 <Ionicons name="calendar-outline" size={16} color={colors.primary} />
               </View>
-              <Text style={styles.sectionTitle}>4. Date & Deadline</Text>
+              <Text style={styles.sectionTitle}>{tr("4. Date & Deadline")}</Text>
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>
-                Gig Date / Needed By <Text style={styles.requiredAsterisk}>*</Text>
+              <Text style={styles.label}>{tr("Gig Date / Needed By")}<Text style={styles.requiredAsterisk}>*</Text>
               </Text>
 
               {/* Quick Date Chips */}
@@ -677,9 +794,7 @@ export default function PostGigScreen() {
                       styles.dateChipText,
                       form.date === getFormattedDate(0) && styles.dateChipTextActive,
                     ]}
-                  >
-                    ⚡ Today
-                  </Text>
+                  >{tr("⚡ Today")}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -695,9 +810,7 @@ export default function PostGigScreen() {
                       styles.dateChipText,
                       form.date === getFormattedDate(1) && styles.dateChipTextActive,
                     ]}
-                  >
-                    Tomorrow
-                  </Text>
+                  >{tr("Tomorrow")}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -713,9 +826,7 @@ export default function PostGigScreen() {
                       styles.dateChipText,
                       form.date === getFormattedDate(7) && styles.dateChipTextActive,
                     ]}
-                  >
-                    In 1 Week
-                  </Text>
+                  >{tr("In 1 Week")}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -724,7 +835,7 @@ export default function PostGigScreen() {
                   disabled={loading}
                 >
                   <Ionicons name="calendar" size={14} color={colors.primary} />
-                  <Text style={styles.customDateBtnText}>Custom</Text>
+                  <Text style={styles.customDateBtnText}>{tr("Custom")}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -740,7 +851,7 @@ export default function PostGigScreen() {
               >
                 <Ionicons name="calendar-clear-outline" size={18} color={colors.primary} />
                 <Text style={styles.dateDisplayText}>
-                  {form.date ? `Target Date: ${form.date}` : 'Select a date'}
+                  {form.date ? tr("Target Date: {{value0}}", { value0: form.date }) : tr("Select a date")}
                 </Text>
                 <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
               </TouchableOpacity>
@@ -762,12 +873,12 @@ export default function PostGigScreen() {
               <View style={styles.sectionIconBadge}>
                 <Ionicons name="location-outline" size={16} color={colors.primary} />
               </View>
-              <Text style={styles.sectionTitle}>5. Location & Work Setup</Text>
+              <Text style={styles.sectionTitle}>{tr("5. Location & Work Setup")}</Text>
             </View>
 
             {/* Location Type Selector */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Work Arrangement</Text>
+              <Text style={styles.label}>{tr("Work Arrangement")}</Text>
               <View style={styles.locationTypeGrid}>
                 {[
                   { type: 'remote' as LocationType, label: 'Remote', icon: 'globe-outline', desc: 'Anywhere' },
@@ -805,9 +916,9 @@ export default function PostGigScreen() {
                           isSelected && styles.locationTypeLabelActive,
                         ]}
                       >
-                        {item.label}
+                        {tr(item.label)}
                       </Text>
-                      <Text style={styles.locationTypeDesc}>{item.desc}</Text>
+                      <Text style={styles.locationTypeDesc}>{tr(item.desc)}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -818,8 +929,8 @@ export default function PostGigScreen() {
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>
                 {form.locationType === 'remote'
-                  ? 'Location / Timezone Note (Optional)'
-                  : 'City, Address or Area'}{' '}
+                  ? tr("Location / Timezone Note (Optional)")
+                  : tr("City, Address or Area")}{' '}
                 {form.locationType !== 'remote' && <Text style={styles.requiredAsterisk}>*</Text>}
               </Text>
               <View
@@ -838,12 +949,12 @@ export default function PostGigScreen() {
                   style={styles.inputInner}
                   placeholder={
                     form.locationType === 'remote'
-                      ? 'e.g. Worldwide, US Timezones, etc.'
-                      : 'e.g. Brooklyn NY, 124 Main Street, Downtown...'
+                      ? tr("e.g. Worldwide, US Timezones, etc.")
+                      : tr("e.g. business name, street, Colombo")
                   }
                   placeholderTextColor={colors.textMuted}
                   value={form.location}
-                  onChangeText={(val) => handleChange('location', val)}
+                  onChangeText={(val) => setForm(previous => ({ ...previous, location: val }))}
                   onBlur={() => handleBlur('location')}
                   editable={!loading}
                 />
@@ -856,6 +967,19 @@ export default function PostGigScreen() {
               )}
             </View>
           </View>
+
+          <View style={styles.fieldGroup}>
+            <FormField label={tr("Gig start time (optional)")} value={form.time ?? ''} placeholder={tr("HH:MM (24-hour)")} error={errors.time} editable={!loading}
+              onChangeText={time => handleChange('time', time)} hint={tr("Use the local time at the gig location.")} />
+          </View>
+          {form.locationType !== 'remote' && <View style={styles.fieldGroup}>
+            <GigLocationField address={form.location} value={form.coordinates} error={errors.coordinates} disabled={loading}
+              onAddressSelected={result => {
+                setForm(previous => ({ ...previous, location: result.label, coordinates: result.coordinates }));
+                setErrors(previous => ({ ...previous, location: undefined, coordinates: undefined }));
+              }}
+              onChange={coordinates => { handleChange('coordinates', coordinates); setErrors(previous => ({ ...previous, coordinates: undefined })); }} />
+          </View>}
 
           {/* ============================================================ */}
           {/* SUBMIT BUTTON */}
@@ -871,15 +995,17 @@ export default function PostGigScreen() {
             >
               {loading ? (
                 <View style={styles.loadingRow}>
-                  <ActivityIndicator color="#080B14" size="small" />
+                  <ActivityIndicator color={colors.primaryOnColor} size="small" />
                   <Text style={styles.submitButtonText}>
-                    {submissionStage === 'saving' ? 'Persisting to Firestore...' : 'Validating Gig...'}
+                    {submissionStage === 'saving'
+                      ? (isEditMode ? 'Updating in Firestore...' : 'Persisting to Firestore...')
+                      : tr("Validating Gig...")}
                   </Text>
                 </View>
               ) : (
                 <View style={styles.loadingRow}>
-                  <Ionicons name="paper-plane" size={18} color="#080B14" />
-                  <Text style={styles.submitButtonText}>Post Gig Now</Text>
+                  <Ionicons name={isEditMode ? 'save-outline' : 'paper-plane'} size={18} color={colors.primaryOnColor} />
+                  <Text style={styles.submitButtonText}>{isEditMode ? tr("Update Gig Now") : tr("Post Gig Now")}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -901,7 +1027,7 @@ export default function PostGigScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.datePickerModalContent}>
             <View style={styles.datePickerModalHeader}>
-              <Text style={styles.datePickerModalTitle}>Select Target Date</Text>
+              <Text style={styles.datePickerModalTitle}>{tr("Select Target Date")}</Text>
               <TouchableOpacity
                 onPress={() => setShowDatePickerModal(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -914,7 +1040,7 @@ export default function PostGigScreen() {
             <View style={styles.pickerColumnsRow}>
               {/* Year */}
               <View style={styles.pickerCol}>
-                <Text style={styles.pickerColLabel}>Year</Text>
+                <Text style={styles.pickerColLabel}>{tr("Year")}</Text>
                 {[2026, 2027].map((y) => (
                   <TouchableOpacity
                     key={y}
@@ -938,12 +1064,12 @@ export default function PostGigScreen() {
 
               {/* Month */}
               <View style={styles.pickerCol}>
-                <Text style={styles.pickerColLabel}>Month</Text>
+                <Text style={styles.pickerColLabel}>{tr("Month")}</Text>
                 <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={false}>
                   {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => {
                     const monthNames = [
-                      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+                      'January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December',
                     ];
                     return (
                       <TouchableOpacity
@@ -960,7 +1086,7 @@ export default function PostGigScreen() {
                             pickerDate.month === m && styles.pickerItemTextActive,
                           ]}
                         >
-                          {monthNames[m - 1]}
+                          {tr(monthNames[m - 1])}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -970,7 +1096,7 @@ export default function PostGigScreen() {
 
               {/* Day */}
               <View style={styles.pickerCol}>
-                <Text style={styles.pickerColLabel}>Day</Text>
+                <Text style={styles.pickerColLabel}>{tr("Day")}</Text>
                 <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={false}>
                   {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
                     <TouchableOpacity
@@ -997,7 +1123,7 @@ export default function PostGigScreen() {
 
             {/* Selected Date Summary */}
             <View style={styles.modalDatePreview}>
-              <Text style={styles.modalDatePreviewLabel}>Selected Date:</Text>
+              <Text style={styles.modalDatePreviewLabel}>{tr("Selected Date:")}</Text>
               <Text style={styles.modalDatePreviewValue}>
                 {pickerDate.year}-{String(pickerDate.month).padStart(2, '0')}-{String(pickerDate.day).padStart(2, '0')}
               </Text>
@@ -1009,13 +1135,13 @@ export default function PostGigScreen() {
                 style={styles.modalCancelBtn}
                 onPress={() => setShowDatePickerModal(false)}
               >
-                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+                <Text style={styles.modalCancelBtnText}>{tr("Cancel")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalApplyBtn}
                 onPress={handleApplyDatePicker}
               >
-                <Text style={styles.modalApplyBtnText}>Apply Date</Text>
+                <Text style={styles.modalApplyBtnText}>{tr("Apply Date")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1038,66 +1164,105 @@ export default function PostGigScreen() {
             </View>
 
             <Text style={styles.successTitle}>
-              {syncPending ? 'Gig queued for publishing' : 'Gig Published! 🎉'}
+              {isEditMode
+                ? tr("Gig Updated Successfully! 🎉")
+                : syncPending
+                ? tr("Gig queued for publishing")
+                : tr("Gig Published! 🎉")}
             </Text>
             <Text style={styles.successSubtitle}>
-              {syncPending
-                ? `"${form.title}" is visible on this device and will sync to Firebase when the connection responds.`
-                : `"${form.title}" has been saved to Cloud Firestore and is now active on the marketplace.`}
+              {isEditMode
+                ? tr("\"{{value0}}\" has been successfully updated and saved to Cloud Firestore.", { value0: form.title })
+                : syncPending
+                ? tr("\"{{value0}}\" is visible on this device and will sync to Firebase when the connection responds.", { value0: form.title })
+                : tr("\"{{value0}}\" has been saved to Cloud Firestore and is now active on the marketplace.", { value0: form.title })}
             </Text>
 
             {/* Assigned Gig ID Badge */}
             {createdGigId ? (
               <View style={styles.gigIdBadge}>
                 <Ionicons name="key-outline" size={13} color={colors.primary} />
-                <Text style={styles.gigIdBadgeText}>ID: {createdGigId}</Text>
+                <Text style={styles.gigIdBadgeText}>{tr("ID:")}{' '}{createdGigId}</Text>
               </View>
             ) : null}
 
             <View style={styles.successSummaryBox}>
               <View style={styles.successSummaryRow}>
-                <Text style={styles.summaryLabel}>Status:</Text>
-                <Text style={styles.summaryStatusText}>🟢 Open for applications</Text>
-              </View>
-              <View style={styles.successSummaryRow}>
-                <Text style={styles.summaryLabel}>Category:</Text>
-                <Text style={styles.summaryValue}>{form.category}</Text>
-              </View>
-              <View style={styles.successSummaryRow}>
-                <Text style={styles.summaryLabel}>Pay:</Text>
-                <Text style={styles.summaryValue}>
-                  ${form.pay} ({form.payType === 'fixed' ? 'Fixed' : 'Hourly'})
+                <Text style={styles.summaryLabel}>{tr("Status:")}</Text>
+                <Text style={styles.summaryStatusText}>
+                  {isEditMode ? tr("🟢 Updated in Firebase") : tr("🟢 Open for applications")}
                 </Text>
               </View>
               <View style={styles.successSummaryRow}>
-                <Text style={styles.summaryLabel}>Date:</Text>
+                <Text style={styles.summaryLabel}>{tr("Category:")}</Text>
+                <Text style={styles.summaryValue}>{form.category}</Text>
+              </View>
+              <View style={styles.successSummaryRow}>
+                <Text style={styles.summaryLabel}>{tr("Pay:")}</Text>
+                <Text style={styles.summaryValue}>
+                  ${form.pay} ({form.payType === 'fixed' ? tr("Fixed") : tr("Hourly")})
+                </Text>
+              </View>
+              <View style={styles.successSummaryRow}>
+                <Text style={styles.summaryLabel}>{tr("Date:")}</Text>
                 <Text style={styles.summaryValue}>{form.date}</Text>
               </View>
               <View style={styles.successSummaryRow}>
-                <Text style={styles.summaryLabel}>Location:</Text>
-                <Text style={styles.summaryValue}>{form.location || 'Remote'}</Text>
+                <Text style={styles.summaryLabel}>{tr("Location:")}</Text>
+                <Text style={styles.summaryValue}>{form.location || tr("Remote")}</Text>
               </View>
             </View>
 
             <View style={styles.successBtnStack}>
-              <TouchableOpacity
-                style={styles.primaryModalBtn}
-                onPress={() => {
-                  setShowSuccessModal(false);
-                  router.replace('/(app)/home' as any);
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.primaryModalBtnText}>Go to Dashboard</Text>
-              </TouchableOpacity>
+              {isEditMode ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.primaryModalBtn}
+                    onPress={() => {
+                      setShowSuccessModal(false);
+                      router.replace({
+                        pathname: '/(app)/gig/[id]',
+                        params: { id: createdGigId || targetGigId },
+                      } as any);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.primaryModalBtnText}>{tr("View Updated Gig")}</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.secondaryModalBtn}
-                onPress={handleResetForm}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.secondaryModalBtnText}>+ Post Another Gig</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.secondaryModalBtn}
+                    onPress={() => {
+                      setShowSuccessModal(false);
+                      router.replace('/(app)/(tabs)/my-gigs' as any);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.secondaryModalBtnText}>{tr("Back to My Gigs")}</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.primaryModalBtn}
+                    onPress={() => {
+                      setShowSuccessModal(false);
+                      router.replace('/(app)/(tabs)/home' as any);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.primaryModalBtnText}>{tr("Go to Dashboard")}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.secondaryModalBtn}
+                    onPress={handleResetForm}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.secondaryModalBtnText}>{tr("+ Post Another Gig")}</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         </View>
@@ -1121,26 +1286,6 @@ const styles = StyleSheet.create({
   },
 
   // Glowing background blobs
-  blob1: {
-    position: 'absolute',
-    top: -50,
-    right: -50,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: colors.primaryGlow,
-    opacity: 0.3,
-  },
-  blob2: {
-    position: 'absolute',
-    bottom: 120,
-    left: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: colors.accentLight,
-    opacity: 0.25,
-  },
 
   // Navigation Bar
   navBar: {
@@ -1207,7 +1352,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
   },
   retryBannerBtnText: {
-    color: '#FFF',
+    color: colors.primaryOnColor,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1315,7 +1460,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     gap: 6,
@@ -1353,7 +1498,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   addSkillBtnText: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -1396,7 +1541,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   suggestedChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.full,
@@ -1437,7 +1582,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   payTypeBtnTextActive: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontWeight: '700',
   },
 
@@ -1484,7 +1629,7 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
   presetChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.full,
@@ -1513,7 +1658,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   dateChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.full,
@@ -1576,7 +1721,7 @@ const styles = StyleSheet.create({
   },
   locationTypeCard: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.md,
@@ -1641,7 +1786,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   submitButtonText: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 0.3,
@@ -1653,7 +1798,7 @@ const styles = StyleSheet.create({
   // Modals Overlay
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
@@ -1663,7 +1808,7 @@ const styles = StyleSheet.create({
   datePickerModalContent: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -1713,7 +1858,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   pickerItemTextActive: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontWeight: '800',
   },
   modalDatePreview: {
@@ -1759,7 +1904,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalApplyBtnText: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontWeight: '700',
   },
 
@@ -1767,7 +1912,7 @@ const styles = StyleSheet.create({
   successModalCard: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -1848,12 +1993,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryModalBtnText: {
-    color: '#080B14',
+    color: colors.primaryOnColor,
     fontWeight: '700',
     fontSize: 15,
   },
   secondaryModalBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,

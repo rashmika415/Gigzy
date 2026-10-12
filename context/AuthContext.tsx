@@ -60,6 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       clearTimeout(safetyTimer);
+      unsubscribeDoc?.();
+      setUserData(null);
+      setLoading(!!firebaseUser);
       setUser(firebaseUser);
       
       if (firebaseUser) {
@@ -69,13 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (snapshot.exists()) {
             setUserData(snapshot.data() as UserData);
           } else {
-            // Fallback profile if Firestore doc hasn't been written yet
-            setUserData({
-              uid: firebaseUser.uid,
-              fullName: firebaseUser.displayName || 'User',
-              email: firebaseUser.email || '',
-              role: 'freelancer', // default fallback
-            });
+            // Keep registration mounted until its profile and referral batch commits.
+            setUserData(null);
           }
           setLoading(false);
         }, (error) => {
@@ -97,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setRoleForTesting = (role: 'freelancer' | 'client' | 'admin') => {
+    if (!__DEV__) return; // No-op in production builds
     if (userData) {
       setUserData({
         ...userData,
