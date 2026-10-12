@@ -4,7 +4,7 @@ const load = require('./helpers/load-ts.cjs');
 function setup(entries = {}, uid = 'admin') {
   const stored = new Map(Object.entries(entries)); const writes = []; const queries = [];
   const sdk = {
-    doc: (_db, ...parts) => parts.join('/'), collection: (_db, name) => name,
+    doc: (_db, ...parts) => parts.length ? parts.join('/') : `${_db}/auto-id`, collection: (_db, ...parts) => parts.join('/'),
     documentId: () => '__name__', orderBy: field => ({ orderBy: field }), startAfter: cursor => ({ cursor }), limit: limit => ({ limit }),
     where: (field, op, value) => ({ field, op, value }), query: (name, ...constraints) => ({ name, constraints }),
     getCountFromServer: async ref => { queries.push(ref); return { data: () => ({ count: 12 }) }; },
@@ -15,7 +15,9 @@ function setup(entries = {}, uid = 'admin') {
     serverTimestamp: () => 'server-time',
     runTransaction: async (_db, fn) => fn({
       get: async ref => ({ ref, exists: () => stored.has(ref), data: () => stored.get(ref) }),
-      update: (ref, values) => writes.push({ ref, values }),
+      update: (ref, values) => writes.push({ kind: 'update', ref, values }),
+      set: (ref, values) => writes.push({ kind: 'set', ref, values }),
+      delete: ref => writes.push({ kind: 'delete', ref }),
     }),
   };
   return { ...load('../services/adminService.ts', { 'firebase/firestore': sdk, '../FirebaseConfig': { db: {}, auth: { currentUser: uid ? { uid } : null } } }), writes, queries };
@@ -33,7 +35,8 @@ test('suspending and reinstating preserve user data and require a valid administ
   await api.setUserSuspension('youth', true, '  Repeated misconduct  ');
   assert.equal(api.writes[0].values.suspensionReason, 'Repeated misconduct'); assert.equal(api.writes[0].values.suspended, true);
   assert.deepEqual(Object.keys(api.writes[0].values).sort(), ['suspended','suspensionReason','updatedAt'].sort());
-  await api.setUserSuspension('youth', false, ''); assert.equal(api.writes[1].values.suspensionReason, '');
+  assert.equal(api.writes[1].values.action, 'user.suspended');
+  await api.setUserSuspension('youth', false, ''); assert.equal(api.writes[2].values.suspensionReason, ''); assert.equal(api.writes[3].values.action, 'user.reactivated');
   await assert.rejects(api.setUserSuspension('admin', true, 'Valid reason'), /cannot be suspended/);
   await assert.rejects(api.setUserSuspension('youth', true, 'bad'), /5 and 500/);
   for (const actor of [{ role: 'client' }, { role: 'admin', suspended: true }]) {
@@ -46,9 +49,23 @@ test('moderator removal closes the gig, records the actor and reason, and preser
   await api.removeGigFromDiscovery('g1', 'Misleading posting');
   const values = api.writes[0].values;
   assert.equal(values.status, 'closed'); assert.equal(values.moderationRemoved, true); assert.equal(values.moderatedBy, 'admin');
-  assert.equal(values.applicantsCount, undefined); assert.equal(api.writes.length, 1);
+  assert.equal(values.applicantsCount, undefined); assert.equal(api.writes.length, 2);
   const removed = setup({ 'users/admin': { role: 'admin' }, 'gigs/g1': { moderationRemoved: true } });
   await assert.rejects(removed.removeGigFromDiscovery('g1', 'Valid reason'), /already been removed/);
   await assert.rejects(api.removeGigFromDiscovery('missing', 'Valid reason'), /no longer exists/);
   await assert.rejects(setup({}, null).removeGigFromDiscovery('g1', 'Valid reason'), /sign in/);
+});
+test('verification, profile flags and badges are role-scoped and audited', async () => {
+  const api = setup({ 'users/admin': { role: 'admin' }, 'users/business': { role: 'client' }, 'users/youth': { role: 'freelancer' } });
+  await api.setBusinessVerification('business', true);
+  assert.equal(api.writes[0].values.isVerified, true); assert.equal(api.writes[1].values.action, 'business.verified');
+  api.writes.length = 0;
+  await api.setProfileFlag('youth', true, 'Inappropriate profile content');
+  assert.equal(api.writes[0].values.profileFlagged, true); assert.equal(api.writes[1].values.action, 'profile.flagged');
+  api.writes.length = 0;
+  await api.setSkillBadges('youth', ['Reliable', 'Reliable', 'Fast learner']);
+  assert.equal(api.writes[0].values.skillBadges.map(item => item.label).join('|'), 'Reliable|Fast learner');
+  assert.equal(api.writes[1].values.action, 'user.badges_updated');
+  await assert.rejects(api.setBusinessVerification('youth', true), /business accounts/);
+  await assert.rejects(api.setSkillBadges('business', ['Reliable']), /youth accounts/);
 });

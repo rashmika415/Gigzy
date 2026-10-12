@@ -948,4 +948,18 @@
   "Gig removed by a moderator": "පරිපාලකයෙකු ගිග් ඉවත් කර ඇත",
   "This gig is no longer available. Existing applications remain in your application history.": "මෙම ගිග් තවදුරටත් ලබාගත නොහැක. පවතින අයදුම්පත් ඔබගේ අයදුම්පත් ඉතිහාසයේ පවතී.",
   "Youth": "තරුණයන්"
+,  "Inspect": "Inspect",
+  "System notifications": "System notifications",
+  "Send an in-app announcement to one member, all youth, all businesses, or everyone.": "Send an in-app announcement to one member, all youth, all businesses, or everyone.",
+  "Selected user": "Selected user",
+  "Recipient: {{name}}": "Recipient: {{name}}",
+  "Choose a recipient from User management using Inspect.": "Choose a recipient from User management using Inspect.",
+  "Inspect recipient": "Inspect recipient",
+  "Notification title": "Notification title",
+  "Notification message": "Notification message",
+  "Send notification": "Send notification",
+  "Admin audit log": "Admin audit log",
+  "Privileged profile, verification, badge, moderation and notification actions appear here.": "Privileged profile, verification, badge, moderation and notification actions appear here.",
+  "Admin action": "Admin action",
+  "No admin actions recorded yet.": "No admin actions recorded yet."
 }

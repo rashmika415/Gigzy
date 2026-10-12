@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
  * then declaratively redirects to onboarding (if unauthenticated) or home (if logged in).
  */
 export default function Index() {
-  const { user, loading } = useAuth();
+  const { user, userData, loading } = useAuth();
 
   if (loading) {
     return (
@@ -19,6 +19,7 @@ export default function Index() {
   }
 
   if (user) {
+    if (userData?.role === 'admin' && !userData.suspended) return <Redirect href="/(admin)/dashboard" />;
     return <Redirect href="/(app)/(tabs)/home" />;
   }
 

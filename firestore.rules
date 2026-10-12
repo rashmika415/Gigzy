@@ -20,7 +20,8 @@ service cloud.firestore {
     function protectedUserFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
         'role', 'isVerified', 'suspended', 'suspensionReason',
-        'ratingAverage', 'ratingCount', 'skillBadges'
+        'ratingAverage', 'ratingCount', 'skillBadges',
+        'profileFlagged', 'profileFlagReason', 'profileFlaggedBy', 'profileFlaggedAt'
       ]);
     }
     function validReferralCodeUpdate(userId) {
@@ -39,11 +40,24 @@ service cloud.firestore {
         && request.resource.data.get('isVerified', false) != true
         && !request.resource.data.keys().hasAny(['referralCode']);
       allow update: if (isAdmin() && userId != request.auth.uid && resource.data.role != 'admin'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suspended', 'suspensionReason', 'updatedAt'])
-        && request.resource.data.suspended is bool
-        && request.resource.data.suspensionReason is string && request.resource.data.suspensionReason.size() <= 500
-        && (!request.resource.data.suspended || request.resource.data.suspensionReason.size() >= 5)
-        && request.resource.data.updatedAt == request.time)
+        && request.resource.data.updatedAt == request.time
+        && (
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suspended', 'suspensionReason', 'updatedAt'])
+            && request.resource.data.suspended is bool
+            && request.resource.data.suspensionReason is string && request.resource.data.suspensionReason.size() <= 500
+            && (!request.resource.data.suspended || request.resource.data.suspensionReason.size() >= 5))
+          || (resource.data.role == 'client'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isVerified', 'updatedAt'])
+            && request.resource.data.isVerified is bool)
+          || (resource.data.role == 'freelancer'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['skillBadges', 'updatedAt'])
+            && request.resource.data.skillBadges is list && request.resource.data.skillBadges.size() <= 20)
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['profileFlagged', 'profileFlagReason', 'profileFlaggedBy', 'profileFlaggedAt', 'updatedAt'])
+            && request.resource.data.profileFlagged is bool
+            && request.resource.data.profileFlagReason is string && request.resource.data.profileFlagReason.size() <= 500
+            && (!request.resource.data.profileFlagged || (request.resource.data.profileFlagReason.size() >= 5 && request.resource.data.profileFlaggedBy == request.auth.uid))
+            && request.resource.data.profileFlaggedAt == request.time)
+        ))
         || (owns(userId) && active() && protectedUserFieldsUnchanged() && validReferralCodeUpdate(userId)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || validProfilePhoto()));
       allow delete: if false;
@@ -85,8 +99,19 @@ service cloud.firestore {
             && data.read == false && data.createdAt == request.time
             && gig.status == 'open' && gig.postedBy.uid != userId;
         }
+        function validAdminSystemNotification() {
+          let data = request.resource.data;
+          return isAdmin()
+            && data.keys().hasOnly(['userId', 'type', 'title', 'body', 'read', 'createdAt'])
+            && data.userId == userId && data.type == 'system'
+            && data.title is string && data.title.size() > 0 && data.title.size() <= 80
+            && data.body is string && data.body.size() > 0 && data.body.size() <= 500
+            && data.read == false && data.createdAt == request.time;
+        }
         allow read: if owns(userId);
-        allow create: if active();
+        allow create: if request.resource.data.type == 'system'
+          ? validAdminSystemNotification()
+          : active();
         allow delete: if owns(userId) || isAdmin();
         allow update: if owns(userId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
@@ -98,7 +123,8 @@ service cloud.firestore {
           && request.resource.data.rating is number
           && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
           && request.resource.data.comment is string && request.resource.data.comment.size() <= 1000;
-        allow update, delete: if active() && resource.data.authorId == request.auth.uid;
+        allow update: if active() && resource.data.authorId == request.auth.uid;
+        allow delete: if isAdmin() || (active() && resource.data.authorId == request.auth.uid);
       }
       match /endorsements/{endorsementId} {
         allow read: if signedIn();
@@ -108,8 +134,22 @@ service cloud.firestore {
         allow delete: if isAdmin() || (active() && resource.data.endorserId == request.auth.uid);
       }
       match /pushTokens/{tokenId} {
-        allow read, create, update, delete: if owns(userId) && active();
+        allow read: if isAdmin() || (owns(userId) && active());
+        allow create, update, delete: if owns(userId) && active();
       }
+    }
+    match /adminAuditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['adminId', 'action', 'targetUserId', 'targetPath', 'details', 'createdAt'])
+        && request.resource.data.adminId == request.auth.uid
+        && request.resource.data.action is string && request.resource.data.action.size() > 0
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+    match /pushDeliveryFailures/{failureId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
     match /referralCodes/{code} {
       // Public lookup exposes only the code owner ID, never profile or contact data.

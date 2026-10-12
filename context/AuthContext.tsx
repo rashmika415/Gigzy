@@ -26,6 +26,10 @@ export interface UserData {
   isVerified?: boolean;
   suspended?: boolean;
   suspensionReason?: string;
+  profileFlagged?: boolean;
+  profileFlagReason?: string;
+  profileFlaggedBy?: string;
+  profileFlaggedAt?: unknown;
   notifyOnMatch?: boolean;
   createdAt?: any;
   updatedAt?: any;
