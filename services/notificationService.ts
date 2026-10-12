@@ -10,9 +10,69 @@ import {
   updateDoc,
   writeBatch,
   setDoc,
+  where,
 } from 'firebase/firestore';
 import { db } from '../FirebaseConfig';
 import { AppNotification } from '../types/notification';
+
+export function subscribeToGigAnnouncements(userId: string, onError?: (error: Error) => void) {
+  let active = true;
+  const unsubscribe = onSnapshot(
+    query(collection(db, 'gigs'), orderBy('createdAt', 'desc'), limit(20)),
+    (snapshot) => {
+      if (!active) return;
+      for (const item of snapshot.docs) {
+        const ref = doc(db, 'users', userId, 'notifications', `gig-posted-${item.id}`);
+        void runTransaction(db, async (transaction) => {
+          if (!active) return;
+          const existing = await transaction.get(ref);
+          if (existing.exists()) return;
+          const gig = (await transaction.get(item.ref)).data();
+          if (!active || gig?.status !== 'open' || !gig.postedBy?.uid
+            || gig.postedBy.uid === userId || typeof gig.title !== 'string') return;
+          transaction.set(ref, {
+            userId, type: 'gig_posted', title: 'New gig posted', body: gig.title,
+            route: `/(app)/gig/${item.id}`, entityId: item.id,
+            read: false, createdAt: serverTimestamp(),
+          });
+        }).catch((error: Error) => { if (active) onError?.(error); });
+      }
+    },
+    onError,
+  );
+  return () => { active = false; unsubscribe(); };
+}
+
+export function subscribeToApplicationAnnouncements(userId: string, onError?: (error: Error) => void) {
+  let active = true;
+  const unsubscribe = onSnapshot(
+    query(collection(db, 'applications'), where('businessId', '==', userId)),
+    (snapshot) => {
+      if (!active) return;
+      for (const item of snapshot.docs) {
+        const ref = doc(db, 'users', userId, 'notifications', `application-${item.id}`);
+        void runTransaction(db, async (transaction) => {
+          if (!active) return;
+          const existing = await transaction.get(ref);
+          if (existing.exists()) return;
+          const application = (await transaction.get(item.ref)).data();
+          if (!application || application.businessId !== userId || !application.youthId
+            || application.youthId === userId || !application.gigId) return;
+          const gig = (await transaction.get(doc(db, 'gigs', application.gigId))).data();
+          if (!active || gig?.postedBy?.uid !== userId) return;
+          transaction.set(ref, {
+            userId, type: 'application', title: 'New gig application',
+            body: `${application.youthName || 'A youth user'} applied to your gig.`,
+            route: `/(app)/gig/${application.gigId}`, entityId: item.id,
+            read: false, createdAt: serverTimestamp(),
+          });
+        }).catch((error: Error) => { if (active) onError?.(error); });
+      }
+    },
+    onError,
+  );
+  return () => { active = false; unsubscribe(); };
+}
 
 export async function sendNotification(
   userId: string,

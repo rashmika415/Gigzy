@@ -1,3 +1,4 @@
+import { translate as tr } from '../../localization/i18n';
 import { Text } from '../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
@@ -5,8 +6,8 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../../FirebaseConfig';
+import { auth } from '../../FirebaseConfig';
+import { createRegisteredProfile, lookupReferral } from '../../services/referralService';
 import { AuthButton, AuthCheckbox, AuthError, AuthField, AuthScreen } from '../../components/auth/AuthUI';
 import { authColors, authStyles } from '../../constants/authTheme';
 import { fonts } from '../../constants/theme';
@@ -52,6 +53,7 @@ export default function Register() {
   }, [roleParam]);
 
   const [fullName, setFullName] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -82,21 +84,22 @@ export default function Register() {
     setError('');
     setLoading(true);
     try {
-      const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const referral = await lookupReferral(referralCode);
+      const credential = auth.currentUser?.email?.toLowerCase() === email.trim().toLowerCase()
+        ? { user: auth.currentUser } : await createUserWithEmailAndPassword(auth, email.trim(), password);
       await updateProfile(credential.user, { displayName: fullName.trim() });
 
-      await setDoc(doc(db, 'users', credential.user.uid), {
+      await createRegisteredProfile(credential.user.uid, {
         uid: credential.user.uid,
         fullName: fullName.trim(),
         email: email.trim(),
         role: ROLE_TO_ACCOUNT_ROLE[role],
         notifyOnMatch,
-        createdAt: serverTimestamp(),
-      });
+      }, referral);
 
       // Auth context listener will trigger redirect automatically
     } catch (e: any) {
-      setError(getFirebaseError(e.code));
+      setError(e.code?.startsWith('auth/') ? getFirebaseError(e.code) : e.message || 'Could not finish registration. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -105,6 +108,9 @@ export default function Register() {
   return <AuthScreen title={t("Your next chapter starts here")} subtitle={role === 'business' ? t("Find the right local talent for your business.") : t("Find flexible work. Build skills. Make your next move.")}
     eyebrow={t("MAKE ROOM FOR OPPORTUNITY")} compact backTo="role-select">
     <View style={authStyles.form}>
+      <AuthField label={t('Referral code (optional)')} icon="gift-outline" value={referralCode}
+        onChangeText={value => { setReferralCode(value.toUpperCase()); setError(''); }}
+        autoCapitalize="characters" autoCorrect={false} maxLength={10} editable={!loading} placeholder={t('Enter a friend’s code')} />
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={t("Change account role")} disabled={loading} style={styles.role}
         onPress={() => router.replace('/(auth)/role-select')}>
         <View style={styles.roleLabel}><Ionicons name={role === 'business' ? 'storefront-outline' : 'briefcase-outline'} size={18} color={authColors.primary} />
@@ -114,7 +120,7 @@ export default function Register() {
       <AuthField label={t("Full name")} icon="person-outline" value={fullName} onChangeText={value => { setFullName(value); setError(''); }}
         placeholder={t("Your full name")} autoCapitalize="words" autoCorrect={false} autoComplete="name" textContentType="name" editable={!loading} />
       <AuthField label={t("Email address")} icon="mail-outline" value={email} onChangeText={value => { setEmail(value); setError(''); }}
-        placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress" editable={!loading} />
+        placeholder={tr("you@example.com")} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress" editable={!loading} />
       <AuthField label={t("Password")} icon="lock-closed-outline" password value={password} onChangeText={value => { setPassword(value); setError(''); }}
         placeholder={t("Create a password")} autoCapitalize="none" autoComplete="new-password" textContentType="newPassword" editable={!loading} hint={t("At least 8 characters, including one number.")} />
       <AuthField label={t("Confirm password")} icon="lock-closed-outline" password value={confirmPassword} onChangeText={value => { setConfirmPassword(value); setError(''); }}

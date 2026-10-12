@@ -1,16 +1,8 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  FlatList,
-  ActivityIndicator,
-  RefreshControl,
-  TextInput,
-  Platform,
-} from 'react-native';
+import { View, TouchableOpacity, StyleSheet, SafeAreaView, FlatList, ActivityIndicator, RefreshControl, Platform } from 'react-native';
+import { Text, TextInput } from '../../components/LocalizedText';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -30,6 +22,7 @@ import {
 } from '../../components/applications';
 
 export default function MyApplicationsScreen() {
+  useTranslation();
   const { user, userData } = useAuth();
   const isBusiness = userData?.role === 'client';
   const [applications, setApplications] = useState<Application[]>([]);
@@ -43,6 +36,10 @@ export default function MyApplicationsScreen() {
 
   // Real-time synchronization of applications (freelancer youth or business client)
   useEffect(() => {
+    let active = true;
+    let unsubscribe = () => {};
+    void Promise.resolve().then(() => {
+    if (!active) return;
     if (!user) {
       setLoading(false);
       return;
@@ -62,11 +59,13 @@ export default function MyApplicationsScreen() {
       setLoading(false);
     };
 
-    const unsubscribe = isBusiness
+    unsubscribe = isBusiness
       ? subscribeToBusinessApplications(user.uid, onUpdate, onError)
       : subscribeToMyApplications(user.uid, onUpdate, onError);
 
+    });
     return () => {
+      active = false;
       unsubscribe();
     };
   }, [user, isBusiness]);
@@ -138,14 +137,14 @@ export default function MyApplicationsScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           activeOpacity={0.7}
-          accessibilityLabel="Back"
+          accessibilityLabel={tr("Back")}
         >
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
 
         <View style={styles.headerTitleWrap}>
           <Text style={styles.headerTitle}>
-            {isBusiness ? 'Gig Applications' : 'My Applications'}
+            {isBusiness ? tr("Gig Applications") : tr("My Applications")}
           </Text>
         </View>
 
@@ -160,8 +159,8 @@ export default function MyApplicationsScreen() {
             style={styles.searchInput}
             placeholder={
               isBusiness
-                ? 'Search by applicant, gig, or skill...'
-                : 'Search by gig title or business...'
+                ? tr("Search by applicant, gig, or skill...")
+                : tr("Search by gig title or business...")
             }
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
@@ -180,31 +179,31 @@ export default function MyApplicationsScreen() {
       {/* Status Filter Tabs */}
       <View style={styles.filterTabsWrap}>
         <FilterTab
-          label="All"
+          label={tr("All")}
           count={counts.all}
           active={activeFilter === 'all'}
           onPress={() => setActiveFilter('all')}
         />
         <FilterTab
-          label="Pending"
+          label={tr("Pending")}
           count={counts.pending}
           active={activeFilter === 'pending'}
           onPress={() => setActiveFilter('pending')}
         />
         <FilterTab
-          label="Accepted"
+          label={tr("Accepted")}
           count={counts.accepted}
           active={activeFilter === 'accepted'}
           onPress={() => setActiveFilter('accepted')}
         />
         <FilterTab
-          label="Rejected"
+          label={tr("Rejected")}
           count={counts.rejected}
           active={activeFilter === 'rejected'}
           onPress={() => setActiveFilter('rejected')}
         />
         <FilterTab
-          label="Completed"
+          label={tr("Completed")}
           count={counts.completed}
           active={activeFilter === 'completed'}
           onPress={() => setActiveFilter('completed')}
@@ -216,16 +215,16 @@ export default function MyApplicationsScreen() {
         <View style={styles.centerBox}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>
-            {isBusiness ? 'Syncing received applications...' : 'Syncing your applications...'}
+            {isBusiness ? tr("Syncing received applications...") : tr("Syncing your applications...")}
           </Text>
         </View>
       ) : errorMsg ? (
         <View style={styles.centerBox}>
           <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
-          <Text style={styles.errorTitle}>Unable to load applications</Text>
-          <Text style={styles.errorSubtitle}>{errorMsg}</Text>
+          <Text style={styles.errorTitle}>{tr("Unable to load applications")}</Text>
+          <Text style={styles.errorSubtitle}>{tr(errorMsg)}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
-            <Text style={styles.retryBtnText}>Retry</Text>
+            <Text style={styles.retryBtnText}>{tr("Retry")}</Text>
           </TouchableOpacity>
         </View>
       ) : filteredApplications.length === 0 ? (
@@ -239,19 +238,19 @@ export default function MyApplicationsScreen() {
           </View>
           <Text style={styles.emptyTitle}>
             {searchQuery
-              ? 'No matching applications'
+              ? tr("No matching applications")
               : activeFilter === 'all'
               ? isBusiness
-                ? 'No applicants yet'
-                : 'No applications yet'
-              : `No ${activeFilter} applications`}
+                ? tr("No applicants yet")
+                : tr("No applications yet")
+              : tr("No {{value0}} applications", { value0: activeFilter })}
           </Text>
           <Text style={styles.emptySubtitle}>
             {activeFilter === 'all'
               ? isBusiness
-                ? 'When youth freelancers apply to your gigs, their applications and details will appear here.'
-                : 'When you apply to gigs, your applications and their statuses will appear here.'
-              : `You do not have any applications marked as "${activeFilter}".`}
+                ? tr("When youth freelancers apply to your gigs, their applications and details will appear here.")
+                : tr("When you apply to gigs, your applications and their statuses will appear here.")
+              : tr("You do not have any applications marked as \"{{value0}}\".", { value0: activeFilter })}
           </Text>
           {activeFilter === 'all' && !searchQuery ? (
             <TouchableOpacity
@@ -271,7 +270,7 @@ export default function MyApplicationsScreen() {
                 color={colors.primaryOnColor}
               />
               <Text style={styles.exploreBtnText}>
-                {isBusiness ? 'Manage Your Gigs' : 'Browse Available Gigs'}
+                {isBusiness ? tr("Manage Your Gigs") : tr("Browse Available Gigs")}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -346,6 +345,7 @@ function FilterTab({
   active: boolean;
   onPress: () => void;
 }) {
+  useTranslation();
   return (
     <TouchableOpacity
       style={[styles.filterTab, active && styles.filterTabActive]}

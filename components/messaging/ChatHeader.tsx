@@ -1,7 +1,10 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing } from '../../constants/theme';
 import { ParticipantDetail } from '../../types/messaging';
 
 interface ChatHeaderProps {
@@ -21,6 +24,7 @@ export default function ChatHeader({
   gigPayType,
   onToggleGigDetails,
 }: ChatHeaderProps) {
+  useTranslation();
   const isBusiness = participant.role === 'client';
 
   return (
@@ -49,7 +53,7 @@ export default function ChatHeader({
 
       <View style={styles.infoBlock}>
         <Text style={styles.name} numberOfLines={1}>
-          {participant.fullName || 'User'}
+          {participant.fullName || tr("User")}
         </Text>
         {gigTitle ? (
           <TouchableOpacity
@@ -67,7 +71,7 @@ export default function ChatHeader({
         ) : (
           <View style={styles.roleRow}>
             <View style={[styles.roleDot, isBusiness ? styles.roleDotBusiness : styles.roleDotYouth]} />
-            <Text style={styles.roleText}>{isBusiness ? 'Business' : 'Youth Freelancer'}</Text>
+            <Text style={styles.roleText}>{isBusiness ? tr("Business") : tr("Youth Freelancer")}</Text>
           </View>
         )}
       </View>

@@ -1,7 +1,9 @@
+import { formatDate as localizedDate } from '../../localization/format';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, borderRadius } from '../../constants/theme';
 import { Message } from '../../types/messaging';
 
 interface MessageBubbleProps {
@@ -13,7 +15,7 @@ interface MessageBubbleProps {
 function formatTime(timestamp: any): string {
   if (!timestamp) return '';
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return localizedDate(date, { hour: '2-digit', minute: '2-digit' });
 }
 
 export default function MessageBubble({ message, isMe, onImagePress }: MessageBubbleProps) {
