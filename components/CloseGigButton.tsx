@@ -1,5 +1,8 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../localization/i18n';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from './LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { borderRadius, colors, spacing } from '../constants/theme';
@@ -7,6 +10,7 @@ import { closeGig } from '../services/gigService';
 import type { Gig } from '../types/gig';
 
 export default function CloseGigButton({ gig }: { gig: Gig }) {
+  useTranslation();
   const { user, userData } = useAuth();
   const [visible, setVisible] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -23,7 +27,7 @@ export default function CloseGigButton({ gig }: { gig: Gig }) {
       await closeGig(gig.id);
       setVisible(false);
       if (Platform.OS === 'web') window.alert('Gig closed successfully.');
-      else Alert.alert('Success', 'Gig closed successfully.');
+      else Alert.alert(tr("Success"), tr("Gig closed successfully."));
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Could not close gig. Please try again.');
     } finally {
@@ -36,21 +40,21 @@ export default function CloseGigButton({ gig }: { gig: Gig }) {
   return <>
     {canClose && <TouchableOpacity style={styles.button} accessibilityRole="button" onPress={() => { setError(''); setVisible(true); }}>
       <Ionicons name="lock-closed-outline" size={16} color={colors.error} />
-      <Text style={styles.buttonText}>Close Gig</Text>
+      <Text style={styles.buttonText}>{tr("Close Gig")}</Text>
     </TouchableOpacity>}
     <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { if (!submitting.current) setVisible(false); }}>
       <View style={styles.overlay}>
         <View style={styles.dialog}>
-          <Text style={styles.title}>Close Gig</Text>
-          <Text style={styles.message}>Are you sure you want to close this gig?</Text>
+          <Text style={styles.title}>{tr("Close Gig")}</Text>
+          <Text style={styles.message}>{tr("Are you sure you want to close this gig?")}</Text>
           <Text style={styles.message}>{gig.title}</Text>
-          {!!error && <Text accessibilityRole="alert" style={styles.buttonText}>{error}</Text>}
+          {!!error && <Text accessibilityRole="alert" style={styles.buttonText}>{tr(error)}</Text>}
           <View style={styles.actions}>
             <TouchableOpacity style={styles.button} disabled={closing} onPress={() => setVisible(false)}>
-              <Text style={styles.message}>Cancel</Text>
+              <Text style={styles.message}>{tr("Cancel")}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.button} disabled={closing || !canClose} onPress={confirm}>
-              {closing ? <ActivityIndicator color={colors.error} /> : <Text style={styles.buttonText}>Close Gig</Text>}
+              {closing ? <ActivityIndicator color={colors.error} /> : <Text style={styles.buttonText}>{tr("Close Gig")}</Text>}
             </TouchableOpacity>
           </View>
         </View>

@@ -31,6 +31,7 @@ export async function createApplication(input: CreateApplicationInput): Promise<
   if (!cleanMessage || cleanMessage.length < 5) {
     throw new Error('Please provide an application message explaining why you are suitable (at least 5 characters).');
   }
+  if (cleanMessage.length > 500) throw new Error('Keep your application message within 500 characters.');
 
   if (!input.availabilityConfirmed) {
     throw new Error('You must confirm your availability on the required date and time to apply.');

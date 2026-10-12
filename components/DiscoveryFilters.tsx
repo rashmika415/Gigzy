@@ -1,3 +1,4 @@
+import { translate as tr } from '../localization/i18n';
 import { Text } from './LocalizedText';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
@@ -54,10 +55,10 @@ export default function DiscoveryFilters({ visible, value, onApply, onClose }: {
         {draft.origin && <Text style={styles.note}>{t("Location ready. Distances are measured in a straight line.")}</Text>}
         <FormField label={t("Within (km)")} value={radius} onChangeText={setRadius} keyboardType="decimal-pad" hint={t("Remote gigs are included. Gigs without coordinates are excluded when distance is set.")} />
         <Text style={styles.label}>{t("Availability")}</Text>
-        <FormField label={t("Available from")} placeholder="YYYY-MM-DD" value={draft.dateFrom ?? ''} onChangeText={dateFrom => setDraft({ ...draft, dateFrom })} />
-        <FormField label={t("Available through")} placeholder="YYYY-MM-DD" value={draft.dateTo ?? ''} onChangeText={dateTo => setDraft({ ...draft, dateTo })} />
-        <FormField label={t("Earliest start time")} placeholder="HH:MM (24-hour)" value={draft.timeFrom ?? ''} onChangeText={timeFrom => setDraft({ ...draft, timeFrom })} />
-        <FormField label={t("Latest start time")} placeholder="HH:MM (24-hour)" value={draft.timeTo ?? ''} onChangeText={timeTo => setDraft({ ...draft, timeTo })} hint={t("Times use the gig's local time. Gigs without a start time are excluded when time filters are set.")} />
+        <FormField label={t("Available from")} placeholder={tr("YYYY-MM-DD")} value={draft.dateFrom ?? ''} onChangeText={dateFrom => setDraft({ ...draft, dateFrom })} />
+        <FormField label={t("Available through")} placeholder={tr("YYYY-MM-DD")} value={draft.dateTo ?? ''} onChangeText={dateTo => setDraft({ ...draft, dateTo })} />
+        <FormField label={t("Earliest start time")} placeholder={tr("HH:MM (24-hour)")} value={draft.timeFrom ?? ''} onChangeText={timeFrom => setDraft({ ...draft, timeFrom })} />
+        <FormField label={t("Latest start time")} placeholder={tr("HH:MM (24-hour)")} value={draft.timeTo ?? ''} onChangeText={timeTo => setDraft({ ...draft, timeTo })} hint={t("Times use the gig's local time. Gigs without a start time are excluded when time filters are set.")} />
         <Chip label={t("Weekends only")} variant={draft.weekendsOnly ? 'selected' : 'default'} onPress={() => setDraft({ ...draft, weekendsOnly: !draft.weekendsOnly })} />
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{t(error ?? "")}</Text>}
         <TouchableOpacity style={styles.button} onPress={apply} disabled={locating}><Text style={styles.buttonText}>{t("Apply filters")}</Text></TouchableOpacity>

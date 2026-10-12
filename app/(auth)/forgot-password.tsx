@@ -1,3 +1,4 @@
+import { translate as tr } from '../../localization/i18n';
 import { Text } from '../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
@@ -48,13 +49,13 @@ export default function ForgotPassword() {
     subtitle={sent ? t("Follow the link in your email to choose a new password.") : t("Forgot your password? We will help you get back to your next opportunity.")}>
     {sent ? <View style={authStyles.form}>
       <View style={styles.success}><Ionicons name="mail-open-outline" size={28} color={authColors.primary} />
-        <Text style={authStyles.paragraph}>{t("If an account exists for")}{email.trim()}{t(", you will receive a password reset link. Check your spam folder too.")}</Text>
+        <Text style={authStyles.paragraph}>{t("If an account exists for {{email}}, you will receive a password reset link. Check your spam folder too.", { email: email.trim() })}</Text>
       </View>
       <AuthButton title={t("Back to sign in")} onPress={() => router.replace('/(auth)/login')} />
       <TouchableOpacity accessibilityRole="button" style={styles.retry} onPress={() => { setSent(false); setError(''); }}><Text style={authStyles.link}>{t("Try another email address")}</Text></TouchableOpacity>
     </View> : <View style={authStyles.form}>
       <AuthField label={t("Email address")} icon="mail-outline" value={email} onChangeText={value => { setEmail(value); setError(''); }}
-        placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" editable={!loading}
+        placeholder={tr("you@example.com")} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" editable={!loading}
         returnKeyType="send" onSubmitEditing={handleSendResetLink} />
       <AuthError message={t(error ?? "")} />
       <AuthButton title={t("Send reset link")} onPress={handleSendResetLink} loading={loading} />

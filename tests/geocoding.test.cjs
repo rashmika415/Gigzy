@@ -1,7 +1,29 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const load = require('./helpers/load-ts.cjs');
-const { searchAddresses } = load('../services/geoapifyGeocoding.ts');
+const { searchAddresses, addressForCoordinates } = load('../services/geoapifyGeocoding.ts');
+
+test('reverse lookup keeps the selected pin instead of snapping to the nearby address', async () => {
+  const point = { latitude: 6.9271, longitude: 79.8612 };
+  const signal = { aborted: false };
+  const result = await addressForCoordinates(point, 'test key', signal, async (url, options) => {
+    assert.ok(url.includes('lat=6.9271&lon=79.8612'));
+    assert.ok(url.includes('apiKey=test%20key'));
+    assert.equal(options.signal, signal);
+    return { ok: true, json: async () => ({ results: [{ formatted: 'Colombo', lat: 6.93, lon: 79.87 }] }) };
+  });
+  assert.equal(result.label, 'Colombo');
+  assert.deepEqual(result.coordinates, point);
+});
+
+test('reverse lookup handles invalid input, unavailable setup, missing address and server failure', async () => {
+  const point = { latitude: 0, longitude: 0 };
+  const empty = async () => ({ ok: true, json: async () => ({ results: [] }) });
+  await assert.rejects(addressForCoordinates({ latitude: 91, longitude: 0 }, 'key', undefined, empty), /valid map point/);
+  await assert.rejects(addressForCoordinates(point, '', undefined, empty), /unavailable/);
+  await assert.rejects(addressForCoordinates(point, 'key', undefined, empty), /No address/);
+  await assert.rejects(addressForCoordinates(point, 'key', undefined, async () => ({ ok: false })), /Could not find/);
+});
 
 test('address search encodes text, returns choices and rejects invalid coordinates', async () => {
   let calledURL;

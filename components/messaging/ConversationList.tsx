@@ -1,14 +1,8 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  RefreshControl,
-  ActivityIndicator,
-  TouchableOpacity,
-  TextInput,
-} from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { Text, TextInput } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { Conversation } from '../../types/messaging';
@@ -41,6 +35,7 @@ export default function ConversationList({
   onTabChange,
   onExploreGigs,
 }: ConversationListProps) {
+  useTranslation();
   const filteredConversations = useMemo(() => {
     return conversations.filter((conv) => {
       const otherUid =
@@ -82,7 +77,7 @@ export default function ConversationList({
           <Ionicons name="search-outline" size={18} color={colors.placeholder} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search conversations, names, or gigs..."
+            placeholder={tr("Search conversations, names, or gigs...")}
             placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={onSearchChange}
@@ -134,7 +129,7 @@ export default function ConversationList({
         {loading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Syncing conversations...</Text>
+            <Text style={styles.loadingText}>{tr("Syncing conversations...")}</Text>
           </View>
         ) : filteredConversations.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -143,23 +138,23 @@ export default function ConversationList({
             </View>
             <Text style={styles.emptyTitle}>
               {searchQuery
-                ? 'No matching conversations'
+                ? tr("No matching conversations")
                 : activeTab === 'unread'
-                ? 'All caught up!'
-                : 'No conversations yet'}
+                ? tr("All caught up!")
+                : tr("No conversations yet")}
             </Text>
             <Text style={styles.emptySubtitle}>
               {searchQuery
-                ? 'Try a different search term or check spelling.'
+                ? tr("Try a different search term or check spelling.")
                 : activeTab === 'unread'
-                ? 'You have read all received messages.'
-                : 'Connect with employers or youth freelancers from gig applications to start chatting.'}
+                ? tr("You have read all received messages.")
+                : tr("Connect with employers or youth freelancers from gig applications to start chatting.")}
             </Text>
 
             {onExploreGigs && !searchQuery && (
               <TouchableOpacity style={styles.exploreButton} onPress={onExploreGigs} activeOpacity={0.85}>
                 <Ionicons name="briefcase-outline" size={16} color={colors.primaryOnColor} />
-                <Text style={styles.exploreButtonText}>Explore Gigs</Text>
+                <Text style={styles.exploreButtonText}>{tr("Explore Gigs")}</Text>
               </TouchableOpacity>
             )}
           </View>
