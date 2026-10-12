@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React from 'react';
 import {
   Modal,
@@ -24,6 +26,7 @@ export default function CelebrationModal({
   gigTitle,
   onClose,
 }: CelebrationModalProps) {
+  useTranslation();
   if (!visible) return null;
 
   const handleClose = () => {
@@ -58,17 +61,15 @@ export default function CelebrationModal({
           {/* Micro pill badge */}
           <View style={styles.badgePill}>
             <Ionicons name="sparkles" size={13} color="#047857" style={{ marginRight: 4 }} />
-            <Text style={styles.badgePillText}>APPLICATION ACCEPTED</Text>
+            <Text style={styles.badgePillText}>{tr("APPLICATION ACCEPTED")}</Text>
           </View>
 
           {/* Main Title */}
-          <Text style={styles.title}>Application Accepted! 🎉</Text>
+          <Text style={styles.title}>{tr("Application Accepted! 🎉")}</Text>
 
           {/* Celebration Quote Message */}
           <View style={styles.messageBox}>
-            <Text style={styles.messageText}>
-              "You have accepted <Text style={styles.boldText}>{displayName}</Text> for '{displayGig}'. Work is now in progress and a notification has been sent to the youth freelancer's dashboard."
-            </Text>
+            <Text style={styles.messageText}>{tr('You accepted {{name}} for {{gig}}. Work is now in progress.', { name: displayName, gig: displayGig })}</Text>
           </View>
 
           {/* Status / Overview Mini Card */}
@@ -78,7 +79,7 @@ export default function CelebrationModal({
                 <Ionicons name="person-circle" size={20} color={colors.primary} />
               </View>
               <View style={styles.overviewTextCol}>
-                <Text style={styles.overviewLabel}>Freelancer Assigned</Text>
+                <Text style={styles.overviewLabel}>{tr("Freelancer Assigned")}</Text>
                 <Text style={styles.overviewValue} numberOfLines={1}>{displayName}</Text>
               </View>
             </View>
@@ -90,12 +91,12 @@ export default function CelebrationModal({
                 <Ionicons name="briefcase" size={18} color={colors.primary} />
               </View>
               <View style={styles.overviewTextCol}>
-                <Text style={styles.overviewLabel}>Gig Title</Text>
+                <Text style={styles.overviewLabel}>{tr("Gig Title")}</Text>
                 <Text style={styles.overviewValue} numberOfLines={1}>{displayGig}</Text>
               </View>
               <View style={styles.statusPill}>
                 <View style={styles.statusDot} />
-                <Text style={styles.statusPillText}>In Progress</Text>
+                <Text style={styles.statusPillText}>{tr("In Progress")}</Text>
               </View>
             </View>
           </View>
@@ -107,7 +108,7 @@ export default function CelebrationModal({
             activeOpacity={0.88}
           >
             <Ionicons name="checkmark-done" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.actionButtonText}>Done</Text>
+            <Text style={styles.actionButtonText}>{tr("Done")}</Text>
           </TouchableOpacity>
         </View>
       </View>

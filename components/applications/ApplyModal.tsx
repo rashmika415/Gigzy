@@ -1,17 +1,8 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React, { useState } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import { Modal, View, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Text, TextInput } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius } from '../../constants/theme';
@@ -41,6 +32,7 @@ export default function ApplyModal({
   onClose,
   onSuccess,
 }: ApplyModalProps) {
+  useTranslation();
   const [message, setMessage] = useState('');
   const [availabilityConfirmed, setAvailabilityConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -123,7 +115,7 @@ export default function ApplyModal({
               <Ionicons name="document-text-outline" size={20} color={colors.primary} />
             </View>
             <View style={styles.headerTextWrap}>
-              <Text style={styles.headerTitle}>Apply to Gig</Text>
+              <Text style={styles.headerTitle}>{tr("Apply to Gig")}</Text>
               <Text style={styles.headerSubtitle} numberOfLines={1}>
                 {gig.title}
               </Text>
@@ -143,7 +135,7 @@ export default function ApplyModal({
             <View style={styles.gigSummaryPill}>
               <Ionicons name="briefcase-outline" size={14} color={colors.primary} />
               <Text style={styles.gigSummaryText} numberOfLines={1}>
-                {gig.title} • ${gig.pay}{gig.payType === 'hourly' ? '/hr' : ' fixed'} • {gig.location}
+                {gig.title} • ${gig.pay}{gig.payType === 'hourly' ? tr("/hr") : tr(" fixed")} • {gig.location}
               </Text>
             </View>
 
@@ -151,18 +143,17 @@ export default function ApplyModal({
             {Boolean(errorMsg) && (
               <View style={styles.errorBanner}>
                 <Ionicons name="alert-circle-outline" size={16} color={colors.errorText} />
-                <Text style={styles.errorBannerText}>{errorMsg}</Text>
+                <Text style={styles.errorBannerText}>{tr(errorMsg)}</Text>
               </View>
             )}
 
             {/* Message input */}
             <View style={styles.fieldWrap}>
-              <Text style={styles.fieldLabel}>
-                Application Message <Text style={styles.requiredStar}>*</Text>
+              <Text style={styles.fieldLabel}>{tr("Application Message")}<Text style={styles.requiredStar}>*</Text>
               </Text>
               <TextInput
                 style={styles.messageInput}
-                placeholder="Tell the business why you are interested and why you are suitable for this gig."
+                placeholder={tr("Tell the business why you are interested and why you are suitable for this gig.")}
                 placeholderTextColor={colors.placeholder}
                 value={message}
                 onChangeText={(text) => {
@@ -174,7 +165,7 @@ export default function ApplyModal({
                 maxLength={500}
                 editable={!submitting}
               />
-              <Text style={styles.charCount}>{message.trim().length} / 500 characters</Text>
+              <Text style={styles.charCount}>{message.trim().length}{tr("/ 500 characters")}</Text>
             </View>
 
             {/* Availability Confirmation Checkbox */}
@@ -193,8 +184,7 @@ export default function ApplyModal({
               <View style={[styles.checkbox, availabilityConfirmed && styles.checkboxActive]}>
                 {availabilityConfirmed && <Ionicons name="checkmark" size={16} color={colors.primaryOnColor} />}
               </View>
-              <Text style={styles.checkboxLabel}>
-                I confirm that I am available on the required date and time. <Text style={styles.requiredStar}>*</Text>
+              <Text style={styles.checkboxLabel}>{tr("I confirm that I am available on the required date and time.")}<Text style={styles.requiredStar}>*</Text>
               </Text>
             </TouchableOpacity>
 
@@ -206,7 +196,7 @@ export default function ApplyModal({
                 disabled={submitting}
                 activeOpacity={0.8}
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={styles.cancelBtnText}>{tr("Cancel")}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -220,7 +210,7 @@ export default function ApplyModal({
                 ) : (
                   <>
                     <Ionicons name="paper-plane" size={16} color={colors.primaryOnColor} />
-                    <Text style={styles.applyBtnText}>Submit Application</Text>
+                    <Text style={styles.applyBtnText}>{tr("Submit Application")}</Text>
                   </>
                 )}
               </TouchableOpacity>

@@ -1,3 +1,4 @@
+import { translate as tr } from '../../localization/i18n';
 import { Text, TextInput } from '../LocalizedText';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
@@ -16,9 +17,10 @@ import LanguageSelector from '../LanguageSelector';
 export const authPhoto = require('../../assets/images/auth/gigzy-cafe-hero.png');
 
 export function AuthBrand() {
+  useTranslation();
   return <View style={styles.brand}>
     <View style={styles.brandIcon}><Ionicons name="flash" size={20} color={palette.primary} /></View>
-    <Text style={styles.brandName}>Gigzy<Text style={styles.brandDot}>.</Text></Text>
+    <Text style={styles.brandName}>{tr("Gigzy")}<Text style={styles.brandDot}>.</Text></Text>
   </View>;
 }
 
@@ -128,6 +130,7 @@ export function AuthError({ message }: { message: string }) {
 export function AuthCheckbox({ checked, onPress, children, disabled = false }: {
   checked: boolean; onPress: () => void; children: ReactNode; disabled?: boolean;
 }) {
+  useTranslation();
   return <TouchableOpacity style={styles.checkboxRow} onPress={onPress} disabled={disabled} activeOpacity={0.8}
     accessibilityRole="checkbox" accessibilityState={{ checked, disabled }} aria-checked={checked} aria-disabled={disabled}>
     <View style={[styles.checkbox, checked && styles.checkboxChecked]}>

@@ -1,5 +1,9 @@
+import { formatDate as localizedDate } from '../../localization/format';
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import type { Application } from '../../types/application';
@@ -19,13 +23,14 @@ function formatDate(timestamp: any): string {
     : new Date(timestamp);
 
   if (isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, {
+  return localizedDate(date, {
     month: 'short',
     day: 'numeric',
   });
 }
 
 export default function ApplicantCard({ application, onPress }: ApplicantCardProps) {
+  useTranslation();
   const statusTheme = getStatusTheme(application.status);
   const appliedDate = formatDate(application.createdAt);
   const initial = (application.youthName?.[0] || 'Y').toUpperCase();
@@ -37,7 +42,7 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
       onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel={`Applicant ${application.youthName || 'Youth'}, status ${statusTheme.label}`}
+      accessibilityLabel={tr("Applicant {{value0}}, status {{value1}}", { value0: application.youthName || 'Youth', value1: statusTheme.label })}
     >
       {/* Top Row: Avatar, Name, Status */}
       <View style={styles.topRow}>
@@ -53,11 +58,11 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
         {/* Name and Info */}
         <View style={styles.nameContainer}>
           <Text style={styles.youthName} numberOfLines={1}>
-            {application.youthName || 'Youth Freelancer'}
+            {application.youthName || tr("Youth Freelancer")}
           </Text>
           <View style={styles.metaRow}>
             {appliedDate ? (
-              <Text style={styles.appliedDate}>Applied {appliedDate}</Text>
+              <Text style={styles.appliedDate}>{tr("Applied")}{' '}{appliedDate}</Text>
             ) : null}
             {application.youthRatingAverage && application.youthRatingAverage > 0 ? (
               <View style={styles.ratingBadge}>
@@ -80,7 +85,7 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
         >
           <Ionicons name={statusTheme.icon} size={11} color={statusTheme.text} />
           <Text style={[styles.statusText, { color: statusTheme.text }]}>
-            {statusTheme.label}
+            {tr(statusTheme.label)}
           </Text>
         </View>
       </View>
@@ -88,7 +93,7 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
       {/* Message preview */}
       {application.message ? (
         <Text style={styles.messagePreview} numberOfLines={2}>
-          "{application.message}"
+          {'“'}{application.message}{'”'}
         </Text>
       ) : null}
 
@@ -102,8 +107,7 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
           ))}
           {(application.youthSkills?.length || 0) > 3 ? (
             <Text style={styles.moreSkillsText}>
-              +{application.youthSkills!.length - 3} more
-            </Text>
+              +{application.youthSkills!.length - 3}{' '}{tr("more")}</Text>
           ) : null}
         </View>
       ) : null}
@@ -112,11 +116,11 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
       <View style={styles.footerRow}>
         <View style={styles.availabilityBadge}>
           <Ionicons name="checkmark-circle" size={13} color="#059669" />
-          <Text style={styles.availabilityText}>Available</Text>
+          <Text style={styles.availabilityText}>{tr("Available")}</Text>
         </View>
 
         <View style={styles.viewApplicantBtn}>
-          <Text style={styles.viewApplicantText}>View Applicant</Text>
+          <Text style={styles.viewApplicantText}>{tr("View Applicant")}</Text>
           <Ionicons name="chevron-forward" size={14} color={colors.primary} />
         </View>
       </View>

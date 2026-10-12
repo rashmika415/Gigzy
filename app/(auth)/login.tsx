@@ -1,3 +1,4 @@
+import { translate as tr } from '../../localization/i18n';
 import { Text } from '../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
@@ -50,7 +51,7 @@ export default function Login() {
   return <AuthScreen title={t("Welcome back")} subtitle={t("Your next opportunity is closer than you think.")} eyebrow={t("LET'S GET YOU BACK TO IT")}>
     <View style={authStyles.form}>
       <AuthField label={t("Email address")} icon="mail-outline" value={email} onChangeText={value => { setEmail(value); setError(''); }}
-        placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress" editable={!loading} returnKeyType="next" />
+        placeholder={tr("you@example.com")} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress" editable={!loading} returnKeyType="next" />
       <AuthField label={t("Password")} icon="lock-closed-outline" password value={password} onChangeText={value => { setPassword(value); setError(''); }}
         placeholder={t("Enter your password")} autoCapitalize="none" autoComplete="current-password" textContentType="password" editable={!loading} returnKeyType="go" onSubmitEditing={handleLogin} />
       <TouchableOpacity style={styles.forgot} onPress={() => router.push('/(auth)/forgot-password')} accessibilityRole="link" disabled={loading}>

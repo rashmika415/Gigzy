@@ -1,10 +1,11 @@
+import { translate as tr } from '../localization/i18n';
 import { Text } from './LocalizedText';
 import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View, TouchableOpacity, StyleSheet } from 'react-native';
 import FormField from './FormField';
 import { getCurrentCoordinates } from '../services/locationService';
-import { searchAddresses, type AddressResult } from '../services/geoapifyGeocoding';
+import { addressForCoordinates, searchAddresses, type AddressResult } from '../services/geoapifyGeocoding';
 import LocationMap from './maps/LocationMap';
 import { validCoordinates } from '../services/discoveryFilters';
 import { colors } from '../constants/theme';
@@ -20,6 +21,7 @@ export default function GigLocationField({ address, value, onChange, onAddressSe
   const [failure, setFailure] = useState('');
   const [results, setResults] = useState<AddressResult[]>([]);
   const [manual, setManual] = useState(false);
+  const [editing, setEditing] = useState(!validCoordinates(value));
   const mounted = useRef(true);
   const controller = useRef<AbortController | null>(null);
   const latestCoordinates = useRef(value);
@@ -40,7 +42,24 @@ export default function GigLocationField({ address, value, onChange, onAddressSe
     setLatitude(point.latitude.toFixed(6)); setLongitude(point.longitude.toFixed(6));
     setFailure(''); setResults([]); onChange(point);
   };
+  const resolvePoint = async (point: Coordinates, active: AbortController) => {
+    selectPoint(point);
+    try {
+      const result = await addressForCoordinates(point, process.env.EXPO_PUBLIC_GEOAPIFY_API_KEY ?? '', active.signal);
+      if (mounted.current && controller.current === active && !active.signal.aborted) onAddressSelected?.(result);
+    } catch {
+      if (mounted.current && controller.current === active) setFailure('Pin selected. Enter or check the meeting address above; automatic address lookup is unavailable.');
+    }
+  };
+  const selectMapPoint = async (point: Coordinates) => {
+    controller.current?.abort();
+    const active = new AbortController(); controller.current = active;
+    const timeout = setTimeout(() => active.abort(), 15000);
+    try { await resolvePoint(point, active); }
+    finally { clearTimeout(timeout); }
+  };
   const change = (lat: string, lon: string) => {
+    controller.current?.abort(); controller.current = null;
     setLatitude(lat); setLongitude(lon); setFailure('');
     const point = { latitude: Number(lat), longitude: Number(lon) };
     if (lat.trim() && lon.trim() && validCoordinates(point)) onChange(point);
@@ -53,7 +72,13 @@ export default function GigLocationField({ address, value, onChange, onAddressSe
     const active = new AbortController(); controller.current = active;
     const timeout = setTimeout(() => active.abort(), 15000);
     try {
-      if (current) { const point = await getCurrentCoordinates(); if (mounted.current && controller.current === active) selectPoint(point); }
+      if (current) {
+        const point = await getCurrentCoordinates();
+        if (mounted.current && controller.current === active && !active.signal.aborted) {
+          await resolvePoint(point, active);
+          if (mounted.current && controller.current === active) setEditing(false);
+        }
+      }
       else {
         const matches = await searchAddresses(address, process.env.EXPO_PUBLIC_GEOAPIFY_API_KEY ?? '', active.signal);
         if (!mounted.current || controller.current !== active) return;
@@ -64,6 +89,16 @@ export default function GigLocationField({ address, value, onChange, onAddressSe
     catch (reason) { if (mounted.current && controller.current === active) setFailure(active.signal.aborted ? 'Address search timed out. Please try again.' : reason instanceof Error ? reason.message : 'Unable to locate this gig.'); }
     finally { clearTimeout(timeout); if (mounted.current && controller.current === active) setBusy(false); }
   };
+  if (validCoordinates(value) && !editing) return <View style={styles.container}>
+    <Text style={styles.note}>{t('Selected meeting point')}</Text>
+    {!!address && <Text>{address}</Text>}
+    <LocationMap point={value} compact />
+    <Text style={styles.note}>{t('Youth will see this map and pin on your gig.')}</Text>
+    <TouchableOpacity accessibilityRole="button" disabled={disabled || busy} onPress={() => setEditing(true)}>
+      <Text style={styles.link}>{t('Edit location')}</Text>
+    </TouchableOpacity>
+    {!!(failure || error) && <Text accessibilityRole="alert" style={styles.error}>{t(failure || error || '')}</Text>}
+  </View>;
   return <View style={styles.container}>
     <Text style={styles.note}>{t("Search the address above, use your current location, or tap the map. Drag the pin to the exact meeting point.")}</Text>
     <View style={styles.row}>
@@ -72,14 +107,19 @@ export default function GigLocationField({ address, value, onChange, onAddressSe
     </View>
     {busy && <ActivityIndicator accessibilityLabel={t("Finding location")} color={colors.primary} />}
     {results.map((result, index) => <TouchableOpacity key={`${result.label}-${index}`} accessibilityRole="button" disabled={disabled || busy}
-      style={styles.result} onPress={() => { selectPoint(result.coordinates); onAddressSelected?.(result); }}><Text style={styles.link}>{result.label}</Text></TouchableOpacity>)}
-    <LocationMap point={value} onChange={selectPoint} disabled={disabled || busy} />
+      style={styles.result} onPress={() => { controller.current?.abort(); controller.current = null; selectPoint(result.coordinates); onAddressSelected?.(result); setEditing(false); }}><Text style={styles.link}>{result.label}</Text></TouchableOpacity>)}
+    <LocationMap point={value} onChange={selectMapPoint} disabled={disabled || busy} />
+    {validCoordinates(value) && <Text style={styles.note}>{value.latitude.toFixed(5)}, {value.longitude.toFixed(5)}</Text>}
     <Text style={styles.note}>{validCoordinates(value) ? t("Meeting point selected. Workers will see this pin on the gig.") : t("Choose a meeting point to show workers where to go.")}</Text>
+    {validCoordinates(value) && <Text style={styles.note}>{t("Editing the address keeps this pin. Search again or move the pin if the meeting point changes.")}</Text>}
     <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: manual }} onPress={() => setManual(previous => !previous)}><Text style={styles.link}>{manual ? t("Hide coordinates") : t("Enter coordinates manually")}</Text></TouchableOpacity>
     {manual && <>
-      <FormField label={t("Latitude")} value={latitude} onChangeText={lat => change(lat, longitude)} editable={!disabled && !busy} placeholder="e.g. 6.9271" keyboardType="numbers-and-punctuation" />
-      <FormField label={t("Longitude")} value={longitude} onChangeText={lon => change(latitude, lon)} editable={!disabled && !busy} placeholder="e.g. 79.8612" keyboardType="numbers-and-punctuation" />
+      <FormField label={t("Latitude")} value={latitude} onChangeText={lat => change(lat, longitude)} editable={!disabled && !busy} placeholder={tr("e.g. 6.9271")} keyboardType="numbers-and-punctuation" />
+      <FormField label={t("Longitude")} value={longitude} onChangeText={lon => change(latitude, lon)} editable={!disabled && !busy} placeholder={tr("e.g. 79.8612")} keyboardType="numbers-and-punctuation" />
     </>}
+    {validCoordinates(value) && <TouchableOpacity accessibilityRole="button" disabled={disabled || busy} onPress={() => setEditing(false)}>
+      <Text style={styles.link}>{t('Use this meeting point')}</Text>
+    </TouchableOpacity>}
     {!!(failure || error) && <Text accessibilityRole="alert" style={styles.error}>{t(failure || error || '')}</Text>}
   </View>;
 }

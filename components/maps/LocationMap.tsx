@@ -9,11 +9,13 @@ import { validCoordinates } from '../../services/discoveryFilters';
 import type { Coordinates } from '../../types/gig';
 import { colors, borderRadius } from '../../constants/theme';
 
-export default function LocationMap({ point, onChange, disabled }: { point?: Coordinates; onChange?: (point: Coordinates) => void; disabled?: boolean }) {
+type LocationMapProps = { point?: Coordinates; onChange?: (point: Coordinates) => void; disabled?: boolean; compact?: boolean };
+
+export default function LocationMap({ point, onChange, disabled, compact }: LocationMapProps) {
   const { i18n } = useTranslation();
-  return <LocationMapContent key={i18n.resolvedLanguage} point={point} onChange={onChange} disabled={disabled} />;
+  return <LocationMapContent key={`${i18n.resolvedLanguage}-${!!onChange}`} point={point} onChange={onChange} disabled={disabled} compact={compact} />;
 }
-function LocationMapContent({ point, onChange, disabled }: { point?: Coordinates; onChange?: (point: Coordinates) => void; disabled?: boolean }) {
+function LocationMapContent({ point, onChange, disabled, compact }: LocationMapProps) {
   const { t } = useTranslation();
   const apiKey = process.env.EXPO_PUBLIC_GEOAPIFY_API_KEY?.trim() ?? '';
   // Keep the document stable while dragging; send external coordinate changes through the bridge.
@@ -48,18 +50,19 @@ function LocationMapContent({ point, onChange, disabled }: { point?: Coordinates
     const timer = setTimeout(() => setFailed(true), 25000);
     return () => clearTimeout(timer);
   }, [apiKey, loaded, failed, attempt]);
-  return <View style={styles.map} pointerEvents={disabled ? 'none' : 'auto'}>
-    {!apiKey ? <Text style={styles.note}>{t("Map preview is unavailable. You can still enter coordinates below.")}</Text> : failed ? <View style={styles.overlay}>
+  return <View style={[styles.map, compact && { height: 180 }]} pointerEvents={disabled ? 'none' : 'auto'}>
+    {!apiKey ? <Text style={styles.note}>{onChange ? t("Map preview is unavailable. Use your current location or enter coordinates below.") : t("Map preview is unavailable. Your selected meeting point is kept.")}</Text> : failed ? <View style={styles.overlay}>
       <Text style={styles.note}>{t("Unable to load the map. Your selected location is kept.")}</Text>
       <TouchableOpacity accessibilityRole="button" onPress={() => { setFailed(false); setLoaded(false); setReady(false); setAttempt(value => value + 1); }}><Text style={styles.link}>{t("Retry map")}</Text></TouchableOpacity>
     </View> : <>
       <MapCanvas key={attempt} ref={canvas} html={html} onEvent={receive} />
-      {!loaded && <View pointerEvents="none" style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={styles.note}>{t("Loading map...")}</Text></View>}
+      {!loaded && <View style={[styles.loading, styles.disabled]}><ActivityIndicator color={colors.primary} /><Text style={styles.note}>{t("Loading map...")}</Text></View>}
     </>}
   </View>;
 }
 const styles = StyleSheet.create({
   map: { height: 260, overflow: 'hidden', borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.surfaceBorder, backgroundColor: colors.surface },
+  disabled: { pointerEvents: 'none' },
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16, gap: 12 },
   note: { color: colors.textSecondary, fontSize: 13, textAlign: 'center', padding: 8 },
   loading: { position: 'absolute', top: 10, alignSelf: 'center', backgroundColor: colors.surface, borderRadius: 12, padding: 8, flexDirection: 'row', alignItems: 'center' },

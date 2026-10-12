@@ -25,7 +25,7 @@ if (Platform.OS !== 'web') {
 }
 
 function RootLayoutNav() {
-  const { user, loading } = useAuth();
+  const { user, userData, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -38,15 +38,18 @@ function RootLayoutNav() {
     }
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inAdminGroup = segments[0] === '(admin)';
 
     if (!user && !inAuthGroup) {
       // Not logged in → send to welcome screen
-      router.replace('/(auth)/welcome');
-    } else if (user && inAuthGroup) {
+      router.replace(inAdminGroup ? '/(auth)/login' : '/(auth)/welcome');
+    } else if (user && userData && userData.role === 'admin' && !userData.suspended && !inAdminGroup) {
+      router.replace('/(admin)/dashboard');
+    } else if (user && userData && inAuthGroup) {
       // Logged in → send to app home
       router.replace('/(app)/(tabs)/home');
     }
-  }, [user, loading, segments, router]);
+  }, [user, userData, loading, segments, router]);
 
   return (
     <>

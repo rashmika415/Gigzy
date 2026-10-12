@@ -4,7 +4,7 @@ import { colors } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { SavedGigsProvider } from '../../context/SavedGigsContext';
 import { registerDeviceForPush } from '../../services/pushNotificationService';
-import { subscribeToGigAnnouncements, subscribeToApplicationAnnouncements } from '../../services/notificationService';
+import { subscribeToGigAnnouncements } from '../../services/notificationService';
 
 /**
  * App layout — wraps the tab navigator and all stack-pushed screens.
@@ -23,13 +23,6 @@ export default function AppLayout() {
   const { user, userData, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-
-  useEffect(() => {
-    if (loading || !user?.uid || userData?.role !== 'client' || userData?.suspended) return;
-    return subscribeToApplicationAnnouncements(user.uid, error => {
-      console.warn('Application notification sync failed:', error.message);
-    });
-  }, [loading, user?.uid, userData?.role, userData?.suspended]);
 
   useEffect(() => {
     if (loading || !user?.uid || userData?.role !== 'freelancer' || userData?.suspended) return;
@@ -73,9 +66,9 @@ export default function AppLayout() {
       <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
       <Stack.Screen name="notifications" options={{ headerShown: false }} />
       <Stack.Screen name="suspended" options={{ headerShown: false }} />
-      <Stack.Screen name="chat" options={{ headerShown: false }} />
-      <Stack.Screen name="profile" options={{ headerShown: false }} />
-      <Stack.Screen name="gig" options={{ headerShown: false }} />
+      <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="profile/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="gig/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="applications" options={{ headerShown: false }} />
     </Stack>
     </SavedGigsProvider>

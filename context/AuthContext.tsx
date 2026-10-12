@@ -60,6 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       clearTimeout(safetyTimer);
+      unsubscribeDoc?.();
+      setUserData(null);
+      setLoading(!!firebaseUser);
       setUser(firebaseUser);
       
       if (firebaseUser) {
@@ -69,16 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (snapshot.exists()) {
             setUserData(snapshot.data() as UserData);
           } else {
-            // Fallback profile if Firestore doc hasn't been written yet.
-            // NOTE: This is a temporary state — onSnapshot will deliver the
-            // real document (with the correct role) within milliseconds. The
-            // fallback prevents a null-userData crash in the meantime.
-            setUserData({
-              uid: firebaseUser.uid,
-              fullName: firebaseUser.displayName || 'User',
-              email: firebaseUser.email || '',
-              role: 'freelancer', // safe default; overwritten once Firestore doc arrives
-            });
+            // Keep registration mounted until its profile and referral batch commits.
+            setUserData(null);
           }
           setLoading(false);
         }, (error) => {
