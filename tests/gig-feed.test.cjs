@@ -12,6 +12,7 @@ function setup() {
   let listener;
   let stopped = false;
   const writes = [];
+  const updates = [];
   const rows = Array.from({ length: 30 }, (_, i) => ({
     id: `a${String(i).padStart(2, '0')}`,
     createdAt: { toMillis: () => i + 1 },
@@ -37,7 +38,7 @@ function setup() {
       return { id, path: maybeId ? `${nameOrId}/${maybeId}` : `${parent.name}/${id}` };
     },
     setDoc: async (ref, data) => { writes.push({ ref, data }); },
-    updateDoc: async () => {},
+    updateDoc: async (ref, data) => { updates.push({ ref, data }); },
     serverTimestamp: () => 'server-time',
     increment: (amount) => amount,
     query: (_, ...clauses) => clauses,
@@ -62,7 +63,6 @@ function setup() {
       if (name === 'firebase/firestore') return firestore;
       if (name === '../FirebaseConfig') return { db: {} };
       if (name === './discoveryFilters') return require('./helpers/load-ts.cjs')('../services/discoveryFilters.ts');
-      if (name === './notificationService') return { sendNotification: async () => {} };
       throw new Error(`Unexpected import: ${name}`);
     },
     console: { error: () => {} },
@@ -77,6 +77,7 @@ function setup() {
     },
     fail: () => { failure = { code: 'permission-denied' }; listener?.(); },
     writes,
+    updates,
   };
 }
 
@@ -135,17 +136,26 @@ test('live feed forwards database errors', () => {
   assert.match(message, /Permission denied/);
 });
 
-test('deduplicateGigs removes duplicate IDs and identical content signatures', () => {
+test('updating an existing gig validates and writes modified data to Firestore', async () => {
   const app = setup();
-  const rawList = [
-    { id: 'gig-1', title: 'Dog Walker', postedBy: { uid: 'biz-1' }, date: '2026-10-10', location: 'Colombo' },
-    { id: 'gig-1', title: 'Dog Walker', postedBy: { uid: 'biz-1' }, date: '2026-10-10', location: 'Colombo' }, // duplicate id
-    { id: 'gig-2', title: 'Dog Walker', postedBy: { uid: 'biz-1' }, date: '2026-10-10', location: 'Colombo' }, // identical content signature
-    { id: 'gig-3', title: 'Website Designer', postedBy: { uid: 'biz-1' }, date: '2026-10-15', location: 'Remote' },
-  ];
-
-  const unique = app.service.deduplicateGigs(rawList);
-  assert.equal(unique.length, 2);
-  assert.equal(unique[0].id, 'gig-1');
-  assert.equal(unique[1].id, 'gig-3');
+  const form = {
+    title: 'Updated Website Design',
+    description: 'Provide end-to-end design and redesign for landing page.',
+    category: 'Design & Creative',
+    pay: '350',
+    payType: 'fixed',
+    date: '2099-12-31',
+    location: '',
+    locationType: 'remote',
+    skills: ['Figma', 'UI/UX'],
+  };
+  const result = await app.service.updateGig('gig-123', form);
+  assert.equal(result.syncStatus, 'synced');
+  assert.equal(app.updates.length, 1);
+  assert.equal(app.updates[0].ref.path, 'gigs/gig-123');
+  assert.equal(app.updates[0].data.title, 'Updated Website Design');
+  assert.equal(app.updates[0].data.pay, 350);
+  assert.equal(app.updates[0].data.location, 'Remote (Work from Anywhere)');
+  assert.deepEqual(app.updates[0].data.skills, ['Figma', 'UI/UX']);
+  assert.equal(app.updates[0].data.updatedAt, 'server-time');
 });

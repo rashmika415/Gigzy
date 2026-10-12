@@ -15,11 +15,11 @@ import {
   setDoc,
   startAfter,
   getDocsFromServer,
+  runTransaction,
 } from 'firebase/firestore';
 import type { QueryDocumentSnapshot, QueryConstraint } from 'firebase/firestore';
 import { categoryId, distanceKm, matchesDiscoveryFilters, validCoordinates, validDate, validTime } from './discoveryFilters';
-import { db } from '../FirebaseConfig';
-import { sendNotification } from './notificationService';
+import { auth, db } from '../FirebaseConfig';
 import {
   Gig,
   GigInput,
@@ -90,10 +90,14 @@ export interface CreateGigResult {
   syncStatus: 'synced' | 'pending';
 }
 
+export interface UpdateGigResult {
+  syncStatus: 'synced' | 'pending';
+}
+
 /**
  * Validates all fields of a gig form with timezone-safe date checking.
  */
-export function validateGigForm(form: GigInput): { isValid: boolean; errors: GigValidationErrors } {
+export function validateGigForm(form: GigInput, isEdit = false): { isValid: boolean; errors: GigValidationErrors } {
   const errors: GigValidationErrors = {};
 
   // Title validation
@@ -150,7 +154,7 @@ export function validateGigForm(form: GigInput): { isValid: boolean; errors: Gig
 
       if (isNaN(year) || isNaN(month) || isNaN(day) || month < 1 || month > 12 || day < 1 || day > 31) {
         errors.date = 'Please provide a valid date (YYYY-MM-DD).';
-      } else {
+      } else if (!isEdit) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const gigDay = new Date(year, month - 1, day, 0, 0, 0, 0);
@@ -259,50 +263,65 @@ export async function createGig(
 }
 
 /**
- * Deduplicates an array of gigs by their unique ID and content signature.
- * Prevents duplicate gigs or duplicate snapshots from rendering multiple times.
+ * Updates all details of an existing gig document in Cloud Firestore.
  */
-export function deduplicateGigs(gigs: Gig[]): Gig[] {
-  if (!Array.isArray(gigs)) return [];
-  const seenIds = new Set<string>();
-  const seenSignatures = new Set<string>();
-  const result: Gig[] = [];
-
-  for (const gig of gigs) {
-    if (!gig) continue;
-    const id = gig.id || (gig as any)._id;
-    if (id) {
-      if (seenIds.has(id)) continue;
-      seenIds.add(id);
-    }
-
-    // Check duplicate signature (same creator, same normalized title, same date and location)
-    const creator = gig.postedBy?.uid || (gig as any).clientId || '';
-    const titleNorm = (gig.title || '').trim().toLowerCase();
-    const date = (gig.date || '').trim();
-    const location = (gig.location || '').trim().toLowerCase();
-    const signature = `${creator}::${titleNorm}::${date}::${location}`;
-
-    if (creator && titleNorm && seenSignatures.has(signature)) {
-      continue;
-    }
-    if (creator && titleNorm) {
-      seenSignatures.add(signature);
-    }
-
-    result.push(gig);
+export async function updateGig(
+  gigId: string,
+  input: GigInput,
+): Promise<UpdateGigResult> {
+  const { isValid, errors } = validateGigForm(input, true);
+  if (!isValid) {
+    const firstError = Object.values(errors)[0];
+    throw new Error(firstError || 'Validation failed. Please check form inputs.');
   }
 
-  return result;
+  const numericPay = parseFloat(input.pay.replace(/[^0-9.]/g, ''));
+  const finalLocation =
+    input.locationType === 'remote'
+      ? input.location.trim() || 'Remote (Work from Anywhere)'
+      : input.location.trim();
+
+  const cleanSkills = input.skills.filter((s) => s.trim().length > 0);
+  const keywords = generateSearchKeywords(input.title, input.category, cleanSkills, finalLocation);
+
+  const updatedData: Record<string, any> = {
+    title: input.title.trim(),
+    description: input.description.trim(),
+    category: input.category.trim(),
+    categoryId: categoryId(input.category),
+    pay: numericPay,
+    payType: input.payType,
+    date: input.date.trim(),
+    location: finalLocation,
+    locationType: input.locationType,
+    skills: cleanSkills,
+    searchKeywords: keywords,
+    updatedAt: serverTimestamp(),
+  };
+
+  if (input.time) {
+    updatedData.time = input.time;
+  }
+  if (input.locationType !== 'remote' && input.coordinates) {
+    updatedData.coordinates = input.coordinates;
+  }
+
+  try {
+    const docRef = doc(db, 'gigs', gigId);
+    const write = updateDoc(docRef, updatedData);
+    const syncStatus = await waitForWrite(write, 20000);
+    return { syncStatus };
+  } catch (error: any) {
+    console.error('Firestore updateGig error:', error);
+    throw new Error(parseFirebaseError(error));
+  }
 }
 
 /**
  * Sorts an array of gigs in memory by createdAt descending with fallback for pending server timestamps.
- * Also deduplicates the list to ensure no duplicate gigs are returned.
  */
 function sortGigsDesc(gigs: Gig[]): Gig[] {
-  const unique = deduplicateGigs(gigs);
-  return unique.sort((a, b) => {
+  return [...gigs].sort((a, b) => {
     const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt || Date.now()).getTime();
     const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt || Date.now()).getTime();
     return timeB - timeA;
@@ -416,7 +435,7 @@ export function calculateBusinessGigStats(gigs: Gig[]): BusinessGigStats {
  * Filters and sorts an array of gigs in memory according to specified filter criteria.
  */
 export function filterAndSortGigs(gigs: Gig[], options: GigFilterOptions): Gig[] {
-  let result = deduplicateGigs(gigs);
+  let result = [...gigs];
 
   // 1. Filter by Status
   if (options.status && options.status !== 'all') {
@@ -519,145 +538,35 @@ export async function getBrowsePage(
 }
 
 /**
- * Updates all editable fields of an existing gig in Cloud Firestore.
- */
-export async function updateGig(
-  gigId: string,
-  input: GigInput,
-  user: { uid: string },
-): Promise<{ id: string; syncStatus: 'synced' | 'pending' }> {
-  const { isValid, errors } = validateGigForm(input);
-  if (!isValid) {
-    const firstError = Object.values(errors)[0];
-    throw new Error(firstError || 'Validation failed. Please check form inputs.');
-  }
-
-  const numericPay = parseFloat(input.pay.replace(/[^0-9.]/g, ''));
-  const finalLocation =
-    input.locationType === 'remote'
-      ? input.location.trim() || 'Remote (Work from Anywhere)'
-      : input.location.trim();
-
-  const cleanSkills = input.skills.filter((s) => s.trim().length > 0);
-  const keywords = generateSearchKeywords(input.title, input.category, cleanSkills, finalLocation);
-
-  const gigDocData = {
-    title: input.title.trim(),
-    description: input.description.trim(),
-    category: input.category.trim(),
-    pay: numericPay,
-    payType: input.payType,
-    date: input.date.trim(),
-    location: finalLocation,
-    locationType: input.locationType,
-    skills: cleanSkills,
-    searchKeywords: keywords,
-    updatedAt: serverTimestamp(),
-  };
-
-  try {
-    const docRef = doc(db, 'gigs', gigId);
-    const write = updateDoc(docRef, gigDocData);
-    const syncStatus = await waitForWrite(write, 20000);
-    return { id: gigId, syncStatus };
-  } catch (error: any) {
-    console.error('Firestore updateGig error:', error);
-    throw new Error(parseFirebaseError(error));
-  }
-}
-
-/**
  * Updates the status of a gig (e.g. 'open' -> 'in-progress' -> 'completed' -> 'cancelled').
- * Also synchronizes applicant applications and delivers in-app notifications.
  */
 export async function updateGigStatus(gigId: string, status: GigStatus): Promise<void> {
   try {
     const docRef = doc(db, 'gigs', gigId);
-
-    // 1. Fetch current gig info for notifications
-    let gigTitle = '';
-    try {
-      const currentSnap = await getDoc(docRef);
-      if (currentSnap.exists()) {
-        const gigData = currentSnap.data();
-        gigTitle = gigData.title || '';
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('Please log in to manage your gigs.');
+    await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(docRef);
+      if (!snapshot.exists()) throw new Error('Gig not found.');
+      const gig = snapshot.data();
+      if (gig.postedBy?.uid !== uid) {
+        throw new Error('Only the business owner who posted this gig can change its status.');
       }
-    } catch {}
-
-    // 2. Update the gig document
-    await updateDoc(docRef, {
-      status,
-      updatedAt: serverTimestamp(),
+      if (gig.status === status) return;
+      if (status === 'closed' && gig.status !== 'open') {
+        throw new Error('Only open gigs can be closed.');
+      }
+      transaction.update(docRef, { status, updatedAt: serverTimestamp() });
     });
-
-    // 3. Find associated applications to notify applicants & update status
-    try {
-      const appsSnap = await getDocs(
-        query(collection(db, 'applications'), where('gigId', '==', gigId))
-      );
-
-      for (const appDoc of appsSnap.docs) {
-        const appData = appDoc.data();
-        const youthId = appData.youthId;
-        if (!youthId) continue;
-
-        let newAppStatus: string | null = null;
-        let notifTitle = '';
-        let notifBody = '';
-
-        if (status === 'in-progress') {
-          newAppStatus = 'accepted';
-          notifTitle = 'Application Accepted! 🎉';
-          notifBody = `Great news! The business owner has started work on "${gigTitle || 'your gig'}". Your application was accepted!`;
-        } else if (status === 'completed') {
-          newAppStatus = 'completed';
-          notifTitle = 'Gig Completed! ✅';
-          notifBody = `The gig "${gigTitle || 'your gig'}" has been marked as completed. Thank you for your work!`;
-        } else if (status === 'cancelled') {
-          newAppStatus = 'rejected';
-          notifTitle = 'Gig Cancelled ℹ️';
-          notifBody = `The gig "${gigTitle || 'your gig'}" was cancelled by the business owner.`;
-        } else if (status === 'open') {
-          notifTitle = 'Gig Reopened 📢';
-          notifBody = `The gig "${gigTitle || 'your gig'}" is now open for applications.`;
-        }
-
-        // Update application document status if relevant
-        if (newAppStatus) {
-          try {
-            await updateDoc(doc(db, 'applications', appDoc.id), {
-              status: newAppStatus,
-              updatedAt: serverTimestamp(),
-            });
-          } catch (appErr) {
-            console.warn('Could not update application document status:', appErr);
-          }
-        }
-
-        // Send in-app notification to the youth freelancer
-        if (notifTitle) {
-          try {
-            await sendNotification(youthId, {
-              userId: youthId,
-              type: 'application',
-              title: notifTitle,
-              body: notifBody,
-              read: false,
-              route: `/(app)/gig/${gigId}`,
-              entityId: appDoc.id,
-            });
-          } catch (notifErr) {
-            console.warn('Could not send gig status notification:', notifErr);
-          }
-        }
-      }
-    } catch (appsErr) {
-      console.warn('Could not sync applications on gig status change:', appsErr);
-    }
   } catch (error: any) {
     console.error('Firestore updateGigStatus error:', error);
     throw new Error(parseFirebaseError(error));
   }
+}
+
+/** Close an open gig after the server verifies ownership and current status. */
+export async function closeGig(gigId: string): Promise<void> {
+  await updateGigStatus(gigId, 'closed');
 }
 
 /**
