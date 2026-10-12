@@ -59,9 +59,6 @@ export default function Home() {
       return;
     }
 
-    setLoadingGigs(true);
-    setLoadError('');
-
     let unsubscribe: () => void = () => {};
 
     if (role === 'client') {
@@ -69,6 +66,7 @@ export default function Home() {
       unsubscribe = subscribeToClientGigs(
         user.uid,
         (clientGigs) => {
+          setLoadError('');
           setGigs(clientGigs);
           setLoadingGigs(false);
         },
@@ -82,6 +80,7 @@ export default function Home() {
       unsubscribe = subscribeToRecentGigs(
         10,
         (recentGigs) => {
+          setLoadError('');
           setGigs(recentGigs);
           setLoadingGigs(false);
         },
@@ -684,10 +683,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    boxShadow: `0px 4px 8px ${colors.primary}4D`,
     elevation: 4,
   },
   postGigButtonText: {

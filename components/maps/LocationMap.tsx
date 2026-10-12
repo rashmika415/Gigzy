@@ -48,18 +48,19 @@ function LocationMapContent({ point, onChange, disabled }: { point?: Coordinates
     const timer = setTimeout(() => setFailed(true), 25000);
     return () => clearTimeout(timer);
   }, [apiKey, loaded, failed, attempt]);
-  return <View style={styles.map} pointerEvents={disabled ? 'none' : 'auto'}>
+  return <View style={[styles.map, disabled && styles.disabled]}>
     {!apiKey ? <Text style={styles.note}>{t("Map preview is unavailable. You can still enter coordinates below.")}</Text> : failed ? <View style={styles.overlay}>
       <Text style={styles.note}>{t("Unable to load the map. Your selected location is kept.")}</Text>
       <TouchableOpacity accessibilityRole="button" onPress={() => { setFailed(false); setLoaded(false); setReady(false); setAttempt(value => value + 1); }}><Text style={styles.link}>{t("Retry map")}</Text></TouchableOpacity>
     </View> : <>
       <MapCanvas key={attempt} ref={canvas} html={html} onEvent={receive} />
-      {!loaded && <View pointerEvents="none" style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={styles.note}>{t("Loading map...")}</Text></View>}
+      {!loaded && <View style={[styles.loading, styles.disabled]}><ActivityIndicator color={colors.primary} /><Text style={styles.note}>{t("Loading map...")}</Text></View>}
     </>}
   </View>;
 }
 const styles = StyleSheet.create({
   map: { height: 260, overflow: 'hidden', borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.surfaceBorder, backgroundColor: colors.surface },
+  disabled: { pointerEvents: 'none' },
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16, gap: 12 },
   note: { color: colors.textSecondary, fontSize: 13, textAlign: 'center', padding: 8 },
   loading: { position: 'absolute', top: 10, alignSelf: 'center', backgroundColor: colors.surface, borderRadius: 12, padding: 8, flexDirection: 'row', alignItems: 'center' },

@@ -73,9 +73,9 @@ export default function AppLayout() {
       <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
       <Stack.Screen name="notifications" options={{ headerShown: false }} />
       <Stack.Screen name="suspended" options={{ headerShown: false }} />
-      <Stack.Screen name="chat" options={{ headerShown: false }} />
-      <Stack.Screen name="profile" options={{ headerShown: false }} />
-      <Stack.Screen name="gig" options={{ headerShown: false }} />
+      <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="profile/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="gig/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="applications" options={{ headerShown: false }} />
     </Stack>
     </SavedGigsProvider>
