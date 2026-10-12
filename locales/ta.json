@@ -948,4 +948,18 @@
   "Gig removed by a moderator": "நடுவரால் வேலை அகற்றப்பட்டது",
   "This gig is no longer available. Existing applications remain in your application history.": "இந்த வேலை இனி கிடைக்காது. ஏற்கனவே உள்ள விண்ணப்பங்கள் உங்கள் விண்ணப்ப வரலாற்றில் இருக்கும்.",
   "Youth": "இளைஞர்கள்"
+,  "Inspect": "Inspect",
+  "System notifications": "System notifications",
+  "Send an in-app announcement to one member, all youth, all businesses, or everyone.": "Send an in-app announcement to one member, all youth, all businesses, or everyone.",
+  "Selected user": "Selected user",
+  "Recipient: {{name}}": "Recipient: {{name}}",
+  "Choose a recipient from User management using Inspect.": "Choose a recipient from User management using Inspect.",
+  "Inspect recipient": "Inspect recipient",
+  "Notification title": "Notification title",
+  "Notification message": "Notification message",
+  "Send notification": "Send notification",
+  "Admin audit log": "Admin audit log",
+  "Privileged profile, verification, badge, moderation and notification actions appear here.": "Privileged profile, verification, badge, moderation and notification actions appear here.",
+  "Admin action": "Admin action",
+  "No admin actions recorded yet.": "No admin actions recorded yet."
 }

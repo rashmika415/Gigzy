@@ -6,19 +6,22 @@ import { signOut } from 'firebase/auth';
 import { useTranslation } from 'react-i18next';
 import { Text, TextInput } from '../LocalizedText';
 import LanguageSelector from '../LanguageSelector';
+import AdminUserInspector from './AdminUserInspector';
 import { useAuth } from '../../context/AuthContext';
 import { auth } from '../../FirebaseConfig';
 import { colors, fonts } from '../../constants/theme';
-import { fetchAdminPage, fetchAdminStats, removeGigFromDiscovery, setUserSuspension } from '../../services/adminService';
-import type { AdminCursor, AdminStats, AdminUser } from '../../services/adminService';
+import { fetchAdminAuditLogs, fetchAdminPage, fetchAdminStats, removeGigFromDiscovery, sendSystemNotification, setUserSuspension } from '../../services/adminService';
+import type { AdminAuditLog, AdminCursor, AdminStats, AdminUser, NotificationAudience } from '../../services/adminService';
 import type { Gig } from '../../types/gig';
 
-type Panel = 'overview' | 'users' | 'gigs';
+type Panel = 'overview' | 'users' | 'gigs' | 'notifications' | 'audit';
 type Action = { kind: 'suspend' | 'reinstate' | 'remove'; id: string; name: string };
 const PANELS: { key: Panel; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'overview', label: 'Overview', icon: 'grid-outline' },
   { key: 'users', label: 'Users', icon: 'people-outline' },
   { key: 'gigs', label: 'Gigs', icon: 'briefcase-outline' },
+  { key: 'notifications', label: 'Notifications', icon: 'notifications-outline' },
+  { key: 'audit', label: 'Audit log', icon: 'list-outline' },
 ];
 const message = (error: unknown) => error instanceof Error ? error.message : 'Could not load dashboard. Please retry.';
 
@@ -46,6 +49,13 @@ export default function AdminDashboardScreen() {
   const [notice, setNotice] = useState('');
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
+  const [selectedUser, setSelectedUser] = useState<AdminUser>();
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
+  const [audience, setAudience] = useState<NotificationAudience>('user');
+  const [notificationTitle, setNotificationTitle] = useState('');
+  const [notificationBody, setNotificationBody] = useState('');
+  const [sendingNotification, setSendingNotification] = useState(false);
   const pageRequest = useRef(0);
   const mounted = useRef(true);
   const actionLock = useRef(false);
@@ -59,7 +69,7 @@ export default function AdminDashboardScreen() {
   }, [revision]);
   useEffect(() => {
     const request = ++pageRequest.current;
-    if (panel === 'overview') return;
+    if (panel !== 'users' && panel !== 'gigs') return;
     void Promise.resolve().then(async () => {
       if (!mounted.current || request !== pageRequest.current) return;
       setListLoading(true); setListError(''); setCursor(undefined); setHasMore(false); setRows([]);
@@ -71,10 +81,22 @@ export default function AdminDashboardScreen() {
       finally { if (mounted.current && request === pageRequest.current) setListLoading(false); }
     });
   }, [panel, revision]);
+  useEffect(() => {
+    if (panel !== 'audit') return;
+    let active = true;
+    void Promise.resolve().then(async () => {
+      if (!active) return;
+      setListLoading(true); setListError('');
+      try { const value = await fetchAdminAuditLogs(); if (active) setAuditLogs(value); }
+      catch (error) { if (active) setListError(message(error)); }
+      finally { if (active) setListLoading(false); }
+    });
+    return () => { active = false; };
+  }, [panel, revision]);
   const refresh = () => { setStatsLoading(true); setStatsError(''); setRevision(value => value + 1); };
   const selectPanel = (next: Panel) => { if (next === panel) return; pageRequest.current++; setListLoading(false); setPanel(next); setSearch(''); setFilter('all'); setNotice(''); setExpandedGig(''); };
   const loadMore = async () => {
-    if (listLoading || !hasMore || panel === 'overview') return;
+    if (listLoading || !hasMore || (panel !== 'users' && panel !== 'gigs')) return;
     const request = ++pageRequest.current;
     setListLoading(true); setListError('');
     try {
@@ -102,6 +124,16 @@ export default function AdminDashboardScreen() {
     try { await signOut(auth); }
     catch { if (mounted.current) setLogoutError('Could not sign out. Please retry.'); }
     finally { if (mounted.current) setLoggingOut(false); }
+  };
+  const sendAnnouncement = async () => {
+    if (sendingNotification) return;
+    setSendingNotification(true); setListError(''); setNotice('');
+    try {
+      const count = await sendSystemNotification(audience, notificationTitle, notificationBody, selectedUser?.id);
+      if (!mounted.current) return;
+      setNotice(`Notification sent to ${count} member${count === 1 ? '' : 's'}.`); setNotificationTitle(''); setNotificationBody('');
+    } catch (error) { if (mounted.current) setListError(message(error)); }
+    finally { if (mounted.current) setSendingNotification(false); }
   };
   const label = (value: string) => t(({ all: 'All', active: 'Active', suspended: 'Suspended', freelancer: 'Youth', client: 'Business', admin: 'Administrator', removed: 'Removed' } as Record<string, string>)[value] || value);
   const filters = panel === 'users' ? ['all', 'active', 'suspended', 'freelancer', 'client', 'admin'] : ['all', 'open', 'filled', 'in-progress', 'completed', 'closed', 'removed'];
@@ -151,7 +183,7 @@ export default function AdminDashboardScreen() {
             <View style={styles.section}><Text style={styles.sectionTitle}>{t('Quick actions')}</Text><View style={styles.actions}>
               <Button title={t('Manage users')} icon="people-outline" onPress={() => selectPanel('users')} primary /><Button title={t('Manage gigs')} icon="briefcase-outline" onPress={() => selectPanel('gigs')} />
             </View><Text style={styles.secondary}>{t('Suspend accounts or remove gigs from discovery with a recorded reason.')}</Text></View>
-          </> : <View style={styles.section}>
+          </> : panel === 'users' || panel === 'gigs' ? <View style={styles.section}>
             <Text style={styles.sectionTitle}>{panel === 'users' ? t('User management') : t('Gig management')}</Text>
             <TextInput accessibilityLabel={t('Search loaded records')} placeholder={t('Search loaded records')} value={search} onChangeText={setSearch} style={styles.input} autoCapitalize="none" />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{filters.map(value =>
@@ -164,8 +196,9 @@ export default function AdminDashboardScreen() {
                   <View style={styles.rowCopy}><Text style={styles.rowTitle}>{item.fullName || item.businessName || t('Unnamed user')}</Text><Text selectable style={styles.secondary}>{item.email || item.id}</Text>
                     <View style={styles.badges}><Badge label={label(item.role)} /><Badge label={item.suspended ? t('Suspended') : t('Active')} danger={!!item.suspended} /></View>
                     {!!item.suspended && !!item.suspensionReason && <Text style={styles.secondary}>{item.suspensionReason}</Text>}</View>
-                  {item.role !== 'admin' && item.id !== user?.uid && <Button title={item.suspended ? t('Reinstate') : t('Suspend')} danger={!item.suspended}
-                    onPress={() => openAction({ kind: item.suspended ? 'reinstate' : 'suspend', id: item.id, name: item.fullName || item.email || item.id })} />}</View>;
+                  <View style={styles.actions}><Button title={t('Inspect')} icon="eye-outline" onPress={() => { setSelectedUser(item); setInspectorOpen(true); }} />
+                    {item.role !== 'admin' && item.id !== user?.uid && <Button title={item.suspended ? t('Reinstate') : t('Suspend')} danger={!item.suspended}
+                      onPress={() => openAction({ kind: item.suspended ? 'reinstate' : 'suspend', id: item.id, name: item.fullName || item.email || item.id })} />}</View></View>;
               }
               const item = row as Gig;
               return <View key={item.id} style={styles.row}><View style={styles.rowCopy}><Text style={styles.rowTitle}>{item.title || t('Untitled gig')}</Text>
@@ -186,6 +219,21 @@ export default function AdminDashboardScreen() {
             {!!listError && <View style={styles.errorBox}><Text accessibilityRole="alert" style={styles.error}>{t('Could not load records. Please retry.')}</Text><Button title={t('Retry')} onPress={cursor ? loadMore : refresh} /></View>}
             {!listLoading && !listError && !visible.length && <View style={styles.empty}><Ionicons name="search-outline" size={32} color={colors.textMuted} /><Text style={styles.secondary}>{t('No matching records loaded.')}</Text></View>}
             {hasMore && !listLoading && <Button title={t('Load more')} onPress={loadMore} />}
+          </View> : panel === 'notifications' ? <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('System notifications')}</Text>
+            <Text style={styles.secondary}>{t('Send an in-app announcement to one member, all youth, all businesses, or everyone.')}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{(['user', 'freelancer', 'client', 'all'] as NotificationAudience[]).map(value =>
+              <TouchableOpacity key={value} onPress={() => setAudience(value)} style={[styles.filter, audience === value && styles.selected]}><Text style={audience === value ? styles.selectedText : styles.secondary}>{value === 'user' ? t('Selected user') : label(value)}</Text></TouchableOpacity>)}</ScrollView>
+            {audience === 'user' && <View style={styles.notificationTarget}><Text style={styles.secondary}>{selectedUser ? t('Recipient: {{name}}', { name: selectedUser.fullName || selectedUser.businessName || selectedUser.email }) : t('Choose a recipient from User management using Inspect.')}</Text>{selectedUser && <Button title={t('Inspect recipient')} icon="eye-outline" onPress={() => setInspectorOpen(true)} />}</View>}
+            <TextInput accessibilityLabel={t('Notification title')} placeholder={t('Notification title')} value={notificationTitle} onChangeText={setNotificationTitle} maxLength={80} style={styles.input} />
+            <TextInput accessibilityLabel={t('Notification message')} placeholder={t('Notification message')} value={notificationBody} onChangeText={setNotificationBody} maxLength={500} multiline style={[styles.input, styles.reason]} />
+            {!!listError && <Text accessibilityRole="alert" style={styles.error}>{listError}</Text>}
+            <View style={styles.actions}><Button title={t('Send notification')} icon="send-outline" primary busy={sendingNotification} disabled={audience === 'user' && !selectedUser} onPress={sendAnnouncement} /></View>
+          </View> : <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('Admin audit log')}</Text><Text style={styles.secondary}>{t('Privileged profile, verification, badge, moderation and notification actions appear here.')}</Text>
+            {listLoading && <ActivityIndicator color={colors.primary} />}{!!listError && <Text accessibilityRole="alert" style={styles.error}>{listError}</Text>}
+            {auditLogs.map(log => <View key={log.id} style={styles.auditRow}><View style={styles.auditDot} /><View style={styles.rowCopy}><Text style={styles.rowTitle}>{log.action || t('Admin action')}</Text><Text style={styles.secondary}>{log.details || log.targetPath || log.targetUserId || ''}</Text><Text selectable style={styles.recordId}>{log.adminId} · {formatAdminDate(log.createdAt)}</Text></View></View>)}
+            {!listLoading && !auditLogs.length && <Text style={styles.secondary}>{t('No admin actions recorded yet.')}</Text>}
           </View>}
         </ScrollView>
       </View>
@@ -200,7 +248,13 @@ export default function AdminDashboardScreen() {
         <View style={styles.actions}><Button title={t('Cancel')} disabled={acting} onPress={() => setAction(undefined)} /><Button title={t('Confirm')} danger={action?.kind !== 'reinstate'} primary={action?.kind === 'reinstate'} busy={acting} onPress={confirmAction} /></View>
       </ScrollView></KeyboardAvoidingView>
     </Modal>
+    <AdminUserInspector member={inspectorOpen ? selectedUser : undefined} onClose={() => setInspectorOpen(false)} onChanged={refresh} />
   </SafeAreaView>;
+}
+
+function formatAdminDate(value: any) {
+  const date = value?.toDate?.() ?? (value ? new Date(value) : null);
+  return date && !Number.isNaN(date.getTime()) ? date.toLocaleString() : 'Pending';
 }
 
 function Button({ title, onPress, primary, danger, disabled, busy, icon }: { title: string; onPress: () => void; primary?: boolean; danger?: boolean; disabled?: boolean; busy?: boolean; icon?: keyof typeof Ionicons.glyphMap }) {
@@ -230,4 +284,5 @@ const styles = StyleSheet.create({
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }, badge: { borderRadius: 7, paddingVertical: 3, paddingHorizontal: 8, backgroundColor: colors.primaryLight }, badgeText: { fontSize: 12, color: colors.primary, fontWeight: '600' }, recordId: { fontSize: 11, color: colors.textMuted },
   summaryRow: { gap: 8 }, summaryLabels: { flexDirection: 'row', justifyContent: 'space-between' }, track: { height: 7, borderRadius: 4, overflow: 'hidden', backgroundColor: colors.surfaceElevated }, progress: { height: 7, borderRadius: 4 }, error: { color: colors.error, lineHeight: 22 }, success: { color: colors.success, backgroundColor: colors.successLight, padding: 12, borderRadius: 10 },
   errorBox: { gap: 10, padding: 12, backgroundColor: colors.errorLight, borderRadius: 10 }, loader: { padding: 20 }, empty: { alignItems: 'center', gap: 12, padding: 28 }, overlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', padding: 24 }, dialog: { flexGrow: 0, width: '100%', maxWidth: 520, maxHeight: '90%', alignSelf: 'center', backgroundColor: colors.surface, borderRadius: 20 }, dialogContent: { padding: 24, gap: 20 }, reason: { minHeight: 110, textAlignVertical: 'top' },
+  notificationTarget: { gap: 10, padding: 12, borderRadius: 10, backgroundColor: colors.surfaceElevated, alignItems: 'flex-start' }, auditRow: { flexDirection: 'row', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderColor: colors.surfaceBorderSubtle }, auditDot: { width: 9, height: 9, marginTop: 6, borderRadius: 5, backgroundColor: colors.primary },
 });
