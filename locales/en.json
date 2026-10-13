@@ -982,5 +982,11 @@
   "{{count}} stars": "{{count}} stars",
   "Review (optional)": "Review (optional)",
   "Submit Review": "Submit Review",
-  "View Applications": "View Applications"
+  "View Applications": "View Applications",
+  "Add Ratings": "Add Ratings",
+  "Search job seekers": "Search job seekers",
+  "Complete a gig with this job seeker to rate them.": "Complete a gig with this job seeker to rate them.",
+  "No job seekers found.": "No job seekers found.",
+  "Could not load job seekers.": "Could not load job seekers.",
+  "Only business users can add ratings.": "Only business users can add ratings."
 }

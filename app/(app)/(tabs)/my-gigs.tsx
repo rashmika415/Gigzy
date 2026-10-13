@@ -300,6 +300,15 @@ export default function MyGigs() {
           />
         }
       >
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={[styles.metricCard, { marginBottom: spacing.md }]}
+          onPress={() => router.push('/(app)/add-ratings' as any)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="star-outline" size={22} color={colors.primary} />
+          <Text style={styles.metricLabel}>{tr("Add Ratings")}</Text>
+        </TouchableOpacity>
         <AppBanner compact kind="business" title={tr("Good help, close to home.")} description={tr("Manage your opportunities and connect with local talent.")} />
         {/* Business Metrics Carousel / Grid */}
         <View style={styles.metricsSection}>

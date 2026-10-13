@@ -982,5 +982,11 @@
   "{{count}} stars": "තරු {{count}}",
   "Review (optional)": "සමාලෝචනය (විකල්ප)",
   "Submit Review": "සමාලෝචනය ඉදිරිපත් කරන්න",
-  "View Applications": "අයදුම්පත් බලන්න"
+  "View Applications": "අයදුම්පත් බලන්න",
+  "Add Ratings": "ශ්‍රේණිගත කිරීම් එක් කරන්න",
+  "Search job seekers": "රැකියා සොයන්නන් සොයන්න",
+  "Complete a gig with this job seeker to rate them.": "මෙම රැකියා සොයන්නා ශ්‍රේණිගත කිරීමට ඔවුන් සමඟ කාර්යයක් සම්පූර්ණ කරන්න.",
+  "No job seekers found.": "රැකියා සොයන්නන් හමු නොවීය.",
+  "Could not load job seekers.": "රැකියා සොයන්නන් පූරණය කළ නොහැක.",
+  "Only business users can add ratings.": "ශ්‍රේණිගත කිරීම් එක් කළ හැක්කේ ව්‍යාපාරික පරිශීලකයන්ට පමණි."
 }

@@ -982,5 +982,11 @@
   "{{count}} stars": "{{count}} நட்சத்திரங்கள்",
   "Review (optional)": "விமர்சனம் (விருப்பத்தேர்வு)",
   "Submit Review": "விமர்சனத்தைச் சமர்ப்பிக்கவும்",
-  "View Applications": "விண்ணப்பங்களைப் பார்க்கவும்"
+  "View Applications": "விண்ணப்பங்களைப் பார்க்கவும்",
+  "Add Ratings": "மதிப்பீடுகளைச் சேர்க்கவும்",
+  "Search job seekers": "வேலை தேடுபவர்களைத் தேடுங்கள்",
+  "Complete a gig with this job seeker to rate them.": "இவரை மதிப்பிட இவருடன் ஒரு பணியை முடிக்கவும்.",
+  "No job seekers found.": "வேலை தேடுபவர்கள் எவரும் இல்லை.",
+  "Could not load job seekers.": "வேலை தேடுபவர்களை ஏற்ற முடியவில்லை.",
+  "Only business users can add ratings.": "வணிகப் பயனர்கள் மட்டுமே மதிப்பீடுகளைச் சேர்க்கலாம்."
 }
