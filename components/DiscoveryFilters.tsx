@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import FormField from './FormField';
 import Chip from './Chip';
 import SegmentedControl from './SegmentedControl';
-import { colors, spacing } from '../constants/theme';
+import { colors, spacing, fonts } from '../constants/theme';
 import { validDate, validTime } from '../services/discoveryFilters';
 import { getCurrentCoordinates } from '../services/locationService';
 import type { GigFilterOptions } from '../types/gig';
@@ -70,8 +70,8 @@ export default function DiscoveryFilters({ visible, value, onApply, onClose }: {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background }, content: { padding: spacing.lg, gap: spacing.md },
   row: { padding: spacing.lg, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { color: colors.text, fontSize: 22, fontWeight: '700' }, label: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  note: { color: colors.textMuted, lineHeight: 20 }, link: { color: colors.primary, fontWeight: '600', paddingVertical: 8 },
+  title: { color: colors.text, fontSize: 22, fontFamily: fonts.heading }, label: { color: colors.text, fontSize: 16, fontFamily: fonts.bodyBold },
+  note: { color: colors.textMuted, lineHeight: 20 }, link: { color: colors.primary, fontFamily: fonts.bodySemiBold, paddingVertical: 8 },
   error: { color: colors.error }, button: { backgroundColor: colors.primary, padding: 16, borderRadius: 16, alignItems: 'center' },
-  buttonText: { color: colors.primaryOnColor, fontWeight: '700' },
+  buttonText: { color: colors.primaryOnColor, fontFamily: fonts.bodyBold },
 });

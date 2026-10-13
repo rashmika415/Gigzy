@@ -5,7 +5,7 @@ import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application } from '../../types/application';
 import { getStatusTheme } from './ApplicationCard';
 
@@ -66,7 +66,7 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
             ) : null}
             {application.youthRatingAverage && application.youthRatingAverage > 0 ? (
               <View style={styles.ratingBadge}>
-                <Ionicons name="star" size={11} color="#F59E0B" />
+                <Ionicons name="star" size={11} color={colors.star} />
                 <Text style={styles.ratingText}>
                   {application.youthRatingAverage.toFixed(1)}
                   {application.youthRatingCount ? ` (${application.youthRatingCount})` : ''}
@@ -115,7 +115,7 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
       {/* Action Footer */}
       <View style={styles.footerRow}>
         <View style={styles.availabilityBadge}>
-          <Ionicons name="checkmark-circle" size={13} color="#059669" />
+          <Ionicons name="checkmark-circle" size={13} color={colors.success} />
           <Text style={styles.availabilityText}>{tr("Available")}</Text>
         </View>
 
@@ -157,15 +157,15 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: colors.primaryBorder,
   },
   avatarText: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   nameContainer: {
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   },
   youthName: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     letterSpacing: -0.2,
   },
@@ -191,15 +191,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: colors.warningLight,
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
   },
   ratingText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#D97706',
+    fontFamily: fonts.bodyBold,
+    color: colors.warning,
   },
   statusPill: {
     flexDirection: 'row',
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   messagePreview: {
     fontSize: 13,
@@ -238,13 +238,13 @@ const styles = StyleSheet.create({
   },
   skillText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   moreSkillsText: {
     fontSize: 11,
     color: colors.textMuted,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   footerRow: {
     flexDirection: 'row',
@@ -262,8 +262,8 @@ const styles = StyleSheet.create({
   },
   availabilityText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
+    fontFamily: fonts.bodySemiBold,
+    color: colors.success,
   },
   viewApplicantBtn: {
     flexDirection: 'row',
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   },
   viewApplicantText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.primary,
   },
 });

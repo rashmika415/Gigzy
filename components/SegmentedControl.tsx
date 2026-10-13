@@ -2,7 +2,7 @@ import { Text } from './LocalizedText';
 import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { colors, borderRadius } from '../constants/theme';
+import { colors, borderRadius, fonts } from '../constants/theme';
 
 interface SegmentOption {
   /** Unique key for the segment */
@@ -97,6 +97,8 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 14,
     gap: 6,
+    minHeight: 40,
+    justifyContent: 'center',
   },
   tabSelected: {
     backgroundColor: colors.primary,
@@ -104,12 +106,12 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   tabTextSelected: {
     color: colors.primaryOnColor,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
   },
   badge: {
     backgroundColor: colors.surfaceElevated,
@@ -122,7 +124,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.textSecondary,
   },
   badgeTextSelected: {

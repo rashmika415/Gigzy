@@ -2,7 +2,7 @@ import { Text } from './LocalizedText';
 import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { colors, spacing, borderRadius } from '../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../constants/theme';
 
 interface LoadingStateProps {
   /** Message displayed below the spinner */
@@ -38,6 +38,6 @@ const styles = StyleSheet.create({
   text: {
     color: colors.textSecondary,
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
 });

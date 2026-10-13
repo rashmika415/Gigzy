@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../localization/i18n';
+import { formatCurrency } from '../../localization/format';
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '../../constants/theme';
+import { colors, spacing, fonts } from '../../constants/theme';
 import { ParticipantDetail } from '../../types/messaging';
 
 interface ChatHeaderProps {
@@ -65,7 +66,7 @@ export default function ChatHeader({
             <Ionicons name="briefcase-outline" size={12} color={colors.primary} />
             <Text style={styles.gigTitle} numberOfLines={1}>
               {gigTitle}
-              {gigPay ? ` • $${gigPay}${gigPayType === 'hourly' ? '/hr' : ''}` : ''}
+              {gigPay ? ` • ${formatCurrency(gigPay)}${gigPayType === 'hourly' ? tr('/hr') : ''}` : ''}
             </Text>
           </TouchableOpacity>
         ) : (
@@ -118,8 +119,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarCircleBusiness: {
-    backgroundColor: 'rgba(44, 73, 104, 0.3)',
-    borderColor: '#7BA6D6',
+    backgroundColor: colors.accentLight,
+    borderColor: colors.accent,
   },
   avatarImage: {
     width: 40,
@@ -130,11 +131,11 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   avatarTextBusiness: {
-    color: '#ADC9EE',
+    color: colors.accent,
   },
   onlineDot: {
     position: 'absolute',
@@ -153,7 +154,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   gigRow: {
@@ -165,7 +166,7 @@ const styles = StyleSheet.create({
   gigTitle: {
     fontSize: 12,
     color: colors.primary,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   roleRow: {
     flexDirection: 'row',
@@ -182,12 +183,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   roleDotBusiness: {
-    backgroundColor: '#7BA6D6',
+    backgroundColor: colors.accent,
   },
   roleText: {
     fontSize: 11,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   detailsBtn: {
     padding: spacing.xs,

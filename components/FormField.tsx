@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { View, StyleSheet, Platform, ViewStyle, TextInputProps, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../constants/theme';
 
 interface FormFieldProps extends Omit<TextInputProps, 'style'> {
   /** Field label displayed above the input */
@@ -130,17 +130,17 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.text,
   },
   asterisk: {
     color: colors.error,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   charCount: {
     fontSize: 11,
     color: colors.textMuted,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 12,
     color: colors.error,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
     flex: 1,
   },
   hintText: {
