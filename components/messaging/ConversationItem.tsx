@@ -1,7 +1,11 @@
+import { formatCurrency, formatDate as localizedDate } from '../../localization/format';
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import { Conversation, ParticipantDetail } from '../../types/messaging';
 
 interface ConversationItemProps {
@@ -24,7 +28,7 @@ function formatTimestamp(timestamp: any): string {
   if (diffHours < 24) return `${diffHours}h`;
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays}d`;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return localizedDate(date, { month: 'short', day: 'numeric' });
 }
 
 export default function ConversationItem({
@@ -32,6 +36,7 @@ export default function ConversationItem({
   currentUserId,
   onPress,
 }: ConversationItemProps) {
+  useTranslation();
   const otherUid =
     conversation.participants?.find((p) => p !== currentUserId) ||
     (conversation.youthId === currentUserId ? conversation.businessId : conversation.youthId) ||
@@ -80,11 +85,11 @@ export default function ConversationItem({
         <View style={styles.headerRow}>
           <View style={styles.nameBlock}>
             <Text style={[styles.name, isUnread && styles.nameBold]} numberOfLines={1}>
-              {other.fullName || 'User'}
+              {other.fullName || tr("User")}
             </Text>
             <View style={[styles.roleTag, isBusiness ? styles.roleTagBusiness : styles.roleTagYouth]}>
               <Text style={[styles.roleTagText, isBusiness ? styles.roleTagTextBusiness : styles.roleTagTextYouth]}>
-                {isBusiness ? 'Client' : 'Freelancer'}
+                {isBusiness ? tr("Client") : tr("Freelancer")}
               </Text>
             </View>
           </View>
@@ -98,14 +103,14 @@ export default function ConversationItem({
             <Ionicons name="briefcase-outline" size={11} color={colors.primary} />
             <Text style={styles.gigPillText} numberOfLines={1}>
               {conversation.gigTitle}
-              {conversation.gigPay ? ` • $${conversation.gigPay}` : ''}
+              {conversation.gigPay ? ` • ${formatCurrency(conversation.gigPay)}` : ''}
             </Text>
           </View>
         )}
 
         <View style={styles.messageRow}>
           <Text style={[styles.previewText, isUnread && styles.previewTextUnread]} numberOfLines={1}>
-            {isSentByMe ? 'You: ' : ''}
+            {isSentByMe ? tr("You: ") : ''}
             {lastMessageText}
           </Text>
           {unreadCount > 0 && (
@@ -155,16 +160,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarCircleBusiness: {
-    backgroundColor: 'rgba(44, 73, 104, 0.3)',
-    borderColor: '#7BA6D6',
+    backgroundColor: colors.accentLight,
+    borderColor: colors.accent,
   },
   avatarText: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   avatarTextBusiness: {
-    color: '#ADC9EE',
+    color: colors.accent,
   },
   unreadDot: {
     position: 'absolute',
@@ -195,12 +200,12 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.text,
   },
   nameBold: {
-    fontWeight: '800',
-    color: '#FFF',
+    fontFamily: fonts.bodyBold,
+    color: colors.text,
   },
   roleTag: {
     paddingHorizontal: 6,
@@ -210,21 +215,21 @@ const styles = StyleSheet.create({
   },
   roleTagYouth: {
     backgroundColor: colors.primaryLight,
-    borderColor: 'rgba(111, 216, 199, 0.3)',
+    borderColor: colors.primaryBorder,
   },
   roleTagBusiness: {
-    backgroundColor: 'rgba(44, 73, 104, 0.3)',
-    borderColor: 'rgba(123, 166, 214, 0.4)',
+    backgroundColor: colors.accentLight,
+    borderColor: colors.accentBorder,
   },
   roleTagText: {
     fontSize: 9,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   roleTagTextYouth: {
     color: colors.primary,
   },
   roleTagTextBusiness: {
-    color: '#ADC9EE',
+    color: colors.accent,
   },
   time: {
     fontSize: 11,
@@ -232,13 +237,13 @@ const styles = StyleSheet.create({
   },
   timeUnread: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   gigPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(111, 216, 199, 0.08)',
+    backgroundColor: colors.primaryLight,
     borderRadius: borderRadius.sm,
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -247,7 +252,7 @@ const styles = StyleSheet.create({
   gigPillText: {
     fontSize: 11,
     color: colors.primary,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   messageRow: {
     flexDirection: 'row',
@@ -262,7 +267,7 @@ const styles = StyleSheet.create({
   },
   previewTextUnread: {
     color: colors.text,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   badge: {
     backgroundColor: colors.primary,
@@ -275,7 +280,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
   },
 });

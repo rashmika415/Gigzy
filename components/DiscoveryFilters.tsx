@@ -1,3 +1,4 @@
+import { translate as tr } from '../localization/i18n';
 import { Text } from './LocalizedText';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
@@ -6,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import FormField from './FormField';
 import Chip from './Chip';
 import SegmentedControl from './SegmentedControl';
-import { colors, spacing } from '../constants/theme';
+import { colors, spacing, fonts } from '../constants/theme';
 import { validDate, validTime } from '../services/discoveryFilters';
 import { getCurrentCoordinates } from '../services/locationService';
 import type { GigFilterOptions } from '../types/gig';
@@ -54,10 +55,10 @@ export default function DiscoveryFilters({ visible, value, onApply, onClose }: {
         {draft.origin && <Text style={styles.note}>{t("Location ready. Distances are measured in a straight line.")}</Text>}
         <FormField label={t("Within (km)")} value={radius} onChangeText={setRadius} keyboardType="decimal-pad" hint={t("Remote gigs are included. Gigs without coordinates are excluded when distance is set.")} />
         <Text style={styles.label}>{t("Availability")}</Text>
-        <FormField label={t("Available from")} placeholder="YYYY-MM-DD" value={draft.dateFrom ?? ''} onChangeText={dateFrom => setDraft({ ...draft, dateFrom })} />
-        <FormField label={t("Available through")} placeholder="YYYY-MM-DD" value={draft.dateTo ?? ''} onChangeText={dateTo => setDraft({ ...draft, dateTo })} />
-        <FormField label={t("Earliest start time")} placeholder="HH:MM (24-hour)" value={draft.timeFrom ?? ''} onChangeText={timeFrom => setDraft({ ...draft, timeFrom })} />
-        <FormField label={t("Latest start time")} placeholder="HH:MM (24-hour)" value={draft.timeTo ?? ''} onChangeText={timeTo => setDraft({ ...draft, timeTo })} hint={t("Times use the gig's local time. Gigs without a start time are excluded when time filters are set.")} />
+        <FormField label={t("Available from")} placeholder={tr("YYYY-MM-DD")} value={draft.dateFrom ?? ''} onChangeText={dateFrom => setDraft({ ...draft, dateFrom })} />
+        <FormField label={t("Available through")} placeholder={tr("YYYY-MM-DD")} value={draft.dateTo ?? ''} onChangeText={dateTo => setDraft({ ...draft, dateTo })} />
+        <FormField label={t("Earliest start time")} placeholder={tr("HH:MM (24-hour)")} value={draft.timeFrom ?? ''} onChangeText={timeFrom => setDraft({ ...draft, timeFrom })} />
+        <FormField label={t("Latest start time")} placeholder={tr("HH:MM (24-hour)")} value={draft.timeTo ?? ''} onChangeText={timeTo => setDraft({ ...draft, timeTo })} hint={t("Times use the gig's local time. Gigs without a start time are excluded when time filters are set.")} />
         <Chip label={t("Weekends only")} variant={draft.weekendsOnly ? 'selected' : 'default'} onPress={() => setDraft({ ...draft, weekendsOnly: !draft.weekendsOnly })} />
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{t(error ?? "")}</Text>}
         <TouchableOpacity style={styles.button} onPress={apply} disabled={locating}><Text style={styles.buttonText}>{t("Apply filters")}</Text></TouchableOpacity>
@@ -69,8 +70,8 @@ export default function DiscoveryFilters({ visible, value, onApply, onClose }: {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background }, content: { padding: spacing.lg, gap: spacing.md },
   row: { padding: spacing.lg, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { color: colors.text, fontSize: 22, fontWeight: '700' }, label: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  note: { color: colors.textMuted, lineHeight: 20 }, link: { color: colors.primary, fontWeight: '600', paddingVertical: 8 },
+  title: { color: colors.text, fontSize: 22, fontFamily: fonts.heading }, label: { color: colors.text, fontSize: 16, fontFamily: fonts.bodyBold },
+  note: { color: colors.textMuted, lineHeight: 20 }, link: { color: colors.primary, fontFamily: fonts.bodySemiBold, paddingVertical: 8 },
   error: { color: colors.error }, button: { backgroundColor: colors.primary, padding: 16, borderRadius: 16, alignItems: 'center' },
-  buttonText: { color: colors.primaryOnColor, fontWeight: '700' },
+  buttonText: { color: colors.primaryOnColor, fontFamily: fonts.bodyBold },
 });

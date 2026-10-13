@@ -1,7 +1,11 @@
+import { formatDate as localizedDate } from '../../localization/format';
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application } from '../../types/application';
 import { getStatusTheme } from './ApplicationCard';
 
@@ -19,13 +23,14 @@ function formatDate(timestamp: any): string {
     : new Date(timestamp);
 
   if (isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, {
+  return localizedDate(date, {
     month: 'short',
     day: 'numeric',
   });
 }
 
 export default function ApplicantCard({ application, onPress }: ApplicantCardProps) {
+  useTranslation();
   const statusTheme = getStatusTheme(application.status);
   const appliedDate = formatDate(application.createdAt);
   const initial = (application.youthName?.[0] || 'Y').toUpperCase();
@@ -37,7 +42,7 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
       onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel={`Applicant ${application.youthName || 'Youth'}, status ${statusTheme.label}`}
+      accessibilityLabel={tr("Applicant {{value0}}, status {{value1}}", { value0: application.youthName || 'Youth', value1: statusTheme.label })}
     >
       {/* Top Row: Avatar, Name, Status */}
       <View style={styles.topRow}>
@@ -53,15 +58,15 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
         {/* Name and Info */}
         <View style={styles.nameContainer}>
           <Text style={styles.youthName} numberOfLines={1}>
-            {application.youthName || 'Youth Freelancer'}
+            {application.youthName || tr("Youth Freelancer")}
           </Text>
           <View style={styles.metaRow}>
             {appliedDate ? (
-              <Text style={styles.appliedDate}>Applied {appliedDate}</Text>
+              <Text style={styles.appliedDate}>{tr("Applied")}{' '}{appliedDate}</Text>
             ) : null}
             {application.youthRatingAverage && application.youthRatingAverage > 0 ? (
               <View style={styles.ratingBadge}>
-                <Ionicons name="star" size={11} color="#F59E0B" />
+                <Ionicons name="star" size={11} color={colors.star} />
                 <Text style={styles.ratingText}>
                   {application.youthRatingAverage.toFixed(1)}
                   {application.youthRatingCount ? ` (${application.youthRatingCount})` : ''}
@@ -80,7 +85,7 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
         >
           <Ionicons name={statusTheme.icon} size={11} color={statusTheme.text} />
           <Text style={[styles.statusText, { color: statusTheme.text }]}>
-            {statusTheme.label}
+            {tr(statusTheme.label)}
           </Text>
         </View>
       </View>
@@ -88,7 +93,7 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
       {/* Message preview */}
       {application.message ? (
         <Text style={styles.messagePreview} numberOfLines={2}>
-          "{application.message}"
+          {'“'}{application.message}{'”'}
         </Text>
       ) : null}
 
@@ -102,8 +107,7 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
           ))}
           {(application.youthSkills?.length || 0) > 3 ? (
             <Text style={styles.moreSkillsText}>
-              +{application.youthSkills!.length - 3} more
-            </Text>
+              +{application.youthSkills!.length - 3}{' '}{tr("more")}</Text>
           ) : null}
         </View>
       ) : null}
@@ -111,12 +115,12 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
       {/* Action Footer */}
       <View style={styles.footerRow}>
         <View style={styles.availabilityBadge}>
-          <Ionicons name="checkmark-circle" size={13} color="#059669" />
-          <Text style={styles.availabilityText}>Available</Text>
+          <Ionicons name="checkmark-circle" size={13} color={colors.success} />
+          <Text style={styles.availabilityText}>{tr("Available")}</Text>
         </View>
 
         <View style={styles.viewApplicantBtn}>
-          <Text style={styles.viewApplicantText}>View Applicant</Text>
+          <Text style={styles.viewApplicantText}>{tr("View Applicant")}</Text>
           <Ionicons name="chevron-forward" size={14} color={colors.primary} />
         </View>
       </View>
@@ -153,15 +157,15 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: colors.primaryBorder,
   },
   avatarText: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   nameContainer: {
@@ -169,7 +173,7 @@ const styles = StyleSheet.create({
   },
   youthName: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     letterSpacing: -0.2,
   },
@@ -187,15 +191,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: colors.warningLight,
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
   },
   ratingText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#D97706',
+    fontFamily: fonts.bodyBold,
+    color: colors.warning,
   },
   statusPill: {
     flexDirection: 'row',
@@ -208,7 +212,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   messagePreview: {
     fontSize: 13,
@@ -234,13 +238,13 @@ const styles = StyleSheet.create({
   },
   skillText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   moreSkillsText: {
     fontSize: 11,
     color: colors.textMuted,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   footerRow: {
     flexDirection: 'row',
@@ -258,8 +262,8 @@ const styles = StyleSheet.create({
   },
   availabilityText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
+    fontFamily: fonts.bodySemiBold,
+    color: colors.success,
   },
   viewApplicantBtn: {
     flexDirection: 'row',
@@ -268,7 +272,7 @@ const styles = StyleSheet.create({
   },
   viewApplicantText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.primary,
   },
 });

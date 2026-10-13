@@ -1,18 +1,13 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  RefreshControl,
-  ActivityIndicator,
-  TouchableOpacity,
-  TextInput,
-} from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { Text, TextInput } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import { Conversation } from '../../types/messaging';
 import ConversationItem from './ConversationItem';
+import SkeletonList from '../Skeleton';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -41,6 +36,7 @@ export default function ConversationList({
   onTabChange,
   onExploreGigs,
 }: ConversationListProps) {
+  useTranslation();
   const filteredConversations = useMemo(() => {
     return conversations.filter((conv) => {
       const otherUid =
@@ -82,7 +78,7 @@ export default function ConversationList({
           <Ionicons name="search-outline" size={18} color={colors.placeholder} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search conversations, names, or gigs..."
+            placeholder={tr("Search conversations, names, or gigs...")}
             placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={onSearchChange}
@@ -132,10 +128,7 @@ export default function ConversationList({
         }
       >
         {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Syncing conversations...</Text>
-          </View>
+          <SkeletonList variant="row" count={5} />
         ) : filteredConversations.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconCircle}>
@@ -143,23 +136,23 @@ export default function ConversationList({
             </View>
             <Text style={styles.emptyTitle}>
               {searchQuery
-                ? 'No matching conversations'
+                ? tr("No matching conversations")
                 : activeTab === 'unread'
-                ? 'All caught up!'
-                : 'No conversations yet'}
+                ? tr("All caught up!")
+                : tr("No conversations yet")}
             </Text>
             <Text style={styles.emptySubtitle}>
               {searchQuery
-                ? 'Try a different search term or check spelling.'
+                ? tr("Try a different search term or check spelling.")
                 : activeTab === 'unread'
-                ? 'You have read all received messages.'
-                : 'Connect with employers or youth freelancers from gig applications to start chatting.'}
+                ? tr("You have read all received messages.")
+                : tr("Connect with employers or youth freelancers from gig applications to start chatting.")}
             </Text>
 
             {onExploreGigs && !searchQuery && (
               <TouchableOpacity style={styles.exploreButton} onPress={onExploreGigs} activeOpacity={0.85}>
                 <Ionicons name="briefcase-outline" size={16} color={colors.primaryOnColor} />
-                <Text style={styles.exploreButtonText}>Explore Gigs</Text>
+                <Text style={styles.exploreButtonText}>{tr("Explore Gigs")}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -211,7 +204,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(135, 147, 144, 0.1)',
+    borderBottomColor: colors.surfaceElevated,
   },
   tabButton: {
     paddingVertical: 6,
@@ -220,6 +213,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.surfaceBorderSubtle,
+    minHeight: 40,
+    justifyContent: 'center',
   },
   tabButtonActive: {
     backgroundColor: colors.primaryLight,
@@ -227,12 +222,12 @@ const styles = StyleSheet.create({
   },
   tabButtonText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   tabButtonTextActive: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   scroll: {
     flex: 1,
@@ -265,14 +260,14 @@ const styles = StyleSheet.create({
     borderRadius: 36,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: 'rgba(111, 216, 199, 0.2)',
+    borderColor: colors.primaryBorder,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
   emptyTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   emptySubtitle: {
@@ -294,7 +289,7 @@ const styles = StyleSheet.create({
   },
   exploreButtonText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
   },
 });

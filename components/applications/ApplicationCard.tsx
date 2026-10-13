@@ -1,7 +1,11 @@
+import { formatDate as localizedDate } from '../../localization/format';
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application, ApplicationStatus } from '../../types/application';
 
 interface ApplicationCardProps {
@@ -14,34 +18,34 @@ export function getStatusTheme(status: ApplicationStatus) {
     case 'accepted':
       return {
         label: 'Accepted',
-        bg: 'rgba(16, 185, 129, 0.12)',
-        text: '#059669',
-        border: 'rgba(16, 185, 129, 0.3)',
+        bg: colors.successLight,
+        text: colors.success,
+        border: colors.successBorder,
         icon: 'checkmark-circle' as const,
       };
     case 'rejected':
       return {
         label: 'Rejected',
-        bg: 'rgba(239, 68, 68, 0.12)',
-        text: '#DC2626',
-        border: 'rgba(239, 68, 68, 0.3)',
+        bg: colors.errorLight,
+        text: colors.error,
+        border: colors.errorBorder,
         icon: 'close-circle' as const,
       };
     case 'completed':
       return {
         label: 'Completed',
-        bg: 'rgba(99, 102, 241, 0.12)',
-        text: '#4F46E5',
-        border: 'rgba(99, 102, 241, 0.3)',
+        bg: colors.infoLight,
+        text: colors.info,
+        border: colors.infoBorder,
         icon: 'trophy' as const,
       };
     case 'pending':
     default:
       return {
         label: 'Pending',
-        bg: 'rgba(245, 158, 11, 0.12)',
-        text: '#D97706',
-        border: 'rgba(245, 158, 11, 0.3)',
+        bg: colors.warningLight,
+        text: colors.warning,
+        border: colors.warningBorder,
         icon: 'time' as const,
       };
   }
@@ -56,7 +60,7 @@ function formatDate(timestamp: any): string {
     : new Date(timestamp);
 
   if (isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, {
+  return localizedDate(date, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -64,6 +68,7 @@ function formatDate(timestamp: any): string {
 }
 
 export default function ApplicationCard({ application, onPress }: ApplicationCardProps) {
+  useTranslation();
   const statusTheme = getStatusTheme(application.status);
   const appliedDate = formatDate(application.createdAt);
 
@@ -73,18 +78,18 @@ export default function ApplicationCard({ application, onPress }: ApplicationCar
       onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel={`Application for ${application.gigTitle || 'Gig'}, status ${statusTheme.label}`}
+      accessibilityLabel={tr("Application for {{value0}}, status {{value1}}", { value0: application.gigTitle || 'Gig', value1: statusTheme.label })}
     >
       {/* Top Header Row */}
       <View style={styles.topRow}>
         <View style={styles.headerLeft}>
           <Text style={styles.gigTitle} numberOfLines={1}>
-            {application.gigTitle || 'Gig Opportunity'}
+            {application.gigTitle || tr("Gig Opportunity")}
           </Text>
           <View style={styles.businessRow}>
             <Ionicons name="business-outline" size={13} color={colors.textSecondary} />
             <Text style={styles.businessName} numberOfLines={1}>
-              {application.businessName || 'Business Owner'}
+              {application.businessName || tr("Business Owner")}
             </Text>
           </View>
         </View>
@@ -98,7 +103,7 @@ export default function ApplicationCard({ application, onPress }: ApplicationCar
         >
           <Ionicons name={statusTheme.icon} size={12} color={statusTheme.text} />
           <Text style={[styles.statusText, { color: statusTheme.text }]}>
-            {statusTheme.label}
+            {tr(statusTheme.label)}
           </Text>
         </View>
       </View>
@@ -106,7 +111,7 @@ export default function ApplicationCard({ application, onPress }: ApplicationCar
       {/* Message snippet preview */}
       {application.message ? (
         <Text style={styles.messagePreview} numberOfLines={2}>
-          "{application.message}"
+          {'“'}{application.message}{'”'}
         </Text>
       ) : null}
 
@@ -130,7 +135,7 @@ export default function ApplicationCard({ application, onPress }: ApplicationCar
               <Ionicons name="wallet-outline" size={12} color={colors.primary} />
               <Text style={styles.payText}>
                 ${application.gigPay}
-                {application.gigPayType === 'hourly' ? '/hr' : ' fixed'}
+                {application.gigPayType === 'hourly' ? tr("/hr") : tr(" fixed")}
               </Text>
             </View>
           ) : null}
@@ -139,7 +144,7 @@ export default function ApplicationCard({ application, onPress }: ApplicationCar
         {appliedDate ? (
           <View style={styles.metaItem}>
             <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
-            <Text style={styles.metaText}>Applied {appliedDate}</Text>
+            <Text style={styles.metaText}>{tr("Applied")}{' '}{appliedDate}</Text>
           </View>
         ) : null}
       </View>
@@ -172,7 +177,7 @@ const styles = StyleSheet.create({
   },
   gigTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     letterSpacing: -0.2,
     marginBottom: 4,
@@ -185,7 +190,7 @@ const styles = StyleSheet.create({
   businessName: {
     fontSize: 13,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   statusPill: {
     flexDirection: 'row',
@@ -198,7 +203,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   messagePreview: {
     fontSize: 13,
@@ -235,7 +240,7 @@ const styles = StyleSheet.create({
   },
   payText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
 });

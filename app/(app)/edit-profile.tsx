@@ -10,10 +10,11 @@ import { prepareProfilePhoto } from '../../services/profilePhoto';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../FirebaseConfig';
 import { useAuth } from '../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import { GIG_CATEGORIES } from '../../types/gig';
 import { parseFirebaseError } from '../../services/gigService';
 import { ProfileValidationErrors } from '../../types/profile';
+import { useToast } from '../../context/ToastContext';
 
 const AVAILABILITY_OPTIONS = [
   'Full-Time',
@@ -25,6 +26,7 @@ const AVAILABILITY_OPTIONS = [
 export default function EditProfile() {
   const { t } = useTranslation();
   const { user, userData } = useAuth();
+  const toast = useToast();
 
   // Initialization flag
   const [isInitialized, setIsInitialized] = useState(false);
@@ -162,10 +164,7 @@ export default function EditProfile() {
       
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          t("Permissions Required"),
-          t("We need access to your photos to upload a profile photo/logo. Please enable it in settings.")
-        );
+        toast.info(t("Permissions Required"), t("We need access to your photos to upload a profile photo/logo. Please enable it in settings."));
         return;
       }
 
@@ -181,7 +180,7 @@ export default function EditProfile() {
       }
     } catch (e) {
       console.error(e);
-      Alert.alert(t("Error"), t("Failed to pick image."));
+      toast.error(t("Failed to pick image."));
     }
   };
 
@@ -192,7 +191,7 @@ export default function EditProfile() {
       setPhotoURL(await prepareProfilePhoto(asset.uri));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
-      Alert.alert(t("Photo Error"), t(error instanceof Error ? error.message : "Could not prepare this photo. Please try another image."));
+      toast.error(t("Photo Error"), t(error instanceof Error ? error.message : "Could not prepare this photo. Please try another image."));
     } finally {
       setUploadingImage(false);
     }
@@ -263,7 +262,7 @@ export default function EditProfile() {
 
     if (!validateForm()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert(t("Validation Error"), t("Please correct the errors in the form before saving."));
+      toast.error(t("Validation Error"), t("Please correct the errors in the form before saving."));
       return;
     }
 
@@ -315,7 +314,7 @@ export default function EditProfile() {
 
     } catch (e: any) {
       console.error(e);
-      Alert.alert(t("Save Failed"), parseFirebaseError(e));
+      toast.error(t("Save Failed"), parseFirebaseError(e));
     } finally {
       setSaving(false);
     }
@@ -392,7 +391,7 @@ export default function EditProfile() {
 
               {uploadingImage ? (
                 <View style={styles.uploadOverlay}>
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={colors.primaryOnColor} />
                 </View>
               ) : (
                 <View style={styles.cameraIconContainer}>
@@ -723,28 +722,32 @@ const styles = StyleSheet.create({
   headerButton: {
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerButtonText: {
     color: colors.textSecondary,
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   saveText: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   disabledButton: {
     opacity: 0.5,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   successBox: {
     backgroundColor: colors.successLight,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: colors.successBorder,
     borderRadius: borderRadius.sm,
     padding: spacing.sm,
     marginBottom: spacing.lg,
@@ -752,7 +755,7 @@ const styles = StyleSheet.create({
   successText: {
     color: colors.success,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     textAlign: 'center',
   },
   photoSection: {
@@ -785,7 +788,7 @@ const styles = StyleSheet.create({
   },
   photoFallbackText: {
     fontSize: 38,
-    fontWeight: '800',
+    fontFamily: fonts.display,
     color: colors.primary,
   },
   cameraIconContainer: {
@@ -815,7 +818,7 @@ const styles = StyleSheet.create({
   photoHelperText: {
     fontSize: 13,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   card: {
     backgroundColor: colors.surface,
@@ -835,7 +838,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.textSecondary,
     marginBottom: spacing.xs,
     textTransform: 'uppercase',
@@ -871,7 +874,7 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontSize: 12,
     marginTop: spacing.xs,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   selectorInput: {
     flexDirection: 'row',
@@ -898,6 +901,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: borderRadius.full,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   chipActive: {
     backgroundColor: colors.primaryLight,
@@ -906,7 +911,7 @@ const styles = StyleSheet.create({
   chipText: {
     color: colors.textSecondary,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   chipTextActive: {
     color: colors.primary,
@@ -921,7 +926,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: colors.primaryOnColor,
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   modalOverlay: {
     flex: 1,
@@ -945,11 +950,15 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   modalCloseIcon: {
-    padding: spacing.xs,
+    padding: spacing.xs,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalList: {
     paddingHorizontal: spacing.lg,
@@ -962,7 +971,7 @@ const styles = StyleSheet.create({
     borderColor: colors.surfaceBorder,
   },
   modalItemActive: {
-    backgroundColor: 'rgba(245, 158, 11, 0.04)',
+    backgroundColor: colors.primaryLight,
   },
   modalItemIcon: {
     marginRight: spacing.md,
@@ -972,10 +981,10 @@ const styles = StyleSheet.create({
   modalItemText: {
     fontSize: 16,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   modalItemTextActive: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
 });

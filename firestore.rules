@@ -4,7 +4,7 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function owns(userId) { return signedIn() && request.auth.uid == userId; }
     function currentUser() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
-    function isAdmin() { return signedIn() && currentUser().data.role == 'admin'; }
+    function isAdmin() { return signedIn() && currentUser().data.role == 'admin' && currentUser().data.get('suspended', false) != true; }
     function active() {
       return signedIn() &&
         (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
@@ -23,14 +23,28 @@ service cloud.firestore {
         'ratingAverage', 'ratingCount', 'skillBadges'
       ]);
     }
+    function validReferralCodeUpdate(userId) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['referralCode'])
+        || (!resource.data.keys().hasAny(['referralCode'])
+          && request.resource.data.referralCode is string
+          && request.resource.data.referralCode.matches('[A-Z0-9]{10}')
+          && getAfter(/databases/$(database)/documents/referralCodes/$(request.resource.data.referralCode)).data.ownerId == userId);
+    }
     match /users/{userId} {
       allow read: if signedIn();
       allow create: if owns(userId) && validRole() && validProfilePhoto()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.get('suspended', false) != true
-        && request.resource.data.get('isVerified', false) != true;
-      allow update: if isAdmin() || (owns(userId) && active() && protectedUserFieldsUnchanged()
+        && request.resource.data.get('isVerified', false) != true
+        && !request.resource.data.keys().hasAny(['referralCode']);
+      allow update: if (isAdmin() && userId != request.auth.uid && resource.data.role != 'admin'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suspended', 'suspensionReason', 'updatedAt'])
+        && request.resource.data.suspended is bool
+        && request.resource.data.suspensionReason is string && request.resource.data.suspensionReason.size() <= 500
+        && (!request.resource.data.suspended || request.resource.data.suspensionReason.size() >= 5)
+        && request.resource.data.updatedAt == request.time)
+        || (owns(userId) && active() && protectedUserFieldsUnchanged() && validReferralCodeUpdate(userId)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || validProfilePhoto()));
       allow delete: if false;
       match /savedGigs/{gigId} {
@@ -97,6 +111,59 @@ service cloud.firestore {
         allow read, create, update, delete: if owns(userId) && active();
       }
     }
+    match /referralCodes/{code} {
+      // Public lookup exposes only the code owner ID, never profile or contact data.
+      allow get: if true;
+      allow list: if false;
+      allow create: if active() && code.matches('[A-Z0-9]{10}')
+        && request.resource.data.keys().hasOnly(['ownerId', 'createdAt'])
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && !currentUser().data.keys().hasAny(['referralCode'])
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.referralCode == code;
+      allow update, delete: if false;
+    }
+    match /referrals/{newUserId} {
+      allow read: if signedIn() && (request.auth.uid == newUserId || resource.data.referrerId == request.auth.uid);
+      allow create: if owns(newUserId)
+        && !exists(/databases/$(database)/documents/users/$(newUserId))
+        && existsAfter(/databases/$(database)/documents/users/$(newUserId))
+        && request.resource.data.keys().hasOnly(['referrerId', 'referralCode', 'createdAt'])
+        && request.resource.data.referrerId != newUserId
+        && request.resource.data.referrerId == get(/databases/$(database)/documents/referralCodes/$(request.resource.data.referralCode)).data.ownerId
+        && get(/databases/$(database)/documents/users/$(request.resource.data.referrerId)).data.get('suspended', false) != true
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+    match /applications/{applicationId} {
+      function participant() { return request.auth.uid == resource.data.youthId || request.auth.uid == resource.data.businessId; }
+      allow get: if active() && (!exists(/databases/$(database)/documents/applications/$(applicationId)) || participant());
+      allow list: if isAdmin() || (active() && participant());
+      allow create: if active() && currentUser().data.role == 'freelancer'
+        && request.resource.data.youthId == request.auth.uid
+        && applicationId == 'app_' + request.resource.data.gigId + '_' + request.auth.uid
+        && request.resource.data.applicationId == applicationId
+        && request.resource.data.businessId == get(/databases/$(database)/documents/gigs/$(request.resource.data.gigId)).data.postedBy.uid
+        && request.resource.data.businessId != request.auth.uid
+        && get(/databases/$(database)/documents/gigs/$(request.resource.data.gigId)).data.status == 'open'
+        && getAfter(/databases/$(database)/documents/gigs/$(request.resource.data.gigId)).data.status == 'open'
+        && request.resource.data.status == 'pending'
+        && request.resource.data.message is string && request.resource.data.message.size() >= 5 && request.resource.data.message.size() <= 500
+        && request.resource.data.availabilityConfirmed == true
+        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+      allow update: if active() && request.auth.uid == resource.data.businessId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && ((resource.data.status == 'pending' && request.resource.data.status == 'rejected')
+          || (resource.data.status == 'pending' && request.resource.data.status == 'accepted'
+            && get(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.status == 'open'
+            && getAfter(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.assignedYouthId == resource.data.youthId
+            && getAfter(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.acceptedApplicationId == applicationId
+            && getAfter(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.status in ['in-progress', 'filled'])
+          || (resource.data.status == 'accepted' && request.resource.data.status == 'completed'
+            && getAfter(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.status == 'completed'));
+      allow delete: if false;
+    }
     match /gigs/{gigId} {
       allow read: if signedIn();
       allow create: if active() && currentUser().data.role == 'client'
@@ -104,8 +171,17 @@ service cloud.firestore {
         && request.resource.data.title is string && request.resource.data.title.size() >= 5
         && request.resource.data.description is string && request.resource.data.description.size() >= 20
         && request.resource.data.pay is number && request.resource.data.pay > 0
+        && !request.resource.data.keys().hasAny(['moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt'])
         && request.resource.data.status == 'open';
-      allow update: if active() && (
+      allow update: if (isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt', 'updatedAt'])
+        && request.resource.data.status == 'closed' && request.resource.data.moderationRemoved == true
+        && request.resource.data.moderationReason is string
+        && request.resource.data.moderationReason.size() >= 5 && request.resource.data.moderationReason.size() <= 500
+        && request.resource.data.moderatedBy == request.auth.uid
+        && request.resource.data.moderatedAt == request.time && request.resource.data.updatedAt == request.time)
+        || (active() && resource.data.get('moderationRemoved', false) != true
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt']) && (
         (resource.data.postedBy.uid == request.auth.uid
           && currentUser().data.role == 'client'
           && request.resource.data.postedBy == resource.data.postedBy
@@ -114,8 +190,8 @@ service cloud.firestore {
         || (resource.data.status == 'open'
           && request.resource.data.status == 'open'
           && getAfter(/databases/$(database)/documents/gigs/$(gigId)).data.status == 'open'
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount'])));
-      allow delete: if active() && resource.data.postedBy.uid == request.auth.uid;
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount']))));
+      allow delete: if active() && resource.data.get('moderationRemoved', false) != true && resource.data.postedBy.uid == request.auth.uid;
     }
     match /chats/{chatId} {
       allow read, update, delete: if active() && request.auth.uid in resource.data.participants;

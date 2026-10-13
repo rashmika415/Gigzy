@@ -1,9 +1,13 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React, { useState } from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, Alert, View } from 'react-native';
+import { TouchableOpacity, StyleSheet, ActivityIndicator, View } from 'react-native';
+import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { colors, borderRadius, spacing } from '../../constants/theme';
+import { colors, borderRadius, spacing, fonts } from '../../constants/theme';
 import { createConversation } from '../../services/messaging/conversationService';
+import { useToast } from '../../context/ToastContext';
 
 interface ApplicationMessageButtonProps {
   applicationId: string;
@@ -32,7 +36,9 @@ export default function ApplicationMessageButton({
   businessName,
   onSuccess,
 }: ApplicationMessageButtonProps) {
+  useTranslation();
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   const isAccepted = status.toLowerCase() === 'accepted';
   const isBusiness = currentRole === 'client';
@@ -40,10 +46,7 @@ export default function ApplicationMessageButton({
 
   const handleOpenConversation = async () => {
     if (!isAccepted) {
-      Alert.alert(
-        'Messaging Unavailable',
-        'Direct messaging opens once the application is accepted by the business.'
-      );
+      toast.info(tr("Messaging Unavailable"), tr("Direct messaging opens once the application is accepted by the business."));
       return;
     }
 
@@ -70,7 +73,7 @@ export default function ApplicationMessageButton({
         } as any);
       }
     } catch (err: any) {
-      Alert.alert('Conversation Error', err.message || 'Could not start conversation.');
+      toast.error(tr("Could not start conversation."), err.message);
     } finally {
       setLoading(false);
     }
@@ -80,7 +83,7 @@ export default function ApplicationMessageButton({
     return (
       <View style={styles.lockedContainer}>
         <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
-        <Text style={styles.lockedText}>Messaging unlocks upon acceptance</Text>
+        <Text style={styles.lockedText}>{tr("Messaging unlocks upon acceptance")}</Text>
       </View>
     );
   }
@@ -118,7 +121,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: colors.primaryOnColor,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   lockedContainer: {
     flexDirection: 'row',
@@ -134,6 +137,6 @@ const styles = StyleSheet.create({
   lockedText: {
     fontSize: 12,
     color: colors.textMuted,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
 });

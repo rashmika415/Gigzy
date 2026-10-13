@@ -1,13 +1,19 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../localization/i18n';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from './LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { borderRadius, colors, spacing } from '../constants/theme';
+import { borderRadius, colors, spacing, fonts } from '../constants/theme';
 import { closeGig } from '../services/gigService';
 import type { Gig } from '../types/gig';
+import { useToast } from '../context/ToastContext';
 
 export default function CloseGigButton({ gig }: { gig: Gig }) {
+  useTranslation();
   const { user, userData } = useAuth();
+  const toast = useToast();
   const [visible, setVisible] = useState(false);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState('');
@@ -22,8 +28,7 @@ export default function CloseGigButton({ gig }: { gig: Gig }) {
     try {
       await closeGig(gig.id);
       setVisible(false);
-      if (Platform.OS === 'web') window.alert('Gig closed successfully.');
-      else Alert.alert('Success', 'Gig closed successfully.');
+      toast.success(tr("Gig closed successfully."));
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Could not close gig. Please try again.');
     } finally {
@@ -36,21 +41,21 @@ export default function CloseGigButton({ gig }: { gig: Gig }) {
   return <>
     {canClose && <TouchableOpacity style={styles.button} accessibilityRole="button" onPress={() => { setError(''); setVisible(true); }}>
       <Ionicons name="lock-closed-outline" size={16} color={colors.error} />
-      <Text style={styles.buttonText}>Close Gig</Text>
+      <Text style={styles.buttonText}>{tr("Close Gig")}</Text>
     </TouchableOpacity>}
     <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { if (!submitting.current) setVisible(false); }}>
       <View style={styles.overlay}>
         <View style={styles.dialog}>
-          <Text style={styles.title}>Close Gig</Text>
-          <Text style={styles.message}>Are you sure you want to close this gig?</Text>
+          <Text style={styles.title}>{tr("Close Gig")}</Text>
+          <Text style={styles.message}>{tr("Are you sure you want to close this gig?")}</Text>
           <Text style={styles.message}>{gig.title}</Text>
-          {!!error && <Text accessibilityRole="alert" style={styles.buttonText}>{error}</Text>}
+          {!!error && <Text accessibilityRole="alert" style={styles.buttonText}>{tr(error)}</Text>}
           <View style={styles.actions}>
             <TouchableOpacity style={styles.button} disabled={closing} onPress={() => setVisible(false)}>
-              <Text style={styles.message}>Cancel</Text>
+              <Text style={styles.message}>{tr("Cancel")}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.button} disabled={closing || !canClose} onPress={confirm}>
-              {closing ? <ActivityIndicator color={colors.error} /> : <Text style={styles.buttonText}>Close Gig</Text>}
+              {closing ? <ActivityIndicator color={colors.error} /> : <Text style={styles.buttonText}>{tr("Close Gig")}</Text>}
             </TouchableOpacity>
           </View>
         </View>
@@ -60,11 +65,11 @@ export default function CloseGigButton({ gig }: { gig: Gig }) {
 }
 
 const styles = StyleSheet.create({
-  button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: spacing.sm, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.surfaceBorder },
-  buttonText: { color: colors.error, fontWeight: '700', fontSize: 13 },
+  button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: spacing.sm, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.surfaceBorder, minHeight: 44 },
+  buttonText: { color: colors.error, fontFamily: fonts.bodyBold, fontSize: 13 },
   overlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: spacing.lg },
   dialog: { width: '100%', maxWidth: 420, backgroundColor: colors.surface, padding: spacing.lg, borderRadius: borderRadius.xl, gap: spacing.md },
-  title: { color: colors.text, fontSize: 18, fontWeight: '800' },
+  title: { color: colors.text, fontSize: 18, fontFamily: fonts.bodyBold },
   message: { color: colors.text, fontSize: 14 },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
 });

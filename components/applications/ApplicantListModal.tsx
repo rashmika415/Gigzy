@@ -1,16 +1,10 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React, { useState, useEffect } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-  SafeAreaView,
-  ActivityIndicator,
-} from 'react-native';
+import { Modal, View, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, ActivityIndicator } from 'react-native';
+import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application, ApplicationFilterStatus } from '../../types/application';
 import { subscribeToGigApplicants } from '../../services/applicationService';
 import ApplicantCard from './ApplicantCard';
@@ -31,6 +25,7 @@ export default function ApplicantListModal({
   businessId,
   onClose,
 }: ApplicantListModalProps) {
+  useTranslation();
   const [applicants, setApplicants] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -40,10 +35,13 @@ export default function ApplicantListModal({
   useEffect(() => {
     if (!visible || !gigId) return;
 
+    let active = true;
+    let unsubscribe = () => {};
+    void Promise.resolve().then(() => {
+    if (!active) return;
     setLoading(true);
     setLoadError('');
-
-    const unsubscribe = subscribeToGigApplicants(
+    unsubscribe = subscribeToGigApplicants(
       gigId,
       businessId,
       (apps: Application[]) => {
@@ -58,7 +56,9 @@ export default function ApplicantListModal({
       }
     );
 
+    });
     return () => {
+      active = false;
       unsubscribe();
     };
   }, [visible, gigId, businessId]);
@@ -104,12 +104,12 @@ export default function ApplicantListModal({
             style={styles.closeBtn}
             onPress={onClose}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel="Close applicant list"
+            accessibilityLabel={tr("Close applicant list")}
           >
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
-            <Text style={styles.headerTitle}>Gig Applicants</Text>
+            <Text style={styles.headerTitle}>{tr("Gig Applicants")}</Text>
             <Text style={styles.headerSubtitle} numberOfLines={1}>
               {gigTitle}
             </Text>
@@ -124,8 +124,7 @@ export default function ApplicantListModal({
             onPress={() => setFilter('all')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabText, filter === 'all' && styles.tabTextActive]}>
-              All ({applicants.length})
+            <Text style={[styles.tabText, filter === 'all' && styles.tabTextActive]}>{tr("All (")}{applicants.length})
             </Text>
           </TouchableOpacity>
 
@@ -134,8 +133,7 @@ export default function ApplicantListModal({
             onPress={() => setFilter('pending')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabText, filter === 'pending' && styles.tabTextActive]}>
-              Pending ({pendingCount})
+            <Text style={[styles.tabText, filter === 'pending' && styles.tabTextActive]}>{tr("Pending (")}{pendingCount})
             </Text>
           </TouchableOpacity>
 
@@ -144,8 +142,7 @@ export default function ApplicantListModal({
             onPress={() => setFilter('accepted')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabText, filter === 'accepted' && styles.tabTextActive]}>
-              Accepted ({acceptedCount})
+            <Text style={[styles.tabText, filter === 'accepted' && styles.tabTextActive]}>{tr("Accepted (")}{acceptedCount})
             </Text>
           </TouchableOpacity>
 
@@ -154,8 +151,7 @@ export default function ApplicantListModal({
             onPress={() => setFilter('rejected')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabText, filter === 'rejected' && styles.tabTextActive]}>
-              Rejected ({rejectedCount})
+            <Text style={[styles.tabText, filter === 'rejected' && styles.tabTextActive]}>{tr("Rejected (")}{rejectedCount})
             </Text>
           </TouchableOpacity>
         </View>
@@ -164,17 +160,17 @@ export default function ApplicantListModal({
         {loading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Loading applicants...</Text>
+            <Text style={styles.loadingText}>{tr("Loading applicants...")}</Text>
           </View>
         ) : loadError ? (
           <View style={styles.emptyContainer}>
-            <View style={[styles.emptyIconBg, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+            <View style={[styles.emptyIconBg, { backgroundColor: colors.errorLight }]}>
               <Ionicons name="alert-circle-outline" size={36} color={colors.error} />
             </View>
-            <Text style={styles.emptyTitle}>Unable to Load Applicants</Text>
-            <Text style={styles.emptySubtitle}>{loadError}</Text>
+            <Text style={styles.emptyTitle}>{tr("Unable to Load Applicants")}</Text>
+            <Text style={styles.emptySubtitle}>{tr(loadError)}</Text>
             <TouchableOpacity style={styles.retryBtn} onPress={handleRetry}>
-              <Text style={styles.retryBtnText}>Try Again</Text>
+              <Text style={styles.retryBtnText}>{tr("Try Again")}</Text>
             </TouchableOpacity>
           </View>
         ) : filteredApplicants.length === 0 ? (
@@ -184,13 +180,13 @@ export default function ApplicantListModal({
             </View>
             <Text style={styles.emptyTitle}>
               {filter === 'all'
-                ? 'No Applicants Yet'
-                : `No ${filter} applicants`}
+                ? tr("No Applicants Yet")
+                : tr("No {{value0}} applicants", { value0: filter })}
             </Text>
             <Text style={styles.emptySubtitle}>
               {filter === 'all'
-                ? 'Youth freelancers who apply to this gig will appear here.'
-                : `No applicants currently match the "${filter}" status.`}
+                ? tr("Youth freelancers who apply to this gig will appear here.")
+                : tr("No applicants currently match the \"{{value0}}\" status.", { value0: filter })}
             </Text>
           </View>
         ) : (
@@ -259,7 +255,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   headerSubtitle: {
@@ -284,6 +280,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   tabActive: {
     backgroundColor: colors.primary,
@@ -291,7 +289,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   tabTextActive: {
@@ -322,14 +320,14 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   emptySubtitle: {
@@ -345,10 +343,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   retryBtnText: {
     color: colors.primaryOnColor,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
 });

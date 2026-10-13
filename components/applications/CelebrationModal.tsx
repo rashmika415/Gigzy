@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React from 'react';
 import {
   Modal,
@@ -9,7 +11,7 @@ import {
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 
 export interface CelebrationModalProps {
   visible: boolean;
@@ -24,6 +26,7 @@ export default function CelebrationModal({
   gigTitle,
   onClose,
 }: CelebrationModalProps) {
+  useTranslation();
   if (!visible) return null;
 
   const handleClose = () => {
@@ -57,18 +60,16 @@ export default function CelebrationModal({
 
           {/* Micro pill badge */}
           <View style={styles.badgePill}>
-            <Ionicons name="sparkles" size={13} color="#047857" style={{ marginRight: 4 }} />
-            <Text style={styles.badgePillText}>APPLICATION ACCEPTED</Text>
+            <Ionicons name="sparkles" size={13} color={colors.success} style={{ marginRight: 4 }} />
+            <Text style={styles.badgePillText}>{tr("APPLICATION ACCEPTED")}</Text>
           </View>
 
           {/* Main Title */}
-          <Text style={styles.title}>Application Accepted! 🎉</Text>
+          <Text style={styles.title}>{tr("Application Accepted! 🎉")}</Text>
 
           {/* Celebration Quote Message */}
           <View style={styles.messageBox}>
-            <Text style={styles.messageText}>
-              "You have accepted <Text style={styles.boldText}>{displayName}</Text> for '{displayGig}'. Work is now in progress and a notification has been sent to the youth freelancer's dashboard."
-            </Text>
+            <Text style={styles.messageText}>{tr('You accepted {{name}} for {{gig}}. Work is now in progress.', { name: displayName, gig: displayGig })}</Text>
           </View>
 
           {/* Status / Overview Mini Card */}
@@ -78,7 +79,7 @@ export default function CelebrationModal({
                 <Ionicons name="person-circle" size={20} color={colors.primary} />
               </View>
               <View style={styles.overviewTextCol}>
-                <Text style={styles.overviewLabel}>Freelancer Assigned</Text>
+                <Text style={styles.overviewLabel}>{tr("Freelancer Assigned")}</Text>
                 <Text style={styles.overviewValue} numberOfLines={1}>{displayName}</Text>
               </View>
             </View>
@@ -90,12 +91,12 @@ export default function CelebrationModal({
                 <Ionicons name="briefcase" size={18} color={colors.primary} />
               </View>
               <View style={styles.overviewTextCol}>
-                <Text style={styles.overviewLabel}>Gig Title</Text>
+                <Text style={styles.overviewLabel}>{tr("Gig Title")}</Text>
                 <Text style={styles.overviewValue} numberOfLines={1}>{displayGig}</Text>
               </View>
               <View style={styles.statusPill}>
                 <View style={styles.statusDot} />
-                <Text style={styles.statusPillText}>In Progress</Text>
+                <Text style={styles.statusPillText}>{tr("In Progress")}</Text>
               </View>
             </View>
           </View>
@@ -106,8 +107,8 @@ export default function CelebrationModal({
             onPress={handleClose}
             activeOpacity={0.88}
           >
-            <Ionicons name="checkmark-done" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.actionButtonText}>Done</Text>
+            <Ionicons name="checkmark-done" size={20} color={colors.primaryOnColor} style={{ marginRight: 8 }} />
+            <Text style={styles.actionButtonText}>{tr("Done")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -118,7 +119,7 @@ export default function CelebrationModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
@@ -155,17 +156,17 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successLight,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#A7F3D0',
+    borderColor: colors.successBorder,
   },
   iconCircleInner: {
     width: 62,
     height: 62,
     borderRadius: 31,
-    backgroundColor: '#D1FAE5',
+    backgroundColor: colors.successLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -176,35 +177,35 @@ const styles = StyleSheet.create({
   badgePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successLight,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 20,
     marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: colors.successBorder,
   },
   badgePillText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#047857',
+    fontFamily: fonts.bodyBold,
+    color: colors.success,
     letterSpacing: 0.6,
   },
   title: {
     fontSize: 22,
-    fontWeight: '800',
+    fontFamily: fonts.heading,
     color: colors.text,
     textAlign: 'center',
     marginBottom: spacing.md,
     letterSpacing: -0.3,
   },
   messageBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.md || 12,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.surfaceBorder,
     marginBottom: spacing.lg,
     width: '100%',
   },
@@ -215,17 +216,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   boldText: {
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   overviewCard: {
     width: '100%',
-    backgroundColor: colors.surfaceElevated || '#F8FAFC',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.md || 12,
     padding: spacing.md,
     marginBottom: spacing.xl,
     borderWidth: 1,
-    borderColor: colors.surfaceBorder || '#E2E8F0',
+    borderColor: colors.surfaceBorder,
     gap: spacing.sm,
   },
   overviewRow: {
@@ -242,42 +243,42 @@ const styles = StyleSheet.create({
   overviewLabel: {
     fontSize: 11,
     color: colors.textMuted,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   overviewValue: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     marginTop: 1,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.surfaceBorder || '#E2E8F0',
+    backgroundColor: colors.surfaceBorder,
     marginVertical: 4,
   },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.warningLight,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: colors.warningBorder,
   },
   statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#D97706',
+    backgroundColor: colors.warning,
     marginRight: 5,
   },
   statusPillText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#92400E',
+    fontFamily: fonts.bodyBold,
+    color: colors.warning,
   },
   actionButton: {
     width: '100%',
@@ -304,8 +305,8 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontFamily: fonts.bodyBold,
+    color: colors.primaryOnColor,
     letterSpacing: 0.2,
   },
 });

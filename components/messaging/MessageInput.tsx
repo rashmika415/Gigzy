@@ -1,15 +1,10 @@
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React from 'react';
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  Image,
-  Text,
-} from 'react-native';
+import { View, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { TextInput, Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 
 interface MessageInputProps {
   value: string;
@@ -32,6 +27,7 @@ export default function MessageInput({
   sending,
   disabled,
 }: MessageInputProps) {
+  useTranslation();
   const canSend = Boolean(value.trim() || selectedImageUri) && !sending && !disabled;
 
   return (
@@ -40,8 +36,8 @@ export default function MessageInput({
         <View style={styles.imagePreviewRow}>
           <Image source={{ uri: selectedImageUri }} style={styles.previewThumbnail} />
           <View style={styles.previewInfo}>
-            <Text style={styles.previewTitle}>Image attached</Text>
-            <Text style={styles.previewSubtitle}>Ready to send</Text>
+            <Text style={styles.previewTitle}>{tr("Image attached")}</Text>
+            <Text style={styles.previewSubtitle}>{tr("Ready to send")}</Text>
           </View>
           <TouchableOpacity
             style={styles.removeImageBtn}
@@ -67,7 +63,7 @@ export default function MessageInput({
 
         <TextInput
           style={styles.textInput}
-          placeholder="Type a message..."
+          placeholder={tr("Type a message...")}
           placeholderTextColor={colors.placeholder}
           value={value}
           onChangeText={onChangeText}
@@ -122,7 +118,7 @@ const styles = StyleSheet.create({
   },
   previewTitle: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   previewSubtitle: {
@@ -138,7 +134,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   iconBtn: {
-    padding: spacing.xs,
+    padding: spacing.xs,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   textInput: {
     flex: 1,

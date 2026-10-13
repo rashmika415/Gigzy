@@ -1,7 +1,11 @@
+import { formatDate as localizedDate } from '../../localization/format';
+import { useTranslation } from 'react-i18next';
+import { translate as tr } from '../../localization/i18n';
 import React, { useRef, useEffect } from 'react';
-import { FlatList, View, Text, StyleSheet } from 'react-native';
+import { FlatList, View, StyleSheet } from 'react-native';
+import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '../../constants/theme';
+import { colors, spacing, fonts } from '../../constants/theme';
 import { Message } from '../../types/messaging';
 import MessageBubble from './MessageBubble';
 
@@ -19,7 +23,7 @@ function formatDateDivider(timestamp: any): string {
   const yesterday = new Date();
   yesterday.setDate(now.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return date.toLocaleDateString('en-US', {
+  return localizedDate(date, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -27,6 +31,7 @@ function formatDateDivider(timestamp: any): string {
 }
 
 export default function MessageList({ messages, currentUserId, onImagePress }: MessageListProps) {
+  useTranslation();
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -68,10 +73,8 @@ export default function MessageList({ messages, currentUserId, onImagePress }: M
           <View style={styles.emptyIconCircle}>
             <Ionicons name="chatbubbles-outline" size={36} color={colors.primary} />
           </View>
-          <Text style={styles.emptyTitle}>No messages yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Send a friendly greeting to start your conversation.
-          </Text>
+          <Text style={styles.emptyTitle}>{tr("No messages yet")}</Text>
+          <Text style={styles.emptySubtitle}>{tr("Send a friendly greeting to start your conversation.")}</Text>
         </View>
       }
     />
@@ -116,7 +119,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   emptySubtitle: {

@@ -1,15 +1,17 @@
-import { formatRelativeDate } from '../../../localization/format';
+import { translate as tr } from '../../../localization/i18n';
+import { formatCurrency, formatRelativeDate } from '../../../localization/format';
 import { Text, TextInput } from '../../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Image } from 'react-native';
+import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../../constants/theme';
 import { subscribeToUserChats } from '../../../services/chatService';
 import { Chat, ParticipantDetail } from '../../../types/chat';
+import SkeletonList from '../../../components/Skeleton';
 
 function formatTimestamp(timestamp: any): string {
   if (!timestamp) return '';
@@ -140,7 +142,7 @@ export default function MessagesScreen() {
           <Text style={styles.headerTitle}>{t("Messages")}</Text>
           {totalUnread > 0 && (
             <View style={styles.headerUnreadBadge}>
-              <Text style={styles.headerUnreadText}>{totalUnread}{t("new")}</Text>
+              <Text style={styles.headerUnreadText}>{totalUnread}{' '}{t("new")}</Text>
             </View>
           )}
         </View>
@@ -215,10 +217,7 @@ export default function MessagesScreen() {
         }
       >
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>{t("Syncing conversations...")}</Text>
-          </View>
+          <SkeletonList variant="row" count={5} />
         ) : errorMsg ? (
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle-outline" size={32} color={colors.error} />
@@ -309,7 +308,7 @@ export default function MessagesScreen() {
                       <Ionicons name="briefcase-outline" size={12} color={colors.primary} />
                       <Text style={styles.gigPillText} numberOfLines={1}>
                         {chat.gigTitle}
-                        {chat.gigPay ? t(" • ${{value0}}{{value1}}", { value0: chat.gigPay, value1: chat.gigPayType === 'hourly' ? t("/hr") : '' }) : ''}
+                        {chat.gigPay ? t(" • {{value0}}{{value1}}", { value0: formatCurrency(chat.gigPay), value1: chat.gigPayType === 'hourly' ? t("/hr") : '' }) : ''}
                       </Text>
                     </View>
                   )}
@@ -320,7 +319,7 @@ export default function MessagesScreen() {
                       style={[styles.lastMessageText, unread > 0 && styles.lastMessageTextUnread]}
                       numberOfLines={1}
                     >
-                      {isSentByMe ? 'You: ' : ''}
+                      {isSentByMe ? tr("You: ") : ''}
                       {lastMsgPreview}
                     </Text>
 
@@ -367,7 +366,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: fonts.heading,
     color: colors.text,
   },
   headerUnreadBadge: {
@@ -380,7 +379,7 @@ const styles = StyleSheet.create({
   },
   headerUnreadText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   headerActionBtn: {
@@ -415,7 +414,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(135, 147, 144, 0.1)',
+    borderBottomColor: colors.surfaceElevated,
   },
   tabButton: {
     paddingVertical: 6,
@@ -424,6 +423,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.surfaceBorderSubtle,
+    minHeight: 40,
+    justifyContent: 'center',
   },
   tabButtonActive: {
     backgroundColor: colors.primaryLight,
@@ -431,12 +432,12 @@ const styles = StyleSheet.create({
   },
   tabButtonText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   tabButtonTextActive: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   listContent: {
     paddingHorizontal: spacing.lg,
@@ -483,7 +484,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   emptySubtitle: {
@@ -505,7 +506,7 @@ const styles = StyleSheet.create({
   },
   exploreButtonText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
   },
   chatCard: {
@@ -537,7 +538,7 @@ const styles = StyleSheet.create({
   },
   avatarCircleBusiness: {
     backgroundColor: colors.accentLight,
-    borderColor: '#2C4968',
+    borderColor: colors.accent,
   },
   avatarImage: {
     width: 52,
@@ -548,11 +549,11 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: fonts.heading,
     color: colors.primary,
   },
   avatarTextBusiness: {
-    color: '#2C4968',
+    color: colors.accent,
   },
   onlineBadge: {
     position: 'absolute',
@@ -583,11 +584,11 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.text,
   },
   userNameBold: {
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   roleTag: {
@@ -602,17 +603,17 @@ const styles = StyleSheet.create({
   },
   roleTagBusiness: {
     backgroundColor: colors.accentLight,
-    borderColor: 'rgba(123, 166, 214, 0.4)',
+    borderColor: colors.accentBorder,
   },
   roleTagText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   roleTagTextYouth: {
     color: colors.primary,
   },
   roleTagTextBusiness: {
-    color: '#2C4968',
+    color: colors.accent,
   },
   timeText: {
     fontSize: 12,
@@ -620,7 +621,7 @@ const styles = StyleSheet.create({
   },
   timeTextUnread: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   gigPill: {
     flexDirection: 'row',
@@ -636,7 +637,7 @@ const styles = StyleSheet.create({
   gigPillText: {
     fontSize: 11,
     color: colors.primary,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   messagePreviewRow: {
     flexDirection: 'row',
@@ -651,7 +652,7 @@ const styles = StyleSheet.create({
   },
   lastMessageTextUnread: {
     color: colors.text,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   unreadPill: {
     backgroundColor: colors.primary,
@@ -664,7 +665,7 @@ const styles = StyleSheet.create({
   },
   unreadPillText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
   },
 });
