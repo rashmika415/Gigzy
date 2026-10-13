@@ -58,6 +58,12 @@
         {
           "locationWhenInUsePermission": "Allow Gigzy to find nearby gigs and set gig locations."
         }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow Gigzy to add scheduled gigs to your calendar."
+        }
       ]
     ],
     "experiments": {

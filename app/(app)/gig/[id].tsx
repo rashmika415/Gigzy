@@ -122,12 +122,28 @@ export default function GigDetailScreen() {
         email: user.email || '',
       };
 
+      const businessUid =
+        (typeof gig.postedBy === 'object' && gig.postedBy?.uid) ||
+        (typeof gig.postedBy === 'string' && gig.postedBy) ||
+        (gig as any).businessId ||
+        (gig as any).clientId ||
+        '';
+
+      if (!businessUid) {
+        Alert.alert(t("Chat Error"), t("Unable to identify the gig creator."));
+        return;
+      }
+
       const businessParticipant = {
-        uid: gig.postedBy.uid,
-        fullName: gig.postedBy.fullName || 'Business Owner',
+        uid: businessUid,
+        fullName:
+          (typeof gig.postedBy === 'object' && gig.postedBy?.fullName) ||
+          (gig as any).businessName ||
+          'Business Owner',
         photoURL: '',
         role: 'client' as const,
-        email: gig.postedBy.email || '',
+        email:
+          (typeof gig.postedBy === 'object' && gig.postedBy?.email) || '',
       };
 
       const chat = await getOrCreateChat(currentParticipant, businessParticipant, gig);

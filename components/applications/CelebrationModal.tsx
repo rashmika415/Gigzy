@@ -7,6 +7,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +20,14 @@ export interface CelebrationModalProps {
   youthName: string;
   gigTitle: string;
   onClose: () => void;
+  applicationId?: string;
+  gigId?: string;
+  gigDate?: string;
+  gigTime?: string;
+  gigLocation?: string;
+  gigPay?: number;
+  gigPayType?: string;
+  onOpenChat?: () => void;
 }
 
 export default function CelebrationModal({
@@ -25,6 +35,14 @@ export default function CelebrationModal({
   youthName,
   gigTitle,
   onClose,
+  applicationId,
+  gigId,
+  gigDate,
+  gigTime,
+  gigLocation,
+  gigPay,
+  gigPayType,
+  onOpenChat,
 }: CelebrationModalProps) {
   useTranslation();
   if (!visible) return null;
@@ -38,6 +56,60 @@ export default function CelebrationModal({
 
   const displayName = youthName || 'Youth Freelancer';
   const displayGig = gigTitle || 'Gig';
+
+  const handleMessage = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    onClose();
+    if (onOpenChat) {
+      onOpenChat();
+    } else if (applicationId) {
+      router.push({
+        pathname: '/(app)/chat/[id]',
+        params: { id: `conv_${applicationId}` },
+      } as any);
+    } else {
+      router.push('/(app)/(tabs)/messages' as any);
+    }
+  };
+
+  const handleAddToCalendar = async () => {
+    setCalendarAdding(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    const result = await addGigToCalendar({
+      title: displayGig,
+      date: gigDate || new Date().toISOString().slice(0, 10),
+      time: gigTime,
+      location: gigLocation,
+      pay: gigPay,
+      payType: gigPayType,
+      counterpartName: displayName,
+      counterpartRole: 'freelancer',
+      gigId,
+      applicationId,
+      description: `Gigzy scheduled gig with ${displayName}`,
+    });
+
+    setCalendarAdding(false);
+    if (result.success) {
+      setCalendarAdded(true);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      Alert.alert(
+        'Gig Scheduled! 📅',
+        result.method === 'native'
+          ? `Added "${displayGig}" to your device calendar (${result.calendarName || 'Calendar'}).`
+          : `Opened calendar for "${displayGig}".`
+      );
+    } else {
+      Alert.alert('Calendar', result.error || 'Could not add gig to calendar.');
+    }
+  };
 
   return (
     <Modal
@@ -99,6 +171,23 @@ export default function CelebrationModal({
                 <Text style={styles.statusPillText}>{tr("In Progress")}</Text>
               </View>
             </View>
+
+            {gigDate ? (
+              <>
+                <View style={styles.divider} />
+                <View style={styles.overviewRow}>
+                  <View style={styles.overviewIconCol}>
+                    <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                  </View>
+                  <View style={styles.overviewTextCol}>
+                    <Text style={styles.overviewLabel}>Scheduled Date & Time</Text>
+                    <Text style={styles.overviewValue} numberOfLines={1}>
+                      {gigDate}{gigTime ? ` at ${gigTime}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              </>
+            ) : null}
           </View>
 
           {/* Dismiss / Confirmation Button */}
@@ -280,20 +369,24 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     color: colors.warning,
   },
-  actionButton: {
+  buttonStack: {
+    width: '100%',
+    gap: spacing.sm,
+  },
+  messageButton: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,
-    paddingVertical: 14,
+    paddingVertical: 13,
     borderRadius: borderRadius.md || 12,
     ...Platform.select({
       ios: {
         shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
       },
       android: {
         elevation: 3,

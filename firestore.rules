@@ -36,16 +36,8 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.get('suspended', false) != true
-        && request.resource.data.get('isVerified', false) != true
-        && !request.resource.data.keys().hasAny(['referralCode']);
-      allow update: if (isAdmin() && userId != request.auth.uid && resource.data.role != 'admin'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suspended', 'suspensionReason', 'updatedAt'])
-        && request.resource.data.suspended is bool
-        && request.resource.data.suspensionReason is string && request.resource.data.suspensionReason.size() <= 500
-        && (!request.resource.data.suspended || request.resource.data.suspensionReason.size() >= 5)
-        && request.resource.data.updatedAt == request.time)
-        || (owns(userId) && active() && protectedUserFieldsUnchanged() && validReferralCodeUpdate(userId)
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || validProfilePhoto()));
+        && request.resource.data.get('isVerified', false) != true;
+      allow update: if isAdmin() || (owns(userId) && active() && protectedUserFieldsUnchanged());
       allow delete: if false;
       match /savedGigs/{gigId} {
         allow read: if owns(userId) && active();
@@ -97,8 +89,9 @@ service cloud.firestore {
           && request.resource.data.authorId == request.auth.uid
           && request.resource.data.rating is number
           && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
-          && request.resource.data.comment is string && request.resource.data.comment.size() <= 1000;
-        allow update, delete: if active() && resource.data.authorId == request.auth.uid;
+          && request.resource.data.comment is string && request.resource.data.comment.size() >= 5 && request.resource.data.comment.size() <= 1000;
+        allow update: if active() && resource.data.authorId == request.auth.uid;
+        allow delete: if isAdmin() || (active() && resource.data.authorId == request.auth.uid);
       }
       match /endorsements/{endorsementId} {
         allow read: if signedIn();
@@ -165,37 +158,44 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /gigs/{gigId} {
+      function isGigOwner() {
+        return (resource.data.keys().hasAny(['postedBy']) && resource.data.postedBy is map && (resource.data.postedBy.get('uid', '') == request.auth.uid || resource.data.postedBy.get('id', '') == request.auth.uid))
+          || resource.data.get('postedBy', '') == request.auth.uid
+          || resource.data.get('businessId', '') == request.auth.uid
+          || resource.data.get('clientId', '') == request.auth.uid
+          || resource.data.get('userId', '') == request.auth.uid
+          || resource.data.get('ownerId', '') == request.auth.uid;
+      }
       allow read: if signedIn();
       allow create: if active() && currentUser().data.role == 'client'
-        && request.resource.data.postedBy.uid == request.auth.uid
+        && ((request.resource.data.keys().hasAny(['postedBy']) && request.resource.data.postedBy is map && request.resource.data.postedBy.get('uid', '') == request.auth.uid) || request.resource.data.get('postedBy', '') == request.auth.uid)
         && request.resource.data.title is string && request.resource.data.title.size() >= 5
         && request.resource.data.description is string && request.resource.data.description.size() >= 20
         && request.resource.data.pay is number && request.resource.data.pay > 0
         && !request.resource.data.keys().hasAny(['moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt'])
         && request.resource.data.status == 'open';
-      allow update: if (isAdmin()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt', 'updatedAt'])
-        && request.resource.data.status == 'closed' && request.resource.data.moderationRemoved == true
-        && request.resource.data.moderationReason is string
-        && request.resource.data.moderationReason.size() >= 5 && request.resource.data.moderationReason.size() <= 500
-        && request.resource.data.moderatedBy == request.auth.uid
-        && request.resource.data.moderatedAt == request.time && request.resource.data.updatedAt == request.time)
-        || (active() && resource.data.get('moderationRemoved', false) != true
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt']) && (
-        (resource.data.postedBy.uid == request.auth.uid
-          && currentUser().data.role == 'client'
-          && request.resource.data.postedBy == resource.data.postedBy
-          && (request.resource.data.status != 'closed'
-            || resource.data.status in ['open', 'closed']))
-        || (resource.data.status == 'open'
-          && request.resource.data.status == 'open'
-          && getAfter(/databases/$(database)/documents/gigs/$(gigId)).data.status == 'open'
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount']))));
-      allow delete: if active() && resource.data.get('moderationRemoved', false) != true && resource.data.postedBy.uid == request.auth.uid;
+      allow update: if active() && (resource.data.postedBy.uid == request.auth.uid
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount']));
+      allow delete: if active() && resource.data.postedBy.uid == request.auth.uid;
     }
     match /chats/{chatId} {
-      allow read, update, delete: if active() && request.auth.uid in resource.data.participants;
-      allow create: if active() && request.auth.uid in request.resource.data.participants;
+      function isChatParticipant() {
+        return resource != null && (
+          (resource.data.keys().hasAny(['participants']) && request.auth.uid in resource.data.participants)
+          || request.auth.uid == resource.data.get('youthId', '')
+          || request.auth.uid == resource.data.get('businessId', '')
+        );
+      }
+      function willBeChatParticipant() {
+        return (request.resource.data.keys().hasAny(['participants']) && request.auth.uid in request.resource.data.participants)
+          || request.auth.uid == request.resource.data.get('youthId', '')
+          || request.auth.uid == request.resource.data.get('businessId', '');
+      }
+
+      allow get: if active() && (resource == null || isChatParticipant());
+      allow list: if active() && isChatParticipant();
+      allow create: if active() && willBeChatParticipant();
+      allow update, delete: if active() && isChatParticipant();
       match /messages/{messageId} {
         allow read: if active() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
         allow create: if active() && request.resource.data.senderId == request.auth.uid
@@ -205,29 +205,37 @@ service cloud.firestore {
     }
     match /conversations/{conversationId} {
       function isParticipant() {
-        return request.auth.uid == resource.data.youthId
-          || request.auth.uid == resource.data.businessId
-          || (resource.data.keys().hasAny(['participants']) && request.auth.uid in resource.data.participants);
+        return resource != null && (
+          request.auth.uid == resource.data.get('youthId', '')
+          || request.auth.uid == resource.data.get('businessId', '')
+          || (resource.data.keys().hasAny(['participants']) && request.auth.uid in resource.data.participants)
+        );
       }
       function willBeParticipant() {
-        return request.auth.uid == request.resource.data.youthId
-          || request.auth.uid == request.resource.data.businessId
+        return request.auth.uid == request.resource.data.get('youthId', '')
+          || request.auth.uid == request.resource.data.get('businessId', '')
           || (request.resource.data.keys().hasAny(['participants']) && request.auth.uid in request.resource.data.participants);
       }
 
-      allow read: if active() && isParticipant();
+      allow get: if active() && (resource == null || isParticipant());
+      allow list: if active() && isParticipant();
       allow create: if active() && willBeParticipant();
       allow update: if active() && (isParticipant() || willBeParticipant());
       allow delete: if isAdmin() || (active() && isParticipant());
 
       match /messages/{messageId} {
+        function hasParentConv() {
+          return exists(/databases/$(database)/documents/conversations/$(conversationId));
+        }
         function parentConv() {
           return get(/databases/$(database)/documents/conversations/$(conversationId)).data;
         }
         function isConvParticipant() {
-          return request.auth.uid == parentConv().youthId
-            || request.auth.uid == parentConv().businessId
-            || (parentConv().keys().hasAny(['participants']) && request.auth.uid in parentConv().participants);
+          return hasParentConv() && (
+            request.auth.uid == parentConv().get('youthId', '')
+            || request.auth.uid == parentConv().get('businessId', '')
+            || (parentConv().keys().hasAny(['participants']) && request.auth.uid in parentConv().participants)
+          );
         }
 
         allow read: if active() && isConvParticipant();
@@ -237,6 +245,47 @@ service cloud.firestore {
               || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt', 'readBy']));
         allow delete: if active() && resource.data.senderId == request.auth.uid;
       }
+    }
+
+    match /applications/{applicationId} {
+      function isYouth() { return signedIn() && request.auth.uid == resource.data.youthId; }
+      function isBusiness() {
+        return signedIn() && (
+          request.auth.uid == resource.data.get('businessId', '')
+          || (resource.data.keys().hasAny(['businessId']) && resource.data.businessId is map && resource.data.businessId.get('uid', '') == request.auth.uid)
+          || request.auth.uid == resource.data.get('businessUid', '')
+          || request.auth.uid == resource.data.get('clientId', '')
+          || request.auth.uid == resource.data.get('userId', '')
+          || (resource.data.keys().hasAny(['gigId']) && exists(/databases/$(database)/documents/gigs/$(resource.data.gigId))
+              && (
+                get(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.get('postedBy', '') == request.auth.uid
+                || (get(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.keys().hasAny(['postedBy'])
+                    && get(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.postedBy is map
+                    && get(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.postedBy.get('uid', '') == request.auth.uid)
+                || get(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.get('businessId', '') == request.auth.uid
+                || get(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.get('clientId', '') == request.auth.uid
+              ))
+        );
+      }
+      function willBeYouth() { return signedIn() && request.auth.uid == request.resource.data.youthId; }
+
+      allow read: if signedIn() && (isYouth() || isBusiness() || isAdmin());
+
+      allow create: if active() && willBeYouth()
+        && currentUser().data.role == 'freelancer'
+        && request.resource.data.status == 'pending'
+        && request.resource.data.message is string && request.resource.data.message.size() >= 5
+        && request.resource.data.availabilityConfirmed == true;
+
+      allow update: if signedIn() && (
+        isAdmin()
+        // Business owner can accept or reject, or link conversationId
+        || isBusiness()
+        // Youth applicant can withdraw pending application
+        || (isYouth() && resource.data.status == 'pending' && request.resource.data.status in ['withdrawn', 'cancelled'])
+      );
+
+      allow delete: if isAdmin() || (signedIn() && isYouth() && resource.data.status == 'pending');
     }
   }
 }

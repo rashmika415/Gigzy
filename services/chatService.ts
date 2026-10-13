@@ -50,23 +50,32 @@ export async function getOrCreateChat(
   const convRef = doc(db, 'conversations', chatId);
 
   try {
-    const convDoc = await getDoc(convRef);
-    if (convDoc.exists()) {
-      return {
-        id: convDoc.id,
-        conversationId: convDoc.id,
-        ...convDoc.data(),
-      } as Chat;
+    let convDoc: any = null;
+    try {
+      convDoc = await getDoc(convRef);
+      if (convDoc && convDoc.exists()) {
+        return {
+          id: convDoc.id,
+          conversationId: convDoc.id,
+          ...convDoc.data(),
+        } as Chat;
+      }
+    } catch {
+      // If reading non-existent conversation document fails or doesn't exist, proceed to create
     }
 
     // Check legacy chats collection fallback
-    const legacyDoc = await getDoc(doc(db, 'chats', chatId));
-    if (legacyDoc.exists()) {
-      return {
-        id: legacyDoc.id,
-        conversationId: legacyDoc.id,
-        ...legacyDoc.data(),
-      } as Chat;
+    try {
+      const legacyDoc = await getDoc(doc(db, 'chats', chatId));
+      if (legacyDoc.exists()) {
+        return {
+          id: legacyDoc.id,
+          conversationId: legacyDoc.id,
+          ...legacyDoc.data(),
+        } as Chat;
+      }
+    } catch {
+      // Legacy fallback ignore
     }
 
     const isCurrentYouth = currentUser.role === 'freelancer';
@@ -112,13 +121,16 @@ export async function getOrCreateChat(
 
     if (gig?.id) {
       newChatData.gigId = gig.id;
-      newChatData.gigTitle = gig.title || '';
-      newChatData.gigPay = gig.pay;
-      newChatData.gigPayType = gig.payType;
-      newChatData.gigCategory = gig.category;
+      if (gig.title) newChatData.gigTitle = gig.title;
+      if (gig.pay !== undefined && gig.pay !== null) newChatData.gigPay = gig.pay;
+      if (gig.payType) newChatData.gigPayType = gig.payType;
+      if (gig.category) newChatData.gigCategory = gig.category;
+      if (gig.date) newChatData.gigDate = gig.date;
+      if (gig.time) newChatData.gigTime = gig.time;
+      if (gig.location) newChatData.gigLocation = gig.location;
     }
 
-    await setDoc(convRef, newChatData);
+    await setDoc(convRef, newChatData, { merge: true });
 
     return {
       id: chatId,

@@ -127,14 +127,24 @@ export default function MyGigs() {
 
   const handleUpdateStatus = async (newStatus: GigStatus) => {
     if (!selectedGigForStatus) return;
+    const currentGig = selectedGigForStatus;
     setStatusUpdating(true);
     try {
-      await updateGigStatus(selectedGigForStatus.id, newStatus);
+      await updateGigStatus(currentGig.id, newStatus);
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
       setStatusModalVisible(false);
       setSelectedGigForStatus(null);
+      if (newStatus === "completed" && currentGig.assignedYouthId) {
+        setRatingTarget({
+          userId: currentGig.assignedYouthId,
+          userName: t("Youth Freelancer"),
+          gigId: currentGig.id,
+          gigTitle: currentGig.title,
+        });
+        setRatingModalVisible(true);
+      }
     } catch (error: any) {
       toast.error(tr("Status Update Failed"), error.message || tr("Could not update gig status."));
     } finally {
@@ -251,6 +261,25 @@ export default function MyGigs() {
         </View>
 
         <View style={styles.headerRightActions}>
+          <TouchableOpacity
+            style={styles.headerMessagesBtn}
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              router.push("/(app)/applications" as any);
+            }}
+            activeOpacity={0.8}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityLabel={t("All Applications")}
+          >
+            <Ionicons
+              name="people-outline"
+              size={20}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.headerMessagesBtn}
             onPress={() => {
@@ -729,6 +758,15 @@ export default function MyGigs() {
                       </View>
                     </View>
 
+                    {Boolean(gig.assignedYouthId || gig.status === "in-progress") && (
+                      <View style={styles.assignedHireBanner}>
+                        <Ionicons name="checkmark-circle" size={13} color="#059669" />
+                        <Text style={styles.assignedHireBannerText}>
+                          {t("Accepted Freelancer Assigned")}
+                        </Text>
+                      </View>
+                    )}
+
                     {/* Gig Description preview */}
                     <Text style={styles.gigCardDesc} numberOfLines={2}>
                       {gig.description}
@@ -843,6 +881,25 @@ export default function MyGigs() {
                         />
                         <Text style={styles.actionStatusBtnText}>{tr("Status")}</Text>
                       </TouchableOpacity>
+
+                      {(gig.status === "completed" || gig.status === "in-progress" || Boolean(gig.assignedYouthId)) && gig.assignedYouthId ? (
+                        <TouchableOpacity
+                          style={styles.actionRateBtn}
+                          onPress={() => {
+                            setRatingTarget({
+                              userId: gig.assignedYouthId!,
+                              userName: t("Youth Freelancer"),
+                              gigId: gig.id,
+                              gigTitle: gig.title,
+                            });
+                            setRatingModalVisible(true);
+                          }}
+                          activeOpacity={0.75}
+                        >
+                          <Ionicons name="star" size={13} color="#D97706" />
+                          <Text style={styles.actionRateBtnText}>{t("Rate Freelancer")}</Text>
+                        </TouchableOpacity>
+                      ) : null}
 
                       <TouchableOpacity
                         style={styles.actionDetailsBtn}
@@ -1912,6 +1969,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fonts.bodySemiBold,
     color: colors.text,
+  },
+  actionRateBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.3)",
+    borderRadius: borderRadius.md,
+    paddingVertical: 7,
+    gap: 4,
+  },
+  actionRateBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#D97706",
   },
   actionDeleteBtn: {
     width: 34,

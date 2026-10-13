@@ -9,6 +9,8 @@ import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application } from '../../types/application';
 import { acceptApplication, rejectApplication } from '../../services/applicationService';
+import { addGigToCalendar } from '../../services/calendarService';
+import { RatingModal } from '../reviews';
 import { getStatusTheme } from './ApplicationCard';
 import { useToast } from '../../context/ToastContext';
 
@@ -49,6 +51,9 @@ export default function ApplicantDetailModal({
   const [acting, setActing] = useState(false);
   const toast = useToast();
   const [errorMsg, setErrorMsg] = useState('');
+  const [calendarAdding, setCalendarAdding] = useState(false);
+  const [calendarAdded, setCalendarAdded] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   if (!application) return null;
 
@@ -56,6 +61,56 @@ export default function ApplicantDetailModal({
   const appliedDateStr = formatDate(application.createdAt);
   const initial = (application.youthName?.[0] || 'Y').toUpperCase();
   const isPending = application.status === 'pending';
+  const isAccepted = application.status === 'accepted';
+
+  const handleMessageApplicant = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    onClose();
+    const convId = application.conversationId || `conv_${application.id}`;
+    router.push({
+      pathname: '/(app)/chat/[id]',
+      params: { id: convId },
+    } as any);
+  };
+
+  const handleAddToCalendar = async () => {
+    setCalendarAdding(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    const result = await addGigToCalendar({
+      title: application.gigTitle || 'Gig',
+      date: application.gigDate || new Date().toISOString().slice(0, 10),
+      time: undefined,
+      location: application.gigLocation,
+      pay: application.gigPay,
+      payType: application.gigPayType,
+      counterpartName: application.youthName,
+      counterpartRole: 'freelancer',
+      gigId: application.gigId,
+      applicationId: application.id,
+      description: `Accepted Gigzy gig with youth freelancer ${application.youthName || ''}`,
+    });
+
+    setCalendarAdding(false);
+    if (result.success) {
+      setCalendarAdded(true);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      Alert.alert(
+        'Gig Added to Calendar! 📅',
+        result.method === 'native'
+          ? `Added "${application.gigTitle || 'Gig'}" to your device calendar.`
+          : `Opened calendar for "${application.gigTitle || 'Gig'}".`
+      );
+    } else {
+      Alert.alert('Calendar', result.error || 'Could not add gig to calendar.');
+    }
+  };
 
   const executeAccept = async () => {
     setActing(true);
@@ -330,6 +385,20 @@ export default function ApplicantDetailModal({
             </View>
           )}
         </ScrollView>
+
+        {application?.youthId ? (
+          <RatingModal
+            visible={showRatingModal}
+            targetUserId={application.youthId}
+            targetUserName={application.youthName || 'Youth Freelancer'}
+            targetUserPhotoURL={application.youthPhotoURL}
+            targetRole="freelancer"
+            gigId={application.gigId}
+            gigTitle={application.gigTitle}
+            onClose={() => setShowRatingModal(false)}
+            onSuccess={() => setShowRatingModal(false)}
+          />
+        ) : null}
       </SafeAreaView>
     </Modal>
   );
@@ -606,6 +675,68 @@ const styles = StyleSheet.create({
   disabledBtn: {
     opacity: 0.6,
   },
+  acceptedActionsContainer: {
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  actionChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  actionChatBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.primaryOnColor,
+  },
+  actionCalendarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+  },
+  actionCalendarBtnAdded: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#059669',
+  },
+  actionCalendarBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  actionCalendarBtnTextAdded: {
+    color: '#059669',
+  },
+  actionRateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+  },
+  actionRateBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#D97706',
+  },
   finalizedNotice: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -616,7 +747,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
-    marginTop: spacing.sm,
+    marginTop: 2,
   },
   finalizedNoticeText: {
     fontSize: 13,

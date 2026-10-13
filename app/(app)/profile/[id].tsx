@@ -5,17 +5,19 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { UserData } from '../../../context/AuthContext';
+import { UserData, useAuth } from '../../../context/AuthContext';
 import { subscribeToProfile, subscribeToProfileReviews } from '../../../services/profileService';
 import { ProfileReview } from '../../../types/profile';
 import { borderRadius, colors, spacing, fonts } from '../../../constants/theme';
 
 export default function PublicProfileScreen() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [profile, setProfile] = useState<UserData | null>(null);
   const [reviews, setReviews] = useState<ProfileReview[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showRatingModal, setShowRatingModal] = useState(false);
   useEffect(() => {
     if (!id) return;
     const stopProfile = subscribeToProfile(id, (value) => { setProfile(value); setLoading(false); }, () => setLoading(false));
@@ -39,8 +41,37 @@ export default function PublicProfileScreen() {
     {youth && skills.length > 0 && <Card title={t("Skills")}><View style={styles.tags}>{skills.map((skill) => <View key={skill} style={styles.tag}><Text style={styles.tagText}>{skill}</Text></View>)}</View></Card>}
     {youth && !!profile.skillBadges?.length && <Card title={t("Earned badges")}><View style={styles.tags}>{profile.skillBadges.map((badge) => <View key={badge.id} style={styles.badge}><Ionicons name="ribbon" size={15} color={colors.primary}/><Text style={styles.tagText}>{badge.label}</Text></View>)}</View></Card>}
     {youth && !!profile.endorsements?.length && <Card title={t("Community endorsements")}>{profile.endorsements.map((item) => <Text key={item.id} style={styles.body}>✓ {item.skill} · {item.endorserName}</Text>)}</Card>}
-    <Card title={t("Reviews")}>{reviews.length ? reviews.map((review) => <View key={review.id} style={styles.review}><View style={styles.reviewHead}><Text style={styles.reviewName}>{review.authorName}</Text><Text style={styles.reviewStars}>{'★'.repeat(Math.round(review.rating))}</Text></View><Text style={styles.body}>{review.comment}</Text></View>) : <Text style={styles.muted}>{t("No reviews yet.")}</Text>}</Card>
-  </ScrollView></View>;
+    <Card title={t("Reviews")}>
+      {reviews.length ? reviews.map((review) => (
+        <View key={review.id} style={styles.review}>
+          <View style={styles.reviewHead}>
+            <Text style={styles.reviewName}>{review.authorName}</Text>
+            <Text style={styles.reviewStars}>{'★'.repeat(Math.round(review.rating))}</Text>
+          </View>
+          {Boolean(review.tags && review.tags.length > 0) && (
+            <View style={styles.reviewTagsRow}>
+              {review.tags!.map((tag, tIdx) => (
+                <View key={tIdx} style={styles.reviewTagChip}>
+                  <Text style={styles.reviewTagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <Text style={styles.body}>{review.comment}</Text>
+        </View>
+      )) : <Text style={styles.muted}>{t("No reviews yet.")}</Text>}
+    </Card>
+  </ScrollView>
+  <RatingModal
+    visible={showRatingModal}
+    onClose={() => setShowRatingModal(false)}
+    targetUserId={profile.uid}
+    targetUserName={name || 'User'}
+    targetUserPhotoURL={profile.photoURL}
+    targetRole={profile.role as 'freelancer' | 'client'}
+    onSuccess={() => {}}
+  />
+  </View>;
 }
 
 function Card({title,children}:{title:string;children:React.ReactNode}) {

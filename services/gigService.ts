@@ -39,7 +39,7 @@ export function parseFirebaseError(error: any): string {
   const message = error.message || '';
 
   if (code.includes('permission-denied') || message.includes('Missing or insufficient permissions')) {
-    return 'Permission denied. Please ensure you are logged in to create or view gigs.';
+    return 'Permission denied by Firestore security rules. Please ensure the updated firestore.rules are published in your Firebase Console.';
   }
   if (code.includes('unavailable') || message.includes('Failed to get document because the client is offline')) {
     return 'Unable to reach Firestore. Please check your internet connection and try again.';

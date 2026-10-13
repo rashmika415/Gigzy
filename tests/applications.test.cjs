@@ -103,6 +103,22 @@ function setupApplicationService() {
         data: () => (item ? { ...item } : undefined),
       };
     },
+    setDoc: async (docRef, data) => {
+      const colName = docRef.collectionName || (docRef.path && docRef.path.split('/')[0]);
+      if (!collections[colName]) {
+        collections[colName] = new Map();
+      }
+      collections[colName].set(docRef.id, { id: docRef.id, ...data });
+    },
+    addDoc: async (colRef, data) => {
+      const colName = colRef.name || (colRef.path && colRef.path.split('/')[0]);
+      if (!collections[colName]) {
+        collections[colName] = new Map();
+      }
+      const id = 'doc_' + Math.random().toString(36).substring(2, 9);
+      collections[colName].set(id, { id, ...data });
+      return { id };
+    },
     getDocs: async (q) => {
       const table = collections[q.collectionName];
       let docs = Array.from(table ? table.values() : []);
@@ -707,3 +723,34 @@ test('TEST 21: A youth cannot be accepted twice for a gig and another applicant 
     }
   );
 });
+
+test('TEST 22: Accepting an application automatically establishes in-app conversation metadata and links conversationId', async () => {
+  const { service, collections } = setupApplicationService();
+
+  const app = await service.createApplication({
+    gigId: 'gig-open-1',
+    youthId: 'youth-1',
+    message: 'Excited to start right away',
+    availabilityConfirmed: true,
+  });
+
+  await service.acceptApplication(app.id, 'biz-1');
+
+  // Verify conversationId is linked onto the application document
+  const updatedApp = collections.applications.get(app.id);
+  assert.equal(updatedApp.status, 'accepted');
+  assert.equal(updatedApp.conversationId, `conv_${app.id}`);
+
+  // Verify conversations collection contains conversation record with participants
+  const conv = collections.conversations?.get(`conv_${app.id}`);
+  assert.ok(conv, 'Conversation document should be created');
+  assert.equal(conv.conversationId, `conv_${app.id}`);
+  assert.equal(conv.applicationId, app.id);
+  assert.equal(conv.participants[0], 'youth-1');
+  assert.equal(conv.participants[1], 'biz-1');
+  assert.equal(conv.participantDetails['youth-1'].role, 'freelancer');
+  assert.equal(conv.participantDetails['biz-1'].role, 'client');
+  assert.equal(conv.gigTitle, 'Graphic Designer Needed');
+  assert.equal(conv.unreadCount['youth-1'], 1);
+});
+

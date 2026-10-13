@@ -9,6 +9,7 @@ import type { Application, ApplicationFilterStatus } from '../../types/applicati
 import { subscribeToGigApplicants } from '../../services/applicationService';
 import ApplicantCard from './ApplicantCard';
 import ApplicantDetailModal from './ApplicantDetailModal';
+import CelebrationModal from './CelebrationModal';
 
 interface ApplicantListModalProps {
   visible: boolean;
@@ -16,6 +17,11 @@ interface ApplicantListModalProps {
   gigTitle: string;
   businessId: string;
   onClose: () => void;
+  gigDate?: string;
+  gigTime?: string;
+  gigLocation?: string;
+  gigPay?: number;
+  gigPayType?: string;
 }
 
 export default function ApplicantListModal({
@@ -24,6 +30,11 @@ export default function ApplicantListModal({
   gigTitle,
   businessId,
   onClose,
+  gigDate,
+  gigTime,
+  gigLocation,
+  gigPay,
+  gigPayType,
 }: ApplicantListModalProps) {
   useTranslation();
   const [applicants, setApplicants] = useState<Application[]>([]);
@@ -31,6 +42,7 @@ export default function ApplicantListModal({
   const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState<ApplicationFilterStatus>('all');
   const [selectedApplicant, setSelectedApplicant] = useState<Application | null>(null);
+  const [acceptedCelebrationApp, setAcceptedCelebrationApp] = useState<Application | null>(null);
 
   useEffect(() => {
     if (!visible || !gigId) return;
@@ -210,6 +222,10 @@ export default function ApplicantListModal({
           application={selectedApplicant}
           businessId={businessId}
           onClose={() => setSelectedApplicant(null)}
+          onAccepted={(app) => {
+            setAcceptedCelebrationApp(app);
+            setSelectedApplicant(null);
+          }}
           onStatusChanged={(newStatus) => {
             if (selectedApplicant) {
               setSelectedApplicant({
@@ -218,6 +234,21 @@ export default function ApplicantListModal({
               });
             }
           }}
+        />
+
+        {/* Celebration Modal on Gig Acceptance */}
+        <CelebrationModal
+          visible={!!acceptedCelebrationApp}
+          youthName={acceptedCelebrationApp?.youthName || 'Youth Freelancer'}
+          gigTitle={acceptedCelebrationApp?.gigTitle || gigTitle || 'Gig'}
+          applicationId={acceptedCelebrationApp?.id}
+          gigId={acceptedCelebrationApp?.gigId || gigId}
+          gigDate={gigDate || acceptedCelebrationApp?.gigDate}
+          gigTime={gigTime}
+          gigLocation={gigLocation || acceptedCelebrationApp?.gigLocation}
+          gigPay={gigPay || acceptedCelebrationApp?.gigPay}
+          gigPayType={gigPayType || acceptedCelebrationApp?.gigPayType}
+          onClose={() => setAcceptedCelebrationApp(null)}
         />
       </SafeAreaView>
     </Modal>

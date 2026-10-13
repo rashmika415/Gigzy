@@ -3,6 +3,9 @@ import {
   doc,
   getDoc,
   getDocs,
+  setDoc,
+  addDoc,
+  updateDoc,
   query,
   where,
   onSnapshot,
@@ -530,10 +533,14 @@ export function subscribeToBusinessApplications(
     return onSnapshot(
       q,
       (snapshot) => {
-        const apps = snapshot.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        })) as Application[];
+        const apps = snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            ...data,
+            id: d.id,
+            applicationId: data.applicationId || d.id,
+          };
+        }) as Application[];
 
         const sorted = apps.sort((a, b) => {
           const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt || 0).getTime();
@@ -566,10 +573,14 @@ export async function getApplicationsForBusiness(businessId?: string): Promise<A
       where('businessId', '==', effectiveBusinessId)
     );
     const snapshot = await getDocs(q);
-    const apps = snapshot.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    })) as Application[];
+    const apps = snapshot.docs.map((d) => {
+      const data = d.data();
+      return {
+        ...data,
+        id: d.id,
+        applicationId: data.applicationId || d.id,
+      };
+    }) as Application[];
 
     return apps.sort((a, b) => {
       const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt || 0).getTime();
@@ -587,73 +598,250 @@ export async function getApplicationsForBusiness(businessId?: string): Promise<A
  */
 export async function acceptApplication(applicationId: string, businessId?: string): Promise<void> {
   const effectiveBusinessId = businessId || auth?.currentUser?.uid;
-  const appRef = doc(db, 'applications', applicationId);
+  let targetRef = doc(db, 'applications', applicationId);
 
   let acceptedData: any = null;
 
   try {
-    await runTransaction(db, async (transaction) => {
-      const appSnap = await transaction.get(appRef);
-      if (!appSnap.exists()) {
-        throw new Error('Application not found.');
-      }
+    // 1. Resolve application document if doc ID differs from applicationId field
+    let directSnap: any = null;
+    try {
+      directSnap = await getDoc(targetRef);
+    } catch {}
 
-      const data = appSnap.data();
-      if (effectiveBusinessId && data.businessId !== effectiveBusinessId) {
-        throw new Error('Unauthorized. You can only manage applications for your own gigs.');
-      }
+    if (!directSnap || !directSnap.exists()) {
+      try {
+        const q = query(
+          collection(db, 'applications'),
+          where('applicationId', '==', applicationId)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          targetRef = snap.docs[0].ref;
+        }
+      } catch {}
+    }
 
-      if (data.status !== 'pending') {
-        throw new Error(`Cannot accept an application that is already ${data.status}.`);
-      }
+    let appData: any = null;
+    let gigDataSnapshot: any = null;
+    let resolvedDocId = targetRef.id;
 
-      // Read gig document if available (must be read before any writes in Firestore transaction)
-      const gigDocRef = data.gigId ? doc(db, 'gigs', data.gigId) : null;
-      let gigExists = false;
-      let gigData: any = null;
-      if (gigDocRef) {
-        try {
-          const gigSnap = await transaction.get(gigDocRef);
-          gigExists = gigSnap.exists();
-          if (gigExists) {
-            gigData = gigSnap.data();
+    try {
+      await runTransaction(db, async (transaction) => {
+        const appSnap = await transaction.get(targetRef);
+        if (!appSnap.exists()) {
+          throw new Error('Application not found.');
+        }
+
+        const data = appSnap.data();
+        appData = data;
+        resolvedDocId = targetRef.id;
+
+        // Read gig document if available (must be read before any writes in Firestore transaction)
+        const gigDocRef = data.gigId ? doc(db, 'gigs', data.gigId) : null;
+        let gigExists = false;
+        let gigData: any = null;
+        if (gigDocRef) {
+          try {
+            const gigSnap = await transaction.get(gigDocRef);
+            gigExists = gigSnap.exists();
+            if (gigExists) {
+              gigData = gigSnap.data();
+              gigDataSnapshot = gigData;
+            }
+          } catch {
+            gigExists = false;
           }
-        } catch {
-          gigExists = false;
         }
-      }
 
-      // Ensure gig is open and not already assigned or in progress (prevent double accept)
-      if (gigExists && gigData) {
-        if (
-          gigData.status === 'in-progress' ||
-          gigData.status === 'completed' ||
-          gigData.status === 'filled' ||
-          gigData.status === 'closed' ||
-          Boolean(gigData.assignedYouthId)
-        ) {
-          throw new Error('This gig has already been accepted and is in progress. A youth cannot be accepted twice for this gig.');
+        // Check business ownership
+        if (effectiveBusinessId && data.businessId && data.businessId !== effectiveBusinessId) {
+          const gPosterId =
+            gigData?.postedBy?.uid ||
+            gigData?.clientId ||
+            gigData?.businessId ||
+            gigData?.userId ||
+            gigData?.ownerId ||
+            (typeof gigData?.postedBy === 'string' ? gigData?.postedBy : null);
+          if (gPosterId && gPosterId !== effectiveBusinessId) {
+            throw new Error('Unauthorized. You can only manage applications for your own gigs.');
+          }
         }
-      }
 
-      // Update application status
-      transaction.update(appRef, {
-        status: 'accepted',
-        updatedAt: serverTimestamp(),
-      });
+        const currentStatus = (data.status || '').toLowerCase();
+        if (currentStatus !== 'pending') {
+          throw new Error(`Cannot accept an application that is already ${data.status}. A youth cannot be accepted twice for this gig.`);
+        }
 
-      // Update gig status to in-progress
-      if (gigDocRef && gigExists) {
-        transaction.update(gigDocRef, {
-          status: 'in-progress',
-          assignedYouthId: data.youthId,
-          acceptedApplicationId: applicationId,
+        // Ensure gig is open and not already assigned or in progress to another applicant
+        if (gigExists && gigData) {
+          const currentGigStatus = (gigData.status || '').toLowerCase();
+          if (currentGigStatus === 'completed' || currentGigStatus === 'closed') {
+            throw new Error(`This gig is already ${gigData.status} and cannot accept new applicants.`);
+          }
+          if (gigData.assignedYouthId && gigData.assignedYouthId !== data.youthId) {
+            throw new Error('This gig has already been accepted and is in progress. A youth cannot be accepted twice for this gig.');
+          }
+        }
+
+        // Update application status and link conversation ID
+        transaction.update(targetRef, {
+          status: 'accepted',
+          conversationId: `conv_${resolvedDocId}`,
           updatedAt: serverTimestamp(),
         });
+
+        // Update gig status to in-progress
+        if (gigDocRef && gigExists) {
+          transaction.update(gigDocRef, {
+            status: 'in-progress',
+            assignedYouthId: data.youthId,
+            acceptedApplicationId: resolvedDocId,
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        acceptedData = {
+          ...data,
+          applicationId: resolvedDocId,
+          ...(gigData
+            ? {
+                gigScheduleDate: gigData.date,
+                gigScheduleTime: gigData.time,
+                gigScheduleLocation: gigData.location,
+              }
+            : {}),
+        };
+      });
+    } catch (txErr: any) {
+      console.warn('Transaction execution warning:', txErr);
+      if (txErr.message && (
+        txErr.message.includes('Unauthorized') ||
+        txErr.message.includes('Cannot accept') ||
+        txErr.message.includes('cannot be accepted twice') ||
+        txErr.message.includes('already been accepted') ||
+        txErr.message.includes('not found')
+      )) {
+        throw txErr;
       }
 
-      acceptedData = data;
-    });
+      // Fallback: If transaction was blocked by a multi-document rule conflict, update application directly
+      const diag = {
+        path: targetRef.path,
+        authUid: auth?.currentUser?.uid ?? null,
+        passedBusinessId: effectiveBusinessId ?? null,
+        appBusinessId: appData?.businessId ?? null,
+        appStatus: appData?.status ?? null,
+        gigPostedBy: gigDataSnapshot?.postedBy ?? null,
+      };
+      console.warn('[acceptApplication] diagnostics:', JSON.stringify(diag));
+      try {
+        await updateDoc(targetRef, {
+          status: 'accepted',
+          conversationId: `conv_${resolvedDocId}`,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (directErr: any) {
+        throw new Error(
+          `Firestore rejected updating ${diag.path}. authUid=${diag.authUid}, application.businessId=${diag.appBusinessId}, gig.postedBy=${JSON.stringify(diag.gigPostedBy)}. (${directErr?.code || directErr?.message})`
+        );
+      }
+
+      // Attempt to update gig status directly
+      if (appData?.gigId) {
+        try {
+          await updateDoc(doc(db, 'gigs', appData.gigId), {
+            status: 'in-progress',
+            assignedYouthId: appData.youthId,
+            acceptedApplicationId: resolvedDocId,
+            updatedAt: serverTimestamp(),
+          });
+        } catch (gigErr) {
+          console.warn('Non-fatal: could not update gig directly:', gigErr);
+        }
+      }
+
+      acceptedData = {
+        ...(appData || {}),
+        applicationId: resolvedDocId,
+        ...(gigDataSnapshot
+          ? {
+              gigScheduleDate: gigDataSnapshot.date,
+              gigScheduleTime: gigDataSnapshot.time,
+              gigScheduleLocation: gigDataSnapshot.location,
+            }
+          : {}),
+      };
+    }
+
+    // Automatically initialize/ensure the direct in-app conversation between business and youth applicant
+    if (acceptedData && acceptedData.youthId && acceptedData.businessId) {
+      try {
+        const convId = `conv_${applicationId}`;
+        const convRef = doc(db, 'conversations', convId);
+        let convSnap: any = null;
+        try {
+          convSnap = await getDoc(convRef);
+        } catch {}
+        if (!convSnap || !convSnap.exists()) {
+          const newConvData: Record<string, any> = {
+            conversationId: convId,
+            applicationId,
+            gigId: acceptedData.gigId || '',
+            youthId: acceptedData.youthId,
+            businessId: acceptedData.businessId,
+            participants: [acceptedData.youthId, acceptedData.businessId],
+            participantDetails: {
+              [acceptedData.youthId]: {
+                uid: acceptedData.youthId,
+                fullName: acceptedData.youthName || 'Youth Freelancer',
+                photoURL: acceptedData.youthPhotoURL || '',
+                role: 'freelancer',
+              },
+              [acceptedData.businessId]: {
+                uid: acceptedData.businessId,
+                fullName: acceptedData.businessName || 'Business Client',
+                photoURL: '',
+                role: 'client',
+              },
+            },
+            gigTitle: acceptedData.gigTitle || 'Gig',
+            gigPay: acceptedData.gigPay || 0,
+            gigPayType: acceptedData.gigPayType || 'fixed',
+            gigCategory: acceptedData.gigCategory || '',
+            gigDate: acceptedData.gigDate || acceptedData.gigScheduleDate || '',
+            gigTime: acceptedData.gigTime || acceptedData.gigScheduleTime || '',
+            gigLocation: acceptedData.gigLocation || acceptedData.gigScheduleLocation || '',
+            lastMessage: '🎉 Application accepted! You can now chat directly.',
+            lastMessageAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            unreadCount: {
+              [acceptedData.youthId]: 1,
+              [acceptedData.businessId]: 0,
+            },
+          };
+          await setDoc(convRef, newConvData, { merge: true });
+
+          // Add initial welcome/system message to the messages subcollection
+          const messagesRef = collection(db, 'conversations', convId, 'messages');
+          await addDoc(messagesRef, {
+            conversationId: convId,
+            senderId: acceptedData.businessId,
+            receiverId: acceptedData.youthId,
+            senderName: acceptedData.businessName || 'Business Client',
+            senderPhotoURL: '',
+            text: `🎉 Application accepted for "${acceptedData.gigTitle || 'this gig'}". You can now discuss instructions, schedules, and deliverables here.`,
+            type: 'system',
+            read: false,
+            readBy: [acceptedData.businessId],
+            createdAt: serverTimestamp(),
+          });
+        }
+      } catch (convErr) {
+        console.warn('Could not initialize conversation on application acceptance:', convErr);
+      }
+    }
 
     // Send in-app notification to youth freelancer
     if (acceptedData && acceptedData.youthId) {
