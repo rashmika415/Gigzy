@@ -1,3 +1,4 @@
+import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
 import CloseGigButton from '../../../components/CloseGigButton';
@@ -815,6 +816,7 @@ export default function MyGigs() {
                       </View>
                     </View>
 
+                    <VerifiedBusinessBadge userId={gig.postedBy.uid} />
                     <CloseGigButton gig={gig} />
 
                     {/* Card Actions Footer */}

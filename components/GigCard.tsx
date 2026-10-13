@@ -1,3 +1,4 @@
+import VerifiedBusinessBadge from './VerifiedBusinessBadge';
 import { formatNumber, formatCalendarDate } from '../localization/format';
 import { Text } from './LocalizedText';
 import { useTranslation } from 'react-i18next';
@@ -57,6 +58,7 @@ export default function GigCard({
           <Text style={styles.categoryText}>{t(GIG_CATEGORIES.find(category => category.id === categoryId(gig.category))?.name ?? gig.category)}</Text>
         </View>
 
+        <VerifiedBusinessBadge userId={gig.postedBy.uid} />
         <StatusPill
           status={gig.status}
           showChevron={!!onStatusPress}

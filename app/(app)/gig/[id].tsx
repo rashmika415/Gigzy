@@ -1,3 +1,4 @@
+import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
 import { formatRelativeDate } from '../../../localization/format';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
@@ -191,7 +192,8 @@ export default function GigDetailScreen() {
             <StatusPill status={gig.status} />
           </View>
 
-          <CloseGigButton gig={gig} />
+          <VerifiedBusinessBadge userId={gig.postedBy.uid} />
+                    <CloseGigButton gig={gig} />
 
           {/* Title */}
           <Text style={styles.gigTitle}>{gig.title}</Text>

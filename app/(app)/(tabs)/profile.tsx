@@ -1,3 +1,5 @@
+import BusinessVerificationCard from '../../../components/BusinessVerificationCard';
+import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
 import { formatNumber } from '../../../localization/format';
 import { Text } from '../../../components/LocalizedText';
 import ReferralCard from '../../../components/ReferralCard';
@@ -86,7 +88,7 @@ export default function Profile() {
             )}
             <Text style={styles.profileName}>
               {isYouth ? (userData?.fullName || t("Youth Member")) : (userData?.businessName || t("Business Owner"))}
-              {!isYouth && userData?.isVerified ? '  ✓' : ''}
+
             </Text>
             <View style={[styles.roleBadge, { borderColor: isYouth ? 'rgba(245, 158, 11, 0.3)' : 'rgba(124, 58, 237, 0.3)' }]}>
               <Text style={[styles.roleText, { color: isYouth ? colors.primary : colors.accent }]}>{t(getRoleLabel())}</Text>
@@ -99,6 +101,8 @@ export default function Profile() {
           </View>
         </View>
 
+        {userData?.role === 'client' && user && <VerifiedBusinessBadge userId={user.uid} />}
+        <BusinessVerificationCard />
         {/* Role-Specific Content */}
         {isYouth ? (
           // Youth Profile Fields

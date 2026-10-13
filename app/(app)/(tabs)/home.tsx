@@ -1,3 +1,4 @@
+import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
 import AppBanner, { AppPhoto } from '../../../components/AppBanner';
@@ -432,6 +433,7 @@ export default function Home() {
                     </View>
                   </View>
 
+                  <VerifiedBusinessBadge userId={gig.postedBy.uid} />
                   <Text style={styles.gigItemTitle} numberOfLines={1}>
                     {gig.title}
                   </Text>

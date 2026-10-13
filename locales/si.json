@@ -952,5 +952,18 @@
   "Application activity": "අයදුම්පත් ක්‍රියාකාරකම්",
   "Yes": "ඔව්",
   "No": "නැත",
-  "Availability confirmed": "ලබාගත හැකි බව තහවුරු කර ඇත"
+  "Availability confirmed": "ලබාගත හැකි බව තහවුරු කර ඇත",
+  "Business verification": "ව්‍යාපාර සත්‍යාපනය",
+  "No pending verification requests.": "සත්‍යාපනය සඳහා බලා සිටින ඉල්ලීම් නොමැත.",
+  "Verification details": "සත්‍යාපන විස්තර",
+  "Rejection reason": "ප්‍රතික්ෂේප කිරීමට හේතුව",
+  "Approve": "අනුමත කරන්න",
+  "Your verification request is awaiting admin review.": "ඔබගේ සත්‍යාපන ඉල්ලීම පරිපාලක සමාලෝචනය සඳහා බලා සිටී.",
+  "Your business is verified.": "ඔබගේ ව්‍යාපාරය සත්‍යාපනය කර ඇත.",
+  "Provide your business registration information and any details that help verify your business.": "ඔබගේ ව්‍යාපාර ලියාපදිංචි තොරතුරු සහ සත්‍යාපනයට උපකාරී වන විස්තර ලබා දෙන්න.",
+  "Submit for verification": "සත්‍යාපනය සඳහා ඉදිරිපත් කරන්න",
+  "Verified": "සත්‍යාපිත",
+  "PENDING": "බලාපොරොත්තුවෙන්",
+  "VERIFIED": "සත්‍යාපිත",
+  "REJECTED": "ප්‍රතික්ෂේපිත"
 }

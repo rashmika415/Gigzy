@@ -952,5 +952,18 @@
   "Application activity": "விண்ணப்பச் செயல்பாடு",
   "Yes": "ஆம்",
   "No": "இல்லை",
-  "Availability confirmed": "பணியாற்ற முடியும் என்பது உறுதி செய்யப்பட்டது"
+  "Availability confirmed": "பணியாற்ற முடியும் என்பது உறுதி செய்யப்பட்டது",
+  "Business verification": "வணிகச் சரிபார்ப்பு",
+  "No pending verification requests.": "நிலுவையில் சரிபார்ப்புக் கோரிக்கைகள் இல்லை.",
+  "Verification details": "சரிபார்ப்பு விவரங்கள்",
+  "Rejection reason": "நிராகரிப்பதற்கான காரணம்",
+  "Approve": "அங்கீகரிக்கவும்",
+  "Your verification request is awaiting admin review.": "உங்கள் சரிபார்ப்புக் கோரிக்கை நிர்வாகி ஆய்வுக்காகக் காத்திருக்கிறது.",
+  "Your business is verified.": "உங்கள் வணிகம் சரிபார்க்கப்பட்டது.",
+  "Provide your business registration information and any details that help verify your business.": "உங்கள் வணிகப் பதிவு தகவல்களையும் சரிபார்க்க உதவும் விவரங்களையும் வழங்கவும்.",
+  "Submit for verification": "சரிபார்ப்புக்குச் சமர்ப்பிக்கவும்",
+  "Verified": "சரிபார்க்கப்பட்டது",
+  "PENDING": "நிலுவையில்",
+  "VERIFIED": "சரிபார்க்கப்பட்டது",
+  "REJECTED": "நிராகரிக்கப்பட்டது"
 }

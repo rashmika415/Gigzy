@@ -1,3 +1,4 @@
+import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
 import { formatNumber } from '../../../localization/format';
 import { Text } from '../../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
@@ -30,7 +31,7 @@ export default function PublicProfileScreen() {
   return <View style={styles.container}><ScrollView contentContainerStyle={styles.content}>
     <View style={styles.header}><TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color={colors.text}/></TouchableOpacity><Text style={styles.headerTitle}>{t("Profile")}</Text><View style={{width:24}}/></View>
     <View style={styles.hero}>{profile.photoURL ? <Image source={{uri:profile.photoURL}} style={styles.avatar}/> : <View style={styles.fallback}><Text style={styles.initial}>{name?.[0]?.toUpperCase()}</Text></View>}
-      <View style={styles.nameRow}><Text style={styles.name}>{name}</Text>{!youth && profile.isVerified && <Ionicons name="checkmark-circle" size={21} color={colors.primary}/>}</View>
+      <View style={styles.nameRow}><Text style={styles.name}>{name}</Text><VerifiedBusinessBadge key={id} userId={id} /></View>
       <Text style={styles.role}>{youth ? t("Youth freelancer") : profile.businessCategory || t("Business")}</Text>
       <View style={styles.rating}><Ionicons name="star" size={16} color="#986000"/><Text style={styles.ratingText}>{t('{{rating}} · Reviews: {{count}}', { rating: formatNumber(profile.ratingAverage ?? 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), count: profile.ratingCount ?? reviews.length })}</Text></View>
     </View>

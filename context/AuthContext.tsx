@@ -24,6 +24,7 @@ export interface UserData {
   skillBadges?: import('../types/profile').SkillBadge[];
   endorsements?: import('../types/profile').CommunityEndorsement[];
   isVerified?: boolean;
+  verificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED';
   suspended?: boolean;
   suspensionReason?: string;
   notifyOnMatch?: boolean;

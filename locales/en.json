@@ -952,5 +952,18 @@
   "Application activity": "Application activity",
   "Yes": "Yes",
   "No": "No",
-  "Availability confirmed": "Availability confirmed"
+  "Availability confirmed": "Availability confirmed",
+  "Business verification": "Business verification",
+  "No pending verification requests.": "No pending verification requests.",
+  "Verification details": "Verification details",
+  "Rejection reason": "Rejection reason",
+  "Approve": "Approve",
+  "Your verification request is awaiting admin review.": "Your verification request is awaiting admin review.",
+  "Your business is verified.": "Your business is verified.",
+  "Provide your business registration information and any details that help verify your business.": "Provide your business registration information and any details that help verify your business.",
+  "Submit for verification": "Submit for verification",
+  "Verified": "Verified",
+  "PENDING": "PENDING",
+  "VERIFIED": "VERIFIED",
+  "REJECTED": "REJECTED"
 }

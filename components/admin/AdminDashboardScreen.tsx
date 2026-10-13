@@ -1,3 +1,4 @@
+import BusinessVerificationPanel from './BusinessVerificationPanel';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,9 +27,10 @@ const colors = {
 };
 const STAT_TONES = ['#EEEAFE', '#E6F2FC', '#E4F6EF', '#FFF1DB'];
 
-type Panel = 'overview' | 'users' | 'gigs' | 'applications';
+type Panel = 'overview' | 'users' | 'gigs' | 'applications' | 'verification';
 type Action = { kind: 'suspend' | 'reinstate' | 'remove'; id: string; name: string };
 const PANELS: { key: Panel; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'verification', label: 'Business verification', icon: 'shield-checkmark-outline' },
   { key: 'overview', label: 'Overview', icon: 'grid-outline' },
   { key: 'users', label: 'Users', icon: 'people-outline' },
   { key: 'gigs', label: 'Gigs', icon: 'briefcase-outline' },
@@ -73,7 +75,7 @@ export default function AdminDashboardScreen() {
   }, [revision]);
   useEffect(() => {
     const request = ++pageRequest.current;
-    if (panel === 'overview') return;
+    if (panel === 'overview' || panel === 'verification') return;
     void Promise.resolve().then(async () => {
       if (!mounted.current || request !== pageRequest.current) return;
       setListLoading(true); setListError(''); setCursor(undefined); setHasMore(false); setRows([]);
@@ -88,7 +90,7 @@ export default function AdminDashboardScreen() {
   const refresh = () => { setStatsLoading(true); setStatsError(''); setRevision(value => value + 1); };
   const selectPanel = (next: Panel) => { if (next === panel) return; pageRequest.current++; setListLoading(false); setPanel(next); setSearch(''); setFilter('all'); setNotice(''); setExpandedGig(''); };
   const loadMore = async () => {
-    if (listLoading || !hasMore || panel === 'overview') return;
+    if (listLoading || !hasMore || (panel === 'overview' || panel === 'verification')) return;
     const request = ++pageRequest.current;
     setListLoading(true); setListError('');
     try {
@@ -163,7 +165,7 @@ export default function AdminDashboardScreen() {
             <Text style={styles.statValue}>{statsError ? '—' : stats ? stats[card.key].toLocaleString() : '…'}</Text><Text style={styles.secondary}>{t(card.label)}</Text>
           </TouchableOpacity>)}</View>
           {!!statsError && <View style={styles.errorBox}><Text accessibilityRole="alert" style={styles.error}>{t('Could not load platform statistics.')}</Text><Button title={t('Retry')} onPress={refresh} /></View>}
-          {panel === 'overview' ? <>
+          {panel === 'verification' ? <BusinessVerificationPanel /> : panel === 'overview' ? <>
             <View style={styles.section}><Text style={styles.sectionTitle}>{t('Community overview')}</Text>
               {statsLoading && !stats ? <ActivityIndicator color={colors.primary} /> : statsError ? <Text style={styles.secondary}>{t('Refresh to load current totals.')}</Text> : stats && <>
                 <SummaryRow label={t('Youth')} value={stats.youth} total={stats.users} /><SummaryRow label={t('Businesses')} value={stats.businesses} total={stats.users} />
