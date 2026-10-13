@@ -3,7 +3,7 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, borderRadius } from '../../constants/theme';
+import { colors, borderRadius, fonts } from '../../constants/theme';
 import { Message } from '../../types/messaging';
 
 interface MessageBubbleProps {
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   },
   avatarInitial: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   bubble: {

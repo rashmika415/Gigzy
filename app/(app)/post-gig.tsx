@@ -8,7 +8,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import { GIG_CATEGORIES, GigInput, GigValidationErrors, LocationType } from '../../types/gig';
 import { FormField, GigLocationField } from '../../components';
 import { createGig, updateGig, getGigById, validateGigForm } from '../../services/gigService';
@@ -360,7 +360,7 @@ export default function PostGigScreen() {
     return (
       <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ marginTop: spacing.md, color: colors.textSecondary, fontSize: 14, fontWeight: '500' }}>{tr("Loading gig details for editing...")}</Text>
+        <Text style={{ marginTop: spacing.md, color: colors.textSecondary, fontSize: 14, fontFamily: fonts.bodyMedium }}>{tr("Loading gig details for editing...")}</Text>
       </SafeAreaView>
     );
   }
@@ -709,7 +709,7 @@ export default function PostGigScreen() {
                   touched.pay && errors.pay ? styles.inputError : null,
                 ]}
               >
-                <Text style={styles.currencyPrefix}>$</Text>
+                <Text style={styles.currencyPrefix}>{tr("Rs.")}</Text>
                 <TextInput
                   style={styles.currencyInput}
                   placeholder="0.00"
@@ -721,7 +721,7 @@ export default function PostGigScreen() {
                   keyboardType="decimal-pad"
                 />
                 <Text style={styles.currencySuffix}>
-                  {form.payType === 'fixed' ? tr("USD") : tr("USD / hr")}
+                  {form.payType === 'fixed' ? tr("LKR") : tr("LKR / hr")}
                 </Text>
               </View>
               {touched.pay && errors.pay && (
@@ -1312,7 +1312,7 @@ const styles = StyleSheet.create({
   },
   navTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     letterSpacing: -0.2,
   },
@@ -1337,7 +1337,7 @@ const styles = StyleSheet.create({
   errorBannerTitle: {
     fontSize: 13,
     color: colors.error,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     marginBottom: 2,
   },
   errorBannerText: {
@@ -1350,11 +1350,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: borderRadius.sm,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   retryBannerBtnText: {
     color: colors.primaryOnColor,
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
 
   // Section Cards
@@ -1382,7 +1384,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
 
@@ -1398,13 +1400,13 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.text,
     marginBottom: 6,
   },
   requiredAsterisk: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   charCount: {
     fontSize: 12,
@@ -1444,7 +1446,7 @@ const styles = StyleSheet.create({
   fieldErrorText: {
     fontSize: 12,
     color: colors.error,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
 
   // Category Selector
@@ -1464,6 +1466,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     gap: 6,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   categoryChipActive: {
     backgroundColor: colors.primaryLight,
@@ -1472,11 +1476,11 @@ const styles = StyleSheet.create({
   categoryChipText: {
     fontSize: 13,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   categoryChipTextActive: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
 
   // Skill Tags
@@ -1499,7 +1503,7 @@ const styles = StyleSheet.create({
   },
   addSkillBtnText: {
     color: colors.primaryOnColor,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     fontSize: 14,
   },
   skillsChipsContainer: {
@@ -1522,7 +1526,7 @@ const styles = StyleSheet.create({
   selectedSkillText: {
     color: colors.primary,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   removeSkillBtn: {
     padding: 2,
@@ -1534,7 +1538,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
     marginBottom: 6,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   suggestedRow: {
     flexDirection: 'row',
@@ -1547,6 +1551,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   suggestedChipText: {
     fontSize: 12,
@@ -1579,11 +1585,11 @@ const styles = StyleSheet.create({
   payTypeBtnText: {
     fontSize: 13,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   payTypeBtnTextActive: {
     color: colors.primaryOnColor,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
 
   // Currency Input
@@ -1598,7 +1604,7 @@ const styles = StyleSheet.create({
   },
   currencyPrefix: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: fonts.heading,
     color: colors.primary,
     marginRight: 6,
   },
@@ -1607,12 +1613,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: colors.text,
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   currencySuffix: {
     fontSize: 13,
     color: colors.textMuted,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
 
   // Budget Presets
@@ -1635,6 +1641,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   presetChipActive: {
     backgroundColor: colors.primaryLight,
@@ -1643,11 +1651,11 @@ const styles = StyleSheet.create({
   presetChipText: {
     fontSize: 12,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   presetChipTextActive: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
 
   // Date Section
@@ -1664,6 +1672,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     paddingHorizontal: 12,
     paddingVertical: 6,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   dateChipActive: {
     backgroundColor: colors.primaryLight,
@@ -1672,11 +1682,11 @@ const styles = StyleSheet.create({
   dateChipText: {
     fontSize: 12,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   dateChipTextActive: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   customDateBtn: {
     flexDirection: 'row',
@@ -1688,11 +1698,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     gap: 4,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   customDateBtnText: {
     fontSize: 12,
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   dateDisplayInput: {
     flexDirection: 'row',
@@ -1709,7 +1721,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.text,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     marginLeft: 8,
   },
 
@@ -1735,7 +1747,7 @@ const styles = StyleSheet.create({
   },
   locationTypeLabel: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.textSecondary,
   },
   locationTypeLabelActive: {
@@ -1788,7 +1800,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: colors.primaryOnColor,
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     letterSpacing: 0.3,
   },
   bottomSpacer: {
@@ -1822,7 +1834,7 @@ const styles = StyleSheet.create({
   },
   datePickerModalTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   pickerColumnsRow: {
@@ -1839,7 +1851,7 @@ const styles = StyleSheet.create({
   },
   pickerColLabel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.textMuted,
     marginBottom: 6,
   },
@@ -1848,6 +1860,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: borderRadius.sm,
     alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
   },
   pickerItemActive: {
     backgroundColor: colors.primary,
@@ -1855,11 +1869,11 @@ const styles = StyleSheet.create({
   pickerItemText: {
     fontSize: 13,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   pickerItemTextActive: {
     color: colors.primaryOnColor,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
   },
   modalDatePreview: {
     flexDirection: 'row',
@@ -1872,12 +1886,12 @@ const styles = StyleSheet.create({
   modalDatePreviewLabel: {
     fontSize: 13,
     color: colors.primary,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   modalDatePreviewValue: {
     fontSize: 13,
     color: colors.primary,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
   },
   modalActionsRow: {
     flexDirection: 'row',
@@ -1894,7 +1908,7 @@ const styles = StyleSheet.create({
   },
   modalCancelBtnText: {
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   modalApplyBtn: {
     flex: 1,
@@ -1905,7 +1919,7 @@ const styles = StyleSheet.create({
   },
   modalApplyBtnText: {
     color: colors.primaryOnColor,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
 
   // Success Modal
@@ -1924,7 +1938,7 @@ const styles = StyleSheet.create({
   },
   successTitle: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: fonts.heading,
     color: colors.text,
     textAlign: 'center',
     marginBottom: 6,
@@ -1951,7 +1965,7 @@ const styles = StyleSheet.create({
   gigIdBadgeText: {
     fontSize: 11,
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   successSummaryBox: {
     width: '100%',
@@ -1970,17 +1984,17 @@ const styles = StyleSheet.create({
   summaryLabel: {
     fontSize: 12,
     color: colors.textMuted,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   summaryValue: {
     fontSize: 12,
     color: colors.text,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   summaryStatusText: {
     fontSize: 12,
     color: colors.success,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   successBtnStack: {
     width: '100%',
@@ -1994,7 +2008,7 @@ const styles = StyleSheet.create({
   },
   primaryModalBtnText: {
     color: colors.primaryOnColor,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     fontSize: 15,
   },
   secondaryModalBtn: {
@@ -2007,7 +2021,7 @@ const styles = StyleSheet.create({
   },
   secondaryModalBtnText: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     fontSize: 14,
   },
 });

@@ -1,22 +1,24 @@
-import { Alert, Linking, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Linking, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Text } from './LocalizedText';
 import LocationMap from './maps/LocationMap';
 import { validCoordinates } from '../services/discoveryFilters';
 import { gigDirectionsUrl } from '../services/gigDirections';
-import { colors, borderRadius } from '../constants/theme';
+import { colors, borderRadius, fonts } from '../constants/theme';
 import type { Gig } from '../types/gig';
+import { useToast } from '../context/ToastContext';
 
 export default function GigMeetingPoint({ gig }: { gig: Gig }) {
   const { t } = useTranslation();
+  const toast = useToast();
   if (gig.locationType === 'remote') return null;
   const hasPin = validCoordinates(gig.coordinates);
   const url = gigDirectionsUrl(gig.location, gig.coordinates);
   const openDirections = async () => {
     if (!url) return;
     try { await Linking.openURL(url); }
-    catch { Alert.alert(t('Unable to open maps'), t('Please try again or search the meeting address in your maps app.')); }
+    catch { toast.error(t('Unable to open maps'), t('Please try again or search the meeting address in your maps app.')); }
   };
   return <View style={styles.card}>
     <Text style={styles.title}>{t('Meeting point')}</Text>
@@ -32,9 +34,9 @@ export default function GigMeetingPoint({ gig }: { gig: Gig }) {
 
 const styles = StyleSheet.create({
   card: { gap: 12, padding: 16, marginHorizontal: 20, marginBottom: 20, borderRadius: borderRadius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
-  title: { fontSize: 18, fontWeight: '700', color: colors.text },
+  title: { fontSize: 18, fontFamily: fonts.bodyBold, color: colors.text },
   address: { fontSize: 15, lineHeight: 22, color: colors.text },
   note: { fontSize: 13, lineHeight: 19, color: colors.textSecondary },
   button: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.primary },
-  buttonText: { fontWeight: '600', color: colors.primary },
+  buttonText: { fontFamily: fonts.bodySemiBold, color: colors.primary },
 });

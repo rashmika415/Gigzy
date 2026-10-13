@@ -4,7 +4,7 @@ import React from 'react';
 import { View, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { TextInput, Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 
 interface MessageInputProps {
   value: string;
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   },
   previewTitle: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   previewSubtitle: {
@@ -134,7 +134,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   iconBtn: {
-    padding: spacing.xs,
+    padding: spacing.xs,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   textInput: {
     flex: 1,

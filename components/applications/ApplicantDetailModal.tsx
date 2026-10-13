@@ -6,10 +6,11 @@ import { Modal, View, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView, Im
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application } from '../../types/application';
 import { acceptApplication, rejectApplication } from '../../services/applicationService';
 import { getStatusTheme } from './ApplicationCard';
+import { useToast } from '../../context/ToastContext';
 
 interface ApplicantDetailModalProps {
   visible: boolean;
@@ -46,6 +47,7 @@ export default function ApplicantDetailModal({
 }: ApplicantDetailModalProps) {
   useTranslation();
   const [acting, setActing] = useState(false);
+  const toast = useToast();
   const [errorMsg, setErrorMsg] = useState('');
 
   if (!application) return null;
@@ -69,7 +71,7 @@ export default function ApplicantDetailModal({
       if (onAccepted) {
         onAccepted(application);
       } else {
-        Alert.alert(
+        toast.success(
           tr("Application Accepted! 🎉"),
           tr("You have accepted {{value0}} for \"{{value1}}\". Work is now in progress and a notification has been sent to the youth freelancer's dashboard.", { value0: application.youthName || 'this applicant', value1: application.gigTitle || 'this gig' })
         );
@@ -122,7 +124,7 @@ export default function ApplicantDetailModal({
               try {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
               } catch {}
-              Alert.alert(tr("Application Rejected"), tr("The application has been rejected."));
+              toast.success(tr("Application Rejected"), tr("The application has been rejected."));
               if (onStatusChanged) onStatusChanged('rejected');
               onClose();
             } catch (err: any) {
@@ -188,7 +190,7 @@ export default function ApplicantDetailModal({
                 <Text style={styles.appliedDate}>{tr("Applied on")}{' '}{appliedDateStr}</Text>
                 {application.youthRatingAverage && application.youthRatingAverage > 0 ? (
                   <View style={styles.detailRatingBadge}>
-                    <Ionicons name="star" size={13} color="#F59E0B" />
+                    <Ionicons name="star" size={13} color={colors.star} />
                     <Text style={styles.detailRatingText}>
                       {application.youthRatingAverage.toFixed(1)}{' '}{tr("Rating")}{application.youthRatingCount ? tr(" ({{value0}} reviews)", { value0: application.youthRatingCount }) : ''}
                     </Text>
@@ -231,7 +233,7 @@ export default function ApplicantDetailModal({
             <Text style={styles.cardLabel}>{tr("AVAILABILITY CONFIRMATION")}</Text>
             <View style={styles.availabilityRow}>
               <View style={styles.checkCircle}>
-                <Ionicons name="checkmark" size={16} color="#059669" />
+                <Ionicons name="checkmark" size={16} color={colors.success} />
               </View>
               <Text style={styles.availabilityText}>{tr("Confirmed available on the required date and time.")}</Text>
             </View>
@@ -273,7 +275,7 @@ export default function ApplicantDetailModal({
             {application.gigPay !== undefined && application.gigPay !== null ? (
               <View style={styles.metaRow}>
                 <Ionicons name="wallet-outline" size={15} color={colors.primary} />
-                <Text style={[styles.metaText, { color: colors.primary, fontWeight: '700' }]}>
+                <Text style={[styles.metaText, { color: colors.primary, fontFamily: fonts.bodyBold }]}>
                   ${application.gigPay}
                   {application.gigPayType === 'hourly' ? tr("/hr") : tr(" fixed")}
                 </Text>
@@ -291,10 +293,10 @@ export default function ApplicantDetailModal({
                 activeOpacity={0.85}
               >
                 {acting ? (
-                  <ActivityIndicator size="small" color="#DC2626" />
+                  <ActivityIndicator size="small" color={colors.error} />
                 ) : (
                   <>
-                    <Ionicons name="close-circle-outline" size={18} color="#DC2626" />
+                    <Ionicons name="close-circle-outline" size={18} color={colors.error} />
                     <Text style={styles.rejectBtnText}>{tr("Reject")}</Text>
                   </>
                 )}
@@ -360,7 +362,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   scroll: {
@@ -375,17 +377,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: colors.errorLight,
     padding: spacing.md,
     borderRadius: borderRadius.md,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderColor: colors.errorBorder,
   },
   errorText: {
     flex: 1,
     fontSize: 13,
     color: colors.error,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   profileCard: {
     backgroundColor: colors.surface,
@@ -410,15 +412,15 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: colors.primaryBorder,
   },
   avatarText: {
     fontSize: 24,
-    fontWeight: '700',
+    fontFamily: fonts.heading,
     color: colors.primary,
   },
   nameWrap: {
@@ -426,7 +428,7 @@ const styles = StyleSheet.create({
   },
   youthName: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: fonts.heading,
     color: colors.text,
     letterSpacing: -0.3,
   },
@@ -439,7 +441,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: colors.warningLight,
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -448,8 +450,8 @@ const styles = StyleSheet.create({
   },
   detailRatingText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#D97706',
+    fontFamily: fonts.bodyBold,
+    color: colors.warning,
   },
   statusBanner: {
     flexDirection: 'row',
@@ -462,7 +464,7 @@ const styles = StyleSheet.create({
   },
   statusBannerText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   card: {
     backgroundColor: colors.surface,
@@ -474,7 +476,7 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.textMuted,
     letterSpacing: 0.8,
     marginBottom: 4,
@@ -498,25 +500,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    backgroundColor: colors.successLight,
     padding: spacing.md,
     borderRadius: borderRadius.md,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: colors.successBorder,
   },
   checkCircle: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    backgroundColor: colors.successBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   availabilityText: {
     flex: 1,
     fontSize: 13,
-    fontWeight: '600',
-    color: '#059669',
+    fontFamily: fonts.bodySemiBold,
+    color: colors.success,
   },
   skillsWrap: {
     flexDirection: 'row',
@@ -536,7 +538,7 @@ const styles = StyleSheet.create({
   },
   skillBadgeText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   bioText: {
@@ -546,7 +548,7 @@ const styles = StyleSheet.create({
   },
   gigTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   metaRow: {
@@ -570,16 +572,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: colors.errorLight,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderColor: colors.errorBorder,
     paddingVertical: spacing.md,
     borderRadius: borderRadius.lg,
   },
   rejectBtnText: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#DC2626',
+    fontFamily: fonts.bodyBold,
+    color: colors.error,
   },
   acceptBtn: {
     flex: 1,
@@ -598,7 +600,7 @@ const styles = StyleSheet.create({
   },
   acceptBtnText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
   },
   disabledBtn: {
@@ -618,6 +620,6 @@ const styles = StyleSheet.create({
   },
   finalizedNoticeText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
 });

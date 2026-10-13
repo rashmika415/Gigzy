@@ -3,13 +3,14 @@ import { translate } from "../../localization/i18n";
 import { Text } from '../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { markAllNotificationsRead, markNotificationRead, subscribeToNotifications } from '../../services/notificationService';
 import { AppNotification, NotificationType } from '../../types/notification';
-import { borderRadius, colors, spacing } from '../../constants/theme';
+import { borderRadius, colors, spacing, fonts } from '../../constants/theme';
+import SkeletonList from '../../components/Skeleton';
 
 const ICONS: Record<NotificationType, keyof typeof Ionicons.glyphMap> = {
   gig_posted: 'briefcase-outline',
@@ -54,7 +55,7 @@ export default function NotificationsScreen() {
           <Text style={[styles.markAll, !unreadCount && styles.disabled]}>{t("Read all")}</Text>
         </TouchableOpacity>
       </View>
-      {loading ? <ActivityIndicator style={styles.loader} color={colors.primary} /> : (
+      {loading ? <SkeletonList variant="row" count={5} style={styles.content} /> : (
         <ScrollView contentContainerStyle={styles.content}>
           {items.length === 0 ? (
             <View style={styles.empty}><Ionicons name="notifications-off-outline" size={42} color={colors.textMuted} />
@@ -73,5 +74,5 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:{flex:1,backgroundColor:colors.background,paddingTop:48}, header:{flexDirection:'row',alignItems:'center',paddingHorizontal:spacing.lg,paddingBottom:spacing.md,borderBottomWidth:1,borderBottomColor:colors.surfaceBorder}, iconButton:{paddingRight:spacing.md}, headerCopy:{flex:1}, title:{fontSize:22,fontWeight:'800',color:colors.text}, subtitle:{fontSize:12,color:colors.textMuted,marginTop:2}, markAll:{color:colors.primary,fontWeight:'700'}, disabled:{opacity:.35}, loader:{marginTop:60}, content:{padding:spacing.lg,gap:spacing.sm,paddingBottom:spacing.xxl}, card:{flexDirection:'row',gap:spacing.md,padding:spacing.md,backgroundColor:colors.surface,borderRadius:borderRadius.lg,borderWidth:1,borderColor:colors.surfaceBorder}, unreadCard:{borderColor:colors.primary,backgroundColor:colors.primaryLight}, notificationIcon:{width:40,height:40,borderRadius:20,backgroundColor:colors.primaryLight,alignItems:'center',justifyContent:'center'}, copy:{flex:1}, itemTitle:{fontSize:15,fontWeight:'700',color:colors.text}, body:{fontSize:13,color:colors.textSecondary,lineHeight:18,marginTop:3}, date:{fontSize:11,color:colors.textMuted,marginTop:6}, dot:{width:8,height:8,borderRadius:4,backgroundColor:colors.primary,marginTop:5}, empty:{alignItems:'center',paddingTop:90,paddingHorizontal:spacing.xl}, emptyTitle:{fontSize:18,fontWeight:'700',color:colors.text,marginTop:spacing.md}, emptyText:{fontSize:14,color:colors.textSecondary,textAlign:'center',marginTop:spacing.sm,lineHeight:20}
+  container:{flex:1,backgroundColor:colors.background,paddingTop:48}, header:{flexDirection:'row',alignItems:'center',paddingHorizontal:spacing.lg,paddingBottom:spacing.md,borderBottomWidth:1,borderBottomColor:colors.surfaceBorder}, iconButton:{paddingRight:spacing.md, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center'}, headerCopy:{flex:1}, title:{fontSize:22,fontFamily: fonts.heading,color:colors.text}, subtitle:{fontSize:12,color:colors.textMuted,marginTop:2}, markAll:{color:colors.primary,fontFamily: fonts.bodyBold}, disabled:{opacity:.35}, loader:{marginTop:60}, content:{padding:spacing.lg,gap:spacing.sm,paddingBottom:spacing.xxl}, card:{flexDirection:'row',gap:spacing.md,padding:spacing.md,backgroundColor:colors.surface,borderRadius:borderRadius.lg,borderWidth:1,borderColor:colors.surfaceBorder}, unreadCard:{borderColor:colors.primary,backgroundColor:colors.primaryLight}, notificationIcon:{width:40,height:40,borderRadius:20,backgroundColor:colors.primaryLight,alignItems:'center',justifyContent:'center'}, copy:{flex:1}, itemTitle:{fontSize:15,fontFamily: fonts.bodyBold,color:colors.text}, body:{fontSize:13,color:colors.textSecondary,lineHeight:18,marginTop:3}, date:{fontSize:11,color:colors.textMuted,marginTop:6}, dot:{width:8,height:8,borderRadius:4,backgroundColor:colors.primary,marginTop:5}, empty:{alignItems:'center',paddingTop:90,paddingHorizontal:spacing.xl}, emptyTitle:{fontSize:18,fontFamily: fonts.bodyBold,color:colors.text,marginTop:spacing.md}, emptyText:{fontSize:14,color:colors.textSecondary,textAlign:'center',marginTop:spacing.sm,lineHeight:20}
 });

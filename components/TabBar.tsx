@@ -4,7 +4,7 @@ import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, borderRadius } from '../constants/theme';
+import { colors, borderRadius, fonts, typography } from '../constants/theme';
 
 interface TabItem {
   /** Route key or unique id */
@@ -107,18 +107,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: {
-    fontSize: 9,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
     color: colors.primaryOnColor,
   },
   label: {
-    fontSize: 10,
-    fontWeight: '600',
+    ...typography.caption,
     color: colors.textMuted,
   },
   labelActive: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   activeIndicator: {
     position: 'absolute',

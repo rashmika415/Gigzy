@@ -13,8 +13,11 @@ import {
   useFonts as useHankenFonts,
   HankenGrotesk_400Regular,
   HankenGrotesk_500Medium,
+  HankenGrotesk_600SemiBold,
+  HankenGrotesk_700Bold,
 } from '@expo-google-fonts/hanken-grotesk';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { ToastProvider } from '../context/ToastContext';
 import LanguageProvider from '../localization/LanguageProvider';
 import { useFonts } from 'expo-font';
 import { NotoSansSinhala_400Regular, NotoSansSinhala_700Bold } from '@expo-google-fonts/noto-sans-sinhala';
@@ -61,7 +64,7 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   const [syneLoaded] = useSyneFonts({ Syne_600SemiBold, Syne_700Bold, Syne_800ExtraBold });
-  const [hankenLoaded] = useHankenFonts({ HankenGrotesk_400Regular, HankenGrotesk_500Medium });
+  const [hankenLoaded] = useHankenFonts({ HankenGrotesk_400Regular, HankenGrotesk_500Medium, HankenGrotesk_600SemiBold, HankenGrotesk_700Bold });
   const [localFontsLoaded] = useFonts({ NotoSansSinhala_400Regular, NotoSansSinhala_700Bold, NotoSansTamil_400Regular, NotoSansTamil_700Bold });
 
   if (!syneLoaded || !hankenLoaded || !localFontsLoaded) {
@@ -69,8 +72,8 @@ export default function RootLayout() {
   }
 
   return (
-    <LanguageProvider><AuthProvider>
+    <LanguageProvider><AuthProvider><ToastProvider>
       <RootLayoutNav />
-    </AuthProvider></LanguageProvider>
+    </ToastProvider></AuthProvider></LanguageProvider>
   );
 }

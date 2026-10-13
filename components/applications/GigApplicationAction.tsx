@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { subscribeToUserApplicationForGig } from '../../services/applicationService';
 import type { Application } from '../../types/application';
 import type { Gig } from '../../types/gig';
-import { colors } from '../../constants/theme';
+import { colors, fonts } from '../../constants/theme';
 
 export default function GigApplicationAction({ gig }: { gig: Gig }) {
   const { user, userData } = useAuth();
@@ -50,5 +50,5 @@ function ApplicationAction({ gig }: { gig: Gig }) {
 }
 const styles = StyleSheet.create({
   container: { flex: 1, gap: 8 }, button: { minHeight: 48, padding: 12, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  label: { color: colors.primaryOnColor, fontWeight: '700', textAlign: 'center' }, note: { color: colors.textSecondary, textAlign: 'center' }, error: { color: colors.error },
+  label: { color: colors.primaryOnColor, fontFamily: fonts.bodyBold, textAlign: 'center' }, note: { color: colors.textSecondary, textAlign: 'center' }, error: { color: colors.error },
 });

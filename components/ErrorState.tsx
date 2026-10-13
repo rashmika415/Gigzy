@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../constants/theme';
 
 interface ErrorStateProps {
   /** Primary error title */
@@ -41,7 +41,7 @@ export default function ErrorState({
           onPress={onRetry}
           activeOpacity={0.8}
         >
-          <Ionicons name="refresh" size={15} color="#FFF" />
+          <Ionicons name="refresh" size={15} color={colors.primaryOnColor} />
           <Text style={styles.retryText}>{t(retryLabel)}</Text>
         </TouchableOpacity>
       )}
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     textAlign: 'center',
   },
@@ -91,10 +91,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     gap: 6,
     marginTop: 4,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   retryText: {
-    color: '#FFF',
+    color: colors.primaryOnColor,
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
 });
