@@ -968,5 +968,19 @@
   "Total Value": "මුළු වටිනාකම",
   "Explore gigs": "වැඩ ගවේෂණය කරන්න",
   "Dismiss": "ඉවත් කරන්න",
-  "Gig deleted": "වැඩ මකා දමන ලදී"
+  "Gig deleted": "වැඩ මකා දමන ලදී",
+  "Ratings unavailable": "ශ්‍රේණිගත කිරීම් නොමැත",
+  "No ratings yet": "තවම ශ්‍රේණිගත කිරීම් නොමැත",
+  "Reviews: {{count}}": "සමාලෝචන: {{count}}",
+  "Could not load reviews.": "සමාලෝචන පූරණය කළ නොහැක.",
+  "Choose a rating from 1 to 5.": "1 සිට 5 දක්වා ශ්‍රේණියක් තෝරන්න.",
+  "Review submitted.": "සමාලෝචනය ඉදිරිපත් කරන ලදී.",
+  "Could not submit review.": "සමාලෝචනය ඉදිරිපත් කළ නොහැක.",
+  "Rate User": "පරිශීලකයා ශ්‍රේණිගත කරන්න",
+  "View profile": "පැතිකඩ බලන්න",
+  "Star rating is required (1-5).": "තරු ශ්‍රේණියක් අවශ්‍යයි (1-5).",
+  "{{count}} stars": "තරු {{count}}",
+  "Review (optional)": "සමාලෝචනය (විකල්ප)",
+  "Submit Review": "සමාලෝචනය ඉදිරිපත් කරන්න",
+  "View Applications": "අයදුම්පත් බලන්න"
 }

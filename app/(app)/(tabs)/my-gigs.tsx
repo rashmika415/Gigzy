@@ -3,6 +3,7 @@ import { translate as tr } from '../../../localization/i18n';
 import { formatCurrency } from '../../../localization/format';
 import CloseGigButton from '../../../components/CloseGigButton';
 import RateUserButton from '../../../components/RateUserButton';
+import ViewApplicantsButton from '../../../components/ViewApplicantsButton';
 import AppBanner from '../../../components/AppBanner';
 import { STATUS_STYLES } from '../../../components/StatusPill';
 import { Ionicons } from "@expo/vector-icons";
@@ -356,7 +357,13 @@ export default function MyGigs() {
             </TouchableOpacity>
 
             {/* Total Applicants */}
-            <View style={styles.metricCard}>
+            <TouchableOpacity
+              style={styles.metricCard}
+              onPress={() => router.push('/(app)/applications')}
+              accessibilityRole="button"
+              accessibilityLabel={tr("View Applications")}
+              activeOpacity={0.8}
+            >
               <View
                 style={[
                   styles.metricIconWrap,
@@ -367,7 +374,7 @@ export default function MyGigs() {
               </View>
               <Text style={styles.metricValue}>{stats.totalApplicants}</Text>
               <Text style={styles.metricLabel}>{tr("Applicants")}</Text>
-            </View>
+            </TouchableOpacity>
 
             {/* Completed */}
             <TouchableOpacity
@@ -815,6 +822,7 @@ export default function MyGigs() {
                       </View>
                     </View>
 
+                    <ViewApplicantsButton key={`applicants-${gig.id}`} gig={gig} />
                     <CloseGigButton gig={gig} />
                     <RateUserButton key={gig.id} gig={gig} />
 

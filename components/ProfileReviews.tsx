@@ -26,8 +26,8 @@ export function ReviewHistory({ reviews, loading, error }: { reviews: ProfileRev
   return <View style={styles.card}>
     <Text style={styles.title}>{t('Reviews')}</Text>
     {loading ? <ActivityIndicator color={colors.primary} /> : error ? <Text accessibilityRole="alert" style={styles.muted}>{t('Could not load reviews.')}</Text> : !reviews.length ? <Text style={styles.muted}>{t('No reviews yet.')}</Text> : reviews.map(review => <View key={review.id} style={styles.review}>
-      <View style={styles.head}><TouchableOpacity accessibilityRole="button" onPress={() => router.push({ pathname: '/(app)/profile/[id]', params: { id: review.reviewerId || review.authorId } })}><Text style={styles.name}>{review.authorName || t('User')}</Text></TouchableOpacity><Text style={styles.stars}>{'?'.repeat(Math.max(0, Math.min(5, Math.round(review.rating))))}</Text></View>
-      <Text style={styles.muted}>{[review.reviewerRole === 'client' ? t('Business') : review.reviewerRole ? t('Freelancer') : '', reviewDate(review.createdAt)].filter(Boolean).join(' ? ')}</Text>
+      <View style={styles.head}><TouchableOpacity accessibilityRole="button" onPress={() => router.push({ pathname: '/(app)/profile/[id]', params: { id: review.reviewerId || review.authorId } })}><Text style={styles.name}>{review.authorName || t('User')}</Text></TouchableOpacity><Text style={styles.stars}>{'\u2605'.repeat(Math.max(0, Math.min(5, Math.round(review.rating))))}</Text></View>
+      <Text style={styles.muted}>{[review.reviewerRole === 'client' ? t('Business') : review.reviewerRole ? t('Freelancer') : '', reviewDate(review.createdAt)].filter(Boolean).join(' \u00b7 ')}</Text>
       {!!review.comment && <Text style={styles.text}>{review.comment}</Text>}
     </View>)}
   </View>;

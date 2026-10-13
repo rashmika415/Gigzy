@@ -1,3 +1,4 @@
+/* global __dirname */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -6,6 +7,8 @@ const { test } = require('node:test');
 const ts = require('typescript');
 
 function setupApplicationService() {
+  const auth = { currentUser: { uid: 'biz-1' } };
+  const sentNotifications = [];
   const collections = {
     applications: new Map(),
     gigs: new Map(),
@@ -57,11 +60,7 @@ function setupApplicationService() {
 
   const firestore = {
     collection: (_, name) => ({ name }),
-    doc: (_, collectionName, docId) => ({
-      collectionName,
-      id: docId,
-      path: `${collectionName}/${docId}`,
-    }),
+    doc: (_, ...segments) => ({ collectionName: segments.slice(0, -1).join('/'), id: segments.at(-1), path: segments.join('/') }),
     serverTimestamp: () => ({ _type: 'serverTimestamp', toMillis: () => Date.now() }),
     increment: (amount) => amount,
     runTransaction: async (_, updateFn) => {
@@ -79,6 +78,7 @@ function setupApplicationService() {
             collections[docRef.collectionName] = new Map();
           }
           collections[docRef.collectionName].set(docRef.id, { id: docRef.id, ...data });
+          if (docRef.collectionName.includes('/notifications')) sentNotifications.push(data);
         },
         update: (docRef, data) => {
           const table = collections[docRef.collectionName];
@@ -158,13 +158,12 @@ function setupApplicationService() {
   }).outputText;
 
   const exports = {};
-  const sentNotifications = [];
   vm.runInNewContext(compiled, {
     exports,
     module: { exports },
     require: (mod) => {
       if (mod === 'firebase/firestore') return firestore;
-      if (mod === '../FirebaseConfig') return { db: {}, auth: { currentUser: null } };
+      if (mod === '../FirebaseConfig') return { db: {}, auth };
       if (mod === './gigService') return { parseFirebaseError: (e) => e.message || String(e) };
       if (mod === './notificationService') return {
         sendNotification: async (userId, notif) => {
@@ -177,7 +176,14 @@ function setupApplicationService() {
     console,
   });
 
-  return { service: exports, collections, sentNotifications };
+  const create = exports.createApplication;
+  exports.createApplication = async input => {
+    const previous = auth.currentUser;
+    auth.currentUser = { uid: input.youthId };
+    try { return await create(input); }
+    finally { auth.currentUser = previous; }
+  };
+  return { service: exports, collections, sentNotifications, auth };
 }
 
 test('TEST 1 & 2: Submitting valid application sets pending status and updates applicant count', async () => {
@@ -535,7 +541,7 @@ test('TEST 15: Business owner only sees applications belonging to their gigs and
 });
 
 test('TEST 16: Business owner views applicants for a specific gig with businessId constraint and listener', async () => {
-  const { service, collections } = setupApplicationService();
+  const { service } = setupApplicationService();
 
   // Two youth apply to gig-open-1
   await service.createApplication({
@@ -703,7 +709,37 @@ test('TEST 21: A youth cannot be accepted twice for a gig and another applicant 
       await service.acceptApplication('app-2', 'biz-1');
     },
     (err) => {
-      return err.message.includes('This gig has already been accepted and is in progress. A youth cannot be accepted twice for this gig.');
+      return err.message.includes('cannot be accepted twice');
     }
   );
+});
+
+test('decision requires a signed-in owner and an existing open gig', async () => {
+  const { service, collections, auth } = setupApplicationService();
+  const app = await service.createApplication({ gigId: 'gig-open-1', youthId: 'youth-1', message: 'Ready for this job', availabilityConfirmed: true });
+  auth.currentUser = null;
+  await assert.rejects(service.acceptApplication(app.id, 'biz-1'), /sign in/);
+  await assert.rejects(service.rejectApplication(app.id, 'biz-1'), /sign in/);
+  auth.currentUser = { uid: 'biz-1' };
+  collections.gigs.get('gig-open-1').status = 'cancelled';
+  await assert.rejects(service.acceptApplication(app.id, 'biz-1'), /no longer open/);
+  collections.gigs.delete('gig-open-1');
+  await assert.rejects(service.acceptApplication(app.id, 'biz-1'), /Gig not found/);
+  assert.equal(collections.applications.get(app.id).status, 'pending');
+});
+test('accepting one applicant preserves the others for review and rejection', async () => {
+  const { service, collections, sentNotifications } = setupApplicationService();
+  const apply = youthId => service.createApplication({ gigId: 'gig-open-1', youthId, message: 'Ready for this job', availabilityConfirmed: true });
+  const first = await apply('youth-1');
+  const second = await apply('youth-2');
+  await service.acceptApplication(first.id, 'biz-1');
+  assert.equal(collections.applications.get(second.id).status, 'pending');
+  await assert.rejects(service.acceptApplication(second.id, 'biz-1'), /no longer open/);
+  await service.rejectApplication(second.id, 'biz-1');
+  assert.equal(collections.applications.get(first.id).status, 'accepted');
+  assert.equal(collections.applications.get(second.id).status, 'rejected');
+  assert.equal(sentNotifications.filter(item => item.title === 'Application Accepted!').length, 1);
+  assert.equal(sentNotifications.filter(item => item.title === 'Application Status Update').length, 1);
+  const notifications = collections[`users/youth-1/notifications`];
+  assert.ok(notifications.has(`application-accepted-${first.id}`));
 });
