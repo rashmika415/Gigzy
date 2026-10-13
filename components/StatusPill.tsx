@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { borderRadius } from '../constants/theme';
+import { colors, borderRadius, typography } from '../constants/theme';
 import type { GigStatus } from '../types/gig';
 
 /** Visual config for each status variant */
@@ -19,32 +19,32 @@ const STATUS_STYLES: Record<
 > = {
   open: {
     label: 'Open & Active',
-    bg: 'rgba(16, 185, 129, 0.12)',
-    text: '#147D54',
-    border: 'rgba(16, 185, 129, 0.3)',
+    bg: colors.successLight,
+    text: colors.success,
+    border: colors.successBorder,
     icon: 'radio-button-on',
   },
   'in-progress': {
     label: 'In Progress',
-    bg: 'rgba(245, 158, 11, 0.12)',
-    text: '#986000',
-    border: 'rgba(245, 158, 11, 0.3)',
+    bg: colors.warningLight,
+    text: colors.warning,
+    border: colors.warningBorder,
     icon: 'time-outline',
   },
-  filled: { label: 'Filled', bg: 'rgba(245,158,11,0.12)', text: '#986000', border: 'rgba(245,158,11,0.3)', icon: 'people-outline' },
-  closed: { label: 'Closed', bg: 'rgba(239,68,68,0.12)', text: '#B42318', border: 'rgba(239,68,68,0.3)', icon: 'lock-closed-outline' },
+  filled: { label: 'Filled', bg: colors.warningLight, text: colors.warning, border: colors.warningBorder, icon: 'people-outline' },
+  closed: { label: 'Closed', bg: colors.errorLight, text: colors.error, border: colors.errorBorder, icon: 'lock-closed-outline' },
   completed: {
     label: 'Completed',
-    bg: 'rgba(124, 58, 237, 0.15)',
-    text: '#6D28D9',
-    border: 'rgba(124, 58, 237, 0.35)',
+    bg: colors.infoLight,
+    text: colors.info,
+    border: colors.infoBorder,
     icon: 'checkmark-circle-outline',
   },
   cancelled: {
     label: 'Cancelled',
-    bg: 'rgba(239, 68, 68, 0.12)',
-    text: '#B42318',
-    border: 'rgba(239, 68, 68, 0.3)',
+    bg: colors.errorLight,
+    text: colors.error,
+    border: colors.errorBorder,
     icon: 'close-circle-outline',
   },
 };
@@ -139,10 +139,12 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   label: {
-    fontSize: 11,
-    fontWeight: '700',
+    ...typography.label,
+    fontSize: 12,
+    lineHeight: 16,
   },
   labelSm: {
-    fontSize: 10,
+    ...typography.caption,
+    fontFamily: typography.label.fontFamily,
   },
 });

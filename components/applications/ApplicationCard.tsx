@@ -5,7 +5,7 @@ import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application, ApplicationStatus } from '../../types/application';
 
 interface ApplicationCardProps {
@@ -18,34 +18,34 @@ export function getStatusTheme(status: ApplicationStatus) {
     case 'accepted':
       return {
         label: 'Accepted',
-        bg: 'rgba(16, 185, 129, 0.12)',
-        text: '#059669',
-        border: 'rgba(16, 185, 129, 0.3)',
+        bg: colors.successLight,
+        text: colors.success,
+        border: colors.successBorder,
         icon: 'checkmark-circle' as const,
       };
     case 'rejected':
       return {
         label: 'Rejected',
-        bg: 'rgba(239, 68, 68, 0.12)',
-        text: '#DC2626',
-        border: 'rgba(239, 68, 68, 0.3)',
+        bg: colors.errorLight,
+        text: colors.error,
+        border: colors.errorBorder,
         icon: 'close-circle' as const,
       };
     case 'completed':
       return {
         label: 'Completed',
-        bg: 'rgba(99, 102, 241, 0.12)',
-        text: '#4F46E5',
-        border: 'rgba(99, 102, 241, 0.3)',
+        bg: colors.infoLight,
+        text: colors.info,
+        border: colors.infoBorder,
         icon: 'trophy' as const,
       };
     case 'pending':
     default:
       return {
         label: 'Pending',
-        bg: 'rgba(245, 158, 11, 0.12)',
-        text: '#D97706',
-        border: 'rgba(245, 158, 11, 0.3)',
+        bg: colors.warningLight,
+        text: colors.warning,
+        border: colors.warningBorder,
         icon: 'time' as const,
       };
   }
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   },
   gigTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     letterSpacing: -0.2,
     marginBottom: 4,
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   businessName: {
     fontSize: 13,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   statusPill: {
     flexDirection: 'row',
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   messagePreview: {
     fontSize: 13,
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   },
   payText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
 });

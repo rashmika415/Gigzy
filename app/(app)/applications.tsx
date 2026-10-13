@@ -6,7 +6,7 @@ import { Text, TextInput } from '../../components/LocalizedText';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application, ApplicationFilterStatus } from '../../types/application';
 import {
   subscribeToMyApplications,
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   searchContainer: {
@@ -438,6 +438,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   filterTabActive: {
     backgroundColor: colors.primary,
@@ -445,7 +447,7 @@ const styles = StyleSheet.create({
   },
   filterTabText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   filterTabTextActive: {
@@ -462,7 +464,7 @@ const styles = StyleSheet.create({
   },
   filterCountText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.textSecondary,
   },
   filterCountTextActive: {
@@ -485,7 +487,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   errorSubtitle: {
@@ -498,10 +500,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   retryBtnText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.primaryOnColor,
   },
   emptyBox: {
@@ -515,14 +519,14 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   emptySubtitle: {
@@ -544,7 +548,7 @@ const styles = StyleSheet.create({
   },
   exploreBtnText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
   },
 });

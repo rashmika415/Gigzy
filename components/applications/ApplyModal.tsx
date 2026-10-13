@@ -5,7 +5,7 @@ import { Modal, View, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardA
 import { Text, TextInput } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import { createApplication } from '../../services/applicationService';
 import type { Gig } from '../../types/gig';
 
@@ -266,13 +266,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   headerSubtitle: {
     fontSize: 12,
     color: colors.primary,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     marginTop: 1,
   },
   closeBtn: {
@@ -300,18 +300,18 @@ const styles = StyleSheet.create({
   gigSummaryText: {
     fontSize: 12,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     flex: 1,
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: colors.errorLight,
     borderRadius: borderRadius.md,
     padding: spacing.sm,
     gap: spacing.xs,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: colors.errorBorder,
   },
   errorBannerText: {
     fontSize: 12,
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   requiredStar: {
@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
   },
   cancelBtnText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.textSecondary,
   },
   applyBtn: {
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   },
   applyBtnText: {
     fontSize: 14,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
   },
 });

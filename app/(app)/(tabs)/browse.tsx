@@ -12,12 +12,13 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../../constants/theme';
 import {
   GigCard,
   SearchBar,
   EmptyState,
   LoadingState,
+  SkeletonList,
   ErrorState,
 } from '../../../components';
 import type { Gig, GigSortOption, LocationType, GigFilterOptions } from '../../../types/gig';
@@ -262,7 +263,7 @@ export default function BrowseScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
         onEndReached={() => { if (!error && filteredGigs.length > 0) loadMore(); }}
         onEndReachedThreshold={0.3}
-        ListEmptyComponent={loading ? <LoadingState message={t("Discovering gigs...")} size="large" /> : error ?
+        ListEmptyComponent={loading ? <SkeletonList variant="gig" count={3} /> : error ?
           <ErrorState title={t("Failed to load gigs")} message={t(error ?? "")} onRetry={refresh} /> :
           <EmptyState icon={hasAnyFilter ? 'search-outline' : 'briefcase-outline'}
             title={hasMore ? t("Still looking for matches") : hasAnyFilter ? t("No matching gigs") : t("No gigs yet")}
@@ -355,7 +356,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '800',
+    fontFamily: fonts.heading,
     color: colors.text,
     letterSpacing: -0.3,
   },
@@ -367,24 +368,26 @@ const styles = StyleSheet.create({
   liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: colors.successLight,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: colors.successBorder,
     borderRadius: borderRadius.full,
     paddingHorizontal: 8,
     paddingVertical: 3,
     gap: 5,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   liveDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#147D54',
+    backgroundColor: colors.success,
   },
   liveText: {
     fontSize: 10,
-    fontWeight: '700',
-    color: '#147D54',
+    fontFamily: fonts.bodyBold,
+    color: colors.success,
   },
 
   // Search + Sort row
@@ -433,6 +436,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     gap: 5,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   categoryChipSelected: {
     backgroundColor: colors.primary,
@@ -440,12 +445,12 @@ const styles = StyleSheet.create({
   },
   categoryChipText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   categoryChipTextSelected: {
     color: colors.primaryOnColor,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
 
   // Location pills
@@ -464,6 +469,8 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 11,
     gap: 4,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   locationChipSelected: {
     backgroundColor: colors.primaryLight,
@@ -471,12 +478,12 @@ const styles = StyleSheet.create({
   },
   locationChipText: {
     fontSize: 11,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
     color: colors.textMuted,
   },
   locationChipTextSelected: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
 
   // Active filter info bar
@@ -490,16 +497,16 @@ const styles = StyleSheet.create({
   filterInfoText: {
     fontSize: 13,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   filterInfoHighlight: {
     color: colors.text,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   clearFiltersText: {
     fontSize: 12,
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
 
   // List
@@ -542,7 +549,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     marginBottom: spacing.md,
   },
@@ -576,11 +583,11 @@ const styles = StyleSheet.create({
   },
   sortOptionText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   sortOptionTextActive: {
     color: colors.text,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
 });

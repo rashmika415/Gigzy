@@ -5,7 +5,7 @@ import React from 'react';
 import { Modal, View, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application } from '../../types/application';
 import { getStatusTheme } from './ApplicationCard';
 
@@ -117,7 +117,7 @@ export default function ApplicationDetailModal({
               <View style={styles.metaRow}>
                 <Ionicons name="wallet-outline" size={16} color={colors.primary} />
                 <Text style={styles.metaLabel}>{tr("Compensation:")}</Text>
-                <Text style={[styles.metaVal, { color: colors.primary, fontWeight: '700' }]}>
+                <Text style={[styles.metaVal, { color: colors.primary, fontFamily: fonts.bodyBold }]}>
                   ${application.gigPay}
                   {application.gigPayType === 'hourly' ? tr("/hr") : tr(" fixed price")}
                 </Text>
@@ -162,7 +162,7 @@ export default function ApplicationDetailModal({
             <Text style={styles.cardSectionLabel}>{tr("AVAILABILITY COMMITMENT")}</Text>
             <View style={styles.availabilityRow}>
               <View style={styles.checkCircle}>
-                <Ionicons name="checkmark" size={16} color="#059669" />
+                <Ionicons name="checkmark" size={16} color={colors.success} />
               </View>
               <Text style={styles.availabilityText}>{tr("Confirmed available on the required date and time.")}</Text>
             </View>
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   scroll: {
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   },
   statusBannerTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     marginBottom: 2,
   },
   statusBannerDesc: {
@@ -272,14 +272,14 @@ const styles = StyleSheet.create({
   },
   cardSectionLabel: {
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.textMuted,
     letterSpacing: 0.8,
     marginBottom: 4,
   },
   gigTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     letterSpacing: -0.3,
     marginBottom: spacing.xs,
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     color: colors.text,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
   },
   messageBox: {
     flexDirection: 'row',
@@ -320,25 +320,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    backgroundColor: colors.successLight,
     padding: spacing.md,
     borderRadius: borderRadius.md,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: colors.successBorder,
   },
   checkCircle: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    backgroundColor: colors.successBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   availabilityText: {
     flex: 1,
     fontSize: 13,
-    fontWeight: '600',
-    color: '#059669',
+    fontFamily: fonts.bodySemiBold,
+    color: colors.success,
   },
   dismissBtn: {
     backgroundColor: colors.surface,
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   },
   dismissBtnText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.text,
   },
 });

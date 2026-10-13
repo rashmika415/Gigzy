@@ -2,7 +2,7 @@ import { Text } from './LocalizedText';
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, borderRadius } from '../constants/theme';
+import { colors, borderRadius, typography } from '../constants/theme';
 
 type ChipVariant = 'default' | 'selected' | 'outline';
 type ChipSize = 'sm' | 'md';
@@ -121,15 +121,17 @@ const styles = StyleSheet.create({
     borderColor: colors.surfaceBorder,
   },
   label: {
-    fontSize: 12,
-    fontWeight: '500',
+    ...typography.caption,
+    fontSize: 13,
+    lineHeight: 18,
     color: colors.textSecondary,
   },
   labelSm: {
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 16,
   },
   labelSelected: {
-    fontWeight: '700',
+    fontFamily: typography.label.fontFamily,
   },
   removeBtn: {
     marginLeft: 4,

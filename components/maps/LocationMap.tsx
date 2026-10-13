@@ -7,7 +7,7 @@ import type { MapCanvasHandle } from './MapCanvas.types';
 import { createGeoapifyMapHTML } from '../../services/geoapifyMap';
 import { validCoordinates } from '../../services/discoveryFilters';
 import type { Coordinates } from '../../types/gig';
-import { colors, borderRadius } from '../../constants/theme';
+import { colors, borderRadius, fonts } from '../../constants/theme';
 
 type LocationMapProps = { point?: Coordinates; onChange?: (point: Coordinates) => void; disabled?: boolean; compact?: boolean };
 
@@ -66,5 +66,5 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16, gap: 12 },
   note: { color: colors.textSecondary, fontSize: 13, textAlign: 'center', padding: 8 },
   loading: { position: 'absolute', top: 10, alignSelf: 'center', backgroundColor: colors.surface, borderRadius: 12, padding: 8, flexDirection: 'row', alignItems: 'center' },
-  link: { color: colors.primary, padding: 12, fontWeight: '600' },
+  link: { color: colors.primary, padding: 12, fontFamily: fonts.bodySemiBold },
 });

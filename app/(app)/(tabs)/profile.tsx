@@ -9,7 +9,7 @@ import { signOut } from 'firebase/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../../../FirebaseConfig';
 import { useAuth } from '../../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../../constants/theme';
 import LanguageSelector from '../../../components/LanguageSelector';
 
 export default function Profile() {
@@ -88,12 +88,12 @@ export default function Profile() {
               {isYouth ? (userData?.fullName || t("Youth Member")) : (userData?.businessName || t("Business Owner"))}
               {!isYouth && userData?.isVerified ? '  ✓' : ''}
             </Text>
-            <View style={[styles.roleBadge, { borderColor: isYouth ? 'rgba(245, 158, 11, 0.3)' : 'rgba(124, 58, 237, 0.3)' }]}>
+            <View style={[styles.roleBadge, { borderColor: isYouth ? colors.primaryBorder : colors.infoBorder }]}>
               <Text style={[styles.roleText, { color: isYouth ? colors.primary : colors.accent }]}>{t(getRoleLabel())}</Text>
             </View>
             <Text style={styles.emailText}>{user?.email}</Text>
             <View style={styles.ratingRow}>
-              <Ionicons name="star" size={15} color="#986000" />
+              <Ionicons name="star" size={15} color={colors.star} />
               <Text style={styles.emailText}>{t('{{rating}} · Reviews: {{count}}', { rating: formatNumber(userData?.ratingAverage ?? 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), count: userData?.ratingCount ?? 0 })}</Text>
             </View>
           </View>
@@ -275,14 +275,22 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   backButton: {
-    padding: spacing.xs,
+    padding: spacing.xs,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   editHeaderButton: {
-    padding: spacing.xs,
+    padding: spacing.xs,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: fonts.heading,
     color: colors.text,
   },
   profileCard: {
@@ -320,12 +328,12 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 36,
-    fontWeight: '800',
+    fontFamily: fonts.display,
     color: colors.primary,
   },
   profileName: {
     fontSize: 22,
-    fontWeight: '800',
+    fontFamily: fonts.heading,
     color: colors.text,
     textAlign: 'center',
   },
@@ -337,7 +345,7 @@ const styles = StyleSheet.create({
   },
   roleText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   emailText: {
     fontSize: 14,
@@ -358,7 +366,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.textSecondary,
     marginBottom: spacing.sm,
     textTransform: 'uppercase',
@@ -383,7 +391,7 @@ const styles = StyleSheet.create({
   skillTag: {
     backgroundColor: colors.primaryLight,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: colors.primaryBorder,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: borderRadius.full,
@@ -391,7 +399,7 @@ const styles = StyleSheet.create({
   skillTagText: {
     color: colors.primary,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
   detailRow: {
     flexDirection: 'row',
@@ -405,7 +413,7 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -413,7 +421,7 @@ const styles = StyleSheet.create({
   detailValue: {
     fontSize: 15,
     color: colors.text,
-    fontWeight: '500',
+    fontFamily: fonts.bodyMedium,
     marginTop: 2,
   },
   actionSection: {
@@ -428,14 +436,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: colors.primaryLight,
     borderWidth: 1,
     borderColor: colors.primary,
   },
   applicationsButtonText: {
     color: colors.primary,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   editButton: {
     backgroundColor: colors.primary,
@@ -447,11 +455,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   publicButton: { borderRadius: borderRadius.full, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.primary },
-  publicButtonText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
+  publicButtonText: { color: colors.primary, fontSize: 15, fontFamily: fonts.bodyBold },
   editButtonText: {
     color: colors.primaryOnColor,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   buttonIcon: {
     marginRight: 2,
@@ -464,12 +472,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.error,
-    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+    backgroundColor: colors.errorLight,
     gap: spacing.sm,
   },
   signOutText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.error,
   },
 });

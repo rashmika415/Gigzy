@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../constants/theme';
 
 interface EmptyStateProps {
   /** Ionicon name for the icon inside the hero circle */
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     textAlign: 'center',
   },
@@ -112,6 +112,6 @@ const styles = StyleSheet.create({
   actionText: {
     color: colors.primaryOnColor,
     fontSize: 14,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
   },
 });

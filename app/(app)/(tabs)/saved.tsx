@@ -5,7 +5,7 @@ import { FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { EmptyState, ErrorState, GigCard, LoadingState } from '../../../components';
+import { EmptyState, ErrorState, GigCard, LoadingState, SkeletonList } from '../../../components';
 import BookmarkButton from '../../../components/BookmarkButton';
 import { useSavedGigs } from '../../../context/SavedGigsContext';
 import { subscribeToGig } from '../../../services/gigService';
@@ -66,7 +66,7 @@ export default function SavedGigsScreen() {
       contentContainerStyle={styles.list} ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}
       ListHeaderComponent={error && items.length > 0 ? <ErrorState title={t("Saved gigs could not refresh")} message={t(error ?? "")} onRetry={refresh} /> : null}
-      ListEmptyComponent={loading ? <LoadingState message={t("Loading your saved gigs...")} /> : error ?
+      ListEmptyComponent={loading ? <SkeletonList variant="gig" count={3} /> : error ?
         <ErrorState title={t("Unable to load saved gigs")} message={t(error ?? "")} onRetry={refresh} /> :
         <EmptyState icon="bookmark-outline" title={t("No saved gigs yet")} description={t("Tap the bookmark on a gig to find it here later.")} actionLabel={t("Browse gigs")} actionIcon="compass-outline" onAction={() => router.navigate('/(app)/(tabs)/browse')} />}
       ListFooterComponent={items.length > visibleCount ? <TouchableOpacity accessibilityRole="button" style={styles.more} onPress={() => setVisibleCount(value => value + 20)}><Text style={styles.moreText}>{t("Load more saved gigs")}</Text></TouchableOpacity> : null}
