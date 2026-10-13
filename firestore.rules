@@ -93,12 +93,26 @@ service cloud.firestore {
       }
       match /reviews/{reviewId} {
         allow read: if signedIn();
-        allow create: if active() && request.auth.uid != userId
-          && request.resource.data.authorId == request.auth.uid
-          && request.resource.data.rating is number
-          && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
-          && request.resource.data.comment is string && request.resource.data.comment.size() <= 1000;
-        allow update, delete: if active() && resource.data.authorId == request.auth.uid;
+        function validGigReview() {
+          let data = request.resource.data;
+          let gig = get(/databases/$(database)/documents/gigs/$(data.gigId)).data;
+          let owner = gig.postedBy.uid;
+          let worker = gig.assignedYouthId;
+          return gig.status == 'completed' && gig.get('moderationRemoved', false) != true
+            && owner != worker && request.auth.uid != userId
+            && ((request.auth.uid == owner && userId == worker && currentUser().data.role == 'client')
+              || (request.auth.uid == worker && userId == owner && currentUser().data.role in ['freelancer', 'youth']))
+            && reviewId == data.gigId + '_' + request.auth.uid
+            && data.keys().hasOnly(['gigId', 'reviewerId', 'reviewedUserId', 'reviewerRole', 'authorId', 'authorName', 'rating', 'comment', 'createdAt'])
+            && data.authorId == request.auth.uid && data.authorName is string
+            && data.reviewerId == request.auth.uid && data.reviewedUserId == userId
+            && data.reviewerRole == currentUser().data.role
+            && data.rating is int && data.rating >= 1 && data.rating <= 5
+            && data.comment is string && data.comment.size() <= 1000
+            && data.createdAt == request.time;
+        }
+        allow create: if active() && validGigReview();
+        allow update, delete: if false;
       }
       match /endorsements/{endorsementId} {
         allow read: if signedIn();

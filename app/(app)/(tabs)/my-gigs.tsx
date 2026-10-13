@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
 import { formatCurrency } from '../../../localization/format';
 import CloseGigButton from '../../../components/CloseGigButton';
+import RateUserButton from '../../../components/RateUserButton';
 import AppBanner from '../../../components/AppBanner';
 import { STATUS_STYLES } from '../../../components/StatusPill';
 import { Ionicons } from "@expo/vector-icons";
@@ -815,6 +816,7 @@ export default function MyGigs() {
                     </View>
 
                     <CloseGigButton gig={gig} />
+                    <RateUserButton key={gig.id} gig={gig} />
 
                     {/* Card Actions Footer */}
                     <View style={styles.cardActionsFooter}>
