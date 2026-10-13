@@ -947,5 +947,10 @@
   "Could not load dashboard. Please retry.": "முகப்பை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
   "Gig removed by a moderator": "நடுவரால் வேலை அகற்றப்பட்டது",
   "This gig is no longer available. Existing applications remain in your application history.": "இந்த வேலை இனி கிடைக்காது. ஏற்கனவே உள்ள விண்ணப்பங்கள் உங்கள் விண்ணப்ப வரலாற்றில் இருக்கும்.",
-  "Youth": "இளைஞர்கள்"
+  "Youth": "இளைஞர்கள்",
+  "Review applications": "விண்ணப்பங்களைப் பார்வையிடுங்கள்",
+  "Application activity": "விண்ணப்பச் செயல்பாடு",
+  "Yes": "ஆம்",
+  "No": "இல்லை",
+  "Availability confirmed": "பணியாற்ற முடியும் என்பது உறுதி செய்யப்பட்டது"
 }

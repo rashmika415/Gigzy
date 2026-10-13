@@ -947,5 +947,10 @@
   "Could not load dashboard. Please retry.": "පරිපාලක පුවරුව පූරණය කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
   "Gig removed by a moderator": "පරිපාලකයෙකු ගිග් ඉවත් කර ඇත",
   "This gig is no longer available. Existing applications remain in your application history.": "මෙම ගිග් තවදුරටත් ලබාගත නොහැක. පවතින අයදුම්පත් ඔබගේ අයදුම්පත් ඉතිහාසයේ පවතී.",
-  "Youth": "තරුණයන්"
+  "Youth": "තරුණයන්",
+  "Review applications": "අයදුම්පත් සමාලෝචනය කරන්න",
+  "Application activity": "අයදුම්පත් ක්‍රියාකාරකම්",
+  "Yes": "ඔව්",
+  "No": "නැත",
+  "Availability confirmed": "ලබාගත හැකි බව තහවුරු කර ඇත"
 }

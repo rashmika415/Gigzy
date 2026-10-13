@@ -2,6 +2,7 @@ import { collection, doc, documentId, getCountFromServer, getDocsFromServer, lim
 import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { auth, db } from '../FirebaseConfig';
 import type { UserData } from '../context/AuthContext';
+import type { Application } from '../types/application';
 import type { Gig } from '../types/gig';
 
 export type AdminUser = UserData & { id: string };
@@ -22,12 +23,12 @@ export async function fetchAdminStats(): Promise<AdminStats> {
   return { users, youth, businesses, suspended, gigs, openGigs, applications };
 }
 
-export async function fetchAdminPage(kind: 'users' | 'gigs', cursor?: AdminCursor) {
+export async function fetchAdminPage(kind: 'users' | 'gigs' | 'applications', cursor?: AdminCursor) {
   const constraints = [orderBy(documentId()), ...(cursor ? [startAfter(cursor)] : []), limit(ADMIN_PAGE_SIZE + 1)];
   const snapshot = await getDocsFromServer(query(collection(db, kind), ...constraints));
   const docs = snapshot.docs.slice(0, ADMIN_PAGE_SIZE);
   return {
-    rows: docs.map(item => ({ ...item.data(), id: item.id })) as (AdminUser | Gig)[],
+    rows: docs.map(item => ({ ...item.data(), id: item.id })) as (AdminUser | Gig | Application)[],
     cursor: docs.at(-1), hasMore: snapshot.docs.length > ADMIN_PAGE_SIZE,
   };
 }

@@ -947,5 +947,10 @@
   "Could not load dashboard. Please retry.": "Could not load dashboard. Please retry.",
   "Gig removed by a moderator": "Gig removed by a moderator",
   "This gig is no longer available. Existing applications remain in your application history.": "This gig is no longer available. Existing applications remain in your application history.",
-  "Youth": "Youth"
+  "Youth": "Youth",
+  "Review applications": "Review applications",
+  "Application activity": "Application activity",
+  "Yes": "Yes",
+  "No": "No",
+  "Availability confirmed": "Availability confirmed"
 }
