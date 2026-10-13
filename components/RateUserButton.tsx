@@ -66,7 +66,7 @@ export default function RateUserButton({ gig }: { gig: Gig }) {
         {!!profileError && <Text style={styles.error}>{t(profileError)}</Text>}
         {!!reviewError && <Text style={styles.error}>{t(reviewError)}</Text>}
         <Text style={styles.text}>{t(userData?.role === 'client' ? 'Rate the freelancer' : 'Rate the business')}</Text>
-        <Text style={styles.text}>{t('Star rating is required (1?5).')}</Text>
+        <Text style={styles.text}>{t('Star rating is required (1-5).')}</Text>
         <View style={styles.actions}>{[1, 2, 3, 4, 5].map(value => <TouchableOpacity key={value} accessibilityRole="button" accessibilityLabel={t('{{count}} stars', { count: value })} accessibilityState={{ selected: rating === value }} disabled={saving} style={styles.star} onPress={() => setRating(value)}>
           <Ionicons name={value <= rating ? 'star' : 'star-outline'} size={30} color={colors.star} />
         </TouchableOpacity>)}</View>

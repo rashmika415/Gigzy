@@ -204,7 +204,7 @@ export default function Home() {
     ? [
         { label: 'Gigs Posted', value: formatNumber(gigs.length), icon: 'briefcase-outline', onPress: goMyGigs },
         { label: 'Total Value', value: formatCurrency(gigs.reduce((acc, g) => acc + (g.pay || 0), 0)), icon: 'wallet-outline', onPress: goMyGigs },
-        { label: 'Rating', value: userData?.ratingCount ? formatNumber(userData.ratingAverage ?? 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—', icon: 'star-outline' },
+        { label: 'Rating', value: userData?.ratingCount ? formatNumber(userData.ratingAverage ?? 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—', icon: 'star-outline', onPress: () => router.push('/(app)/add-ratings' as any) },
       ]
     : [
         { label: 'New Gigs', value: formatNumber(gigs.length), icon: 'flash-outline', onPress: goBrowse },
