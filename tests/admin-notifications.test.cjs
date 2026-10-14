@@ -63,7 +63,7 @@ test('admin announcement validates content and delivers to the selected active r
   assert.equal(api.updates.at(-1).value.deliveredCount, 1);
   await assert.rejects(api.createAdminAnnouncement({ title: 'No', body: 'Valid message', audience: 'all' }), /Title must/);
   await assert.rejects(api.createAdminAnnouncement({ title: 'Valid title', body: 'No', audience: 'all' }), /Message must/);
-  await assert.rejects(api.createAdminAnnouncement({ title: 'Valid title', body: 'Valid message', audience: 'user' }), /recipient user ID/);
+  await assert.rejects(api.createAdminAnnouncement({ title: 'Valid title', body: 'Valid message', audience: 'user' }), /Select a recipient/);
   await assert.rejects(setup(null).createAdminAnnouncement({ title: 'Valid title', body: 'Valid message', audience: 'all' }), /sign in/);
 });
 
@@ -74,4 +74,21 @@ test('announcement history uses authoritative IDs and newest-first subscription'
   api.emit([{ id: 'real-id', title: 'Update', body: 'Details', audience: 'all', status: 'sent', deliveredCount: 3 }]);
   assert.equal(items[0].id, 'real-id');
   assert.equal(items[0].deliveredCount, 3);
+});
+
+test('recipient directory exposes active youth and businesses for name or email selection', async () => {
+  const api = setup();
+  const recipients = await api.fetchAnnouncementRecipients();
+  assert.deepEqual(Array.from(recipients, item => item.id), ['business', 'youth']);
+  assert.deepEqual(Array.from(recipients, item => item.role), ['client', 'freelancer']);
+});
+
+test('one-user announcements keep the selected user ID internal and deliver only to that account', async () => {
+  const api = setup();
+  await api.createAdminAnnouncement({ title: 'Profile update', body: 'Please review your account details.', audience: 'user', targetUserId: 'youth' });
+  assert.equal(api.writes[0].value.targetUserId, 'youth');
+  const delivered = api.writes.filter(item => String(item.reference).includes('/notifications/'));
+  assert.equal(delivered.length, 1);
+  assert.match(delivered[0].reference, /^users\/youth\/notifications\/announcement-announcement-1$/);
+  await assert.rejects(api.createAdminAnnouncement({ title: 'Profile update', body: 'Please review your account details.', audience: 'user', targetUserId: 'blocked' }), /suspended/);
 });

@@ -1034,5 +1034,11 @@
   "Reinstated": "மீண்டும் செயல்படுத்தப்பட்டது",
   "Could not save moderation action. Please retry.": "நிர்வாக நடவடிக்கையைச் சேமிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
   "Choose a suspension duration between 1 and 365 days.": "1 முதல் 365 நாட்களுக்குள் இடைநிறுத்த காலத்தைத் தேர்ந்தெடுக்கவும்.",
-  "Access returns after {{date}}": "{{date}}க்குப் பிறகு அணுகல் மீண்டும் கிடைக்கும்"
+  "Access returns after {{date}}": "{{date}}க்குப் பிறகு அணுகல் மீண்டும் கிடைக்கும்",
+  "Select recipient": "பெறுநரைத் தேர்ந்தெடுக்கவும்",
+  "Search by name or email": "பெயர் அல்லது மின்னஞ்சல் மூலம் தேடவும்",
+  "No matching users found.": "பொருந்தும் பயனர்கள் கிடைக்கவில்லை.",
+  "Selected recipient": "தேர்ந்தெடுக்கப்பட்ட பெறுநர்",
+  "Could not load users. Please retry.": "பயனர்களை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+  "Select a recipient.": "பெறுநரைத் தேர்ந்தெடுக்கவும்."
 }
