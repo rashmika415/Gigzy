@@ -20,6 +20,8 @@ service cloud.firestore {
     function protectedUserFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
         'role', 'isVerified', 'suspended', 'suspensionReason',
+        'suspensionType', 'suspendedUntil', 'warningCount',
+        'lastWarningReason', 'lastWarnedAt',
         'ratingAverage', 'ratingCount', 'skillBadges'
       ]);
     }
@@ -74,14 +76,65 @@ service cloud.firestore {
         && request.resource.data.get('isVerified', false) != true
         && !request.resource.data.keys().hasAny(['referralCode']);
       allow update: if (isAdmin() && userId != request.auth.uid && resource.data.role != 'admin'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suspended', 'suspensionReason', 'updatedAt'])
-        && request.resource.data.suspended is bool
-        && request.resource.data.suspensionReason is string && request.resource.data.suspensionReason.size() <= 500
-        && (!request.resource.data.suspended || request.resource.data.suspensionReason.size() >= 5)
-        && request.resource.data.updatedAt == request.time)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'suspended', 'suspensionReason', 'suspensionType', 'suspendedUntil',
+          'warningCount', 'lastWarningReason', 'lastWarnedAt', 'updatedAt'
+        ])
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.get('warningCount', 0) is int
+        && request.resource.data.get('warningCount', 0) >= resource.data.get('warningCount', 0)
+        && request.resource.data.get('lastWarningReason', '') is string
+        && request.resource.data.get('lastWarningReason', '').size() <= 500
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'suspended', 'suspensionReason', 'suspensionType', 'suspendedUntil'
+          ]) || (
+            request.resource.data.suspended is bool
+            && request.resource.data.suspensionReason is string
+            && request.resource.data.suspensionReason.size() <= 500
+            && ((request.resource.data.suspended == false
+                && request.resource.data.suspensionReason == ''
+                && request.resource.data.suspensionType == 'none'
+                && request.resource.data.suspendedUntil == null)
+              || (request.resource.data.suspended == true
+                && request.resource.data.suspensionReason.size() >= 5
+                && request.resource.data.suspensionType in ['temporary', 'permanent']
+                && ((request.resource.data.suspensionType == 'permanent'
+                    && request.resource.data.suspendedUntil == null)
+                  || (request.resource.data.suspensionType == 'temporary'
+                    && request.resource.data.suspendedUntil is timestamp
+                    && request.resource.data.suspendedUntil > request.time
+                    && request.resource.data.suspendedUntil <= request.time + duration.value(365, 'd'))))))))
+        || (owns(userId)
+          && resource.data.get('suspended', false) == true
+          && resource.data.get('suspensionType', '') == 'temporary'
+          && resource.data.suspendedUntil is timestamp
+          && resource.data.suspendedUntil <= request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'suspended', 'suspensionReason', 'suspensionType', 'suspendedUntil', 'updatedAt'
+          ])
+          && request.resource.data.suspended == false
+          && request.resource.data.suspensionReason == ''
+          && request.resource.data.suspensionType == 'none'
+          && request.resource.data.suspendedUntil == null
+          && request.resource.data.updatedAt == request.time)
         || (owns(userId) && active() && protectedUserFieldsUnchanged() && validReferralCodeUpdate(userId)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || validProfilePhoto()));
       allow delete: if false;
+      match /moderationHistory/{eventId} {
+        allow read: if owns(userId) || isAdmin();
+        allow create: if isAdmin()
+          && request.resource.data.keys().hasOnly(['type', 'reason', 'actorId', 'suspendedUntil', 'createdAt'])
+          && request.resource.data.type in ['warning', 'temporary_suspension', 'permanent_suspension', 'reinstated']
+          && request.resource.data.reason is string
+          && request.resource.data.reason.size() >= 5 && request.resource.data.reason.size() <= 500
+          && request.resource.data.actorId == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && ((request.resource.data.type == 'temporary_suspension'
+              && request.resource.data.suspendedUntil is timestamp)
+            || (request.resource.data.type != 'temporary_suspension'
+              && !request.resource.data.keys().hasAny(['suspendedUntil'])));
+        allow update, delete: if false;
+      }
       match /savedGigs/{gigId} {
         allow read: if owns(userId) && active();
         allow create: if owns(userId) && active() && currentUser().data.role == 'freelancer'
