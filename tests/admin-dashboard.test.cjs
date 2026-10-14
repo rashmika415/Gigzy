@@ -78,3 +78,14 @@ test('moderator removal closes the gig, records the actor and reason, and preser
   await assert.rejects(api.removeGigFromDiscovery('missing', 'Valid reason'), /no longer exists/);
   await assert.rejects(setup({}, null).removeGigFromDiscovery('g1', 'Valid reason'), /sign in/);
 });
+
+test('admin applications are paginated and preserve authoritative IDs', async () => {
+  const api = setup();
+  const page = await api.fetchAdminPage('applications');
+  assert.equal(api.queries.at(-1).name, 'applications');
+  assert.equal(page.rows.length, 25);
+  assert.equal(page.rows[0].id, 'id-0');
+  assert.equal(page.hasMore, true);
+  await api.fetchAdminPage('applications', page.cursor);
+  assert.equal(api.queries.at(-1).constraints[1].cursor, page.cursor);
+});

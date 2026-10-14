@@ -68,6 +68,26 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/referralCodes/$(request.resource.data.referralCode)).data.ownerId == userId);
     }
     match /users/{userId} {
+      function verificationSubmission() {
+        let requestDoc = getAfter(/databases/$(database)/documents/businessVerificationRequests/$(userId)).data;
+        return owns(userId) && active() && resource.data.role == 'client'
+          && resource.data.get('verificationStatus', '') in ['', 'REJECTED']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verificationStatus', 'updatedAt'])
+          && request.resource.data.verificationStatus == 'PENDING'
+          && request.resource.data.updatedAt == request.time
+          && requestDoc.status == 'PENDING' && requestDoc.businessId == userId
+          && requestDoc.submittedAt == request.time;
+      }
+      function verificationDecision() {
+        let decision = getAfter(/databases/$(database)/documents/businessVerificationRequests/$(userId)).data;
+        return isAdmin() && resource.data.role == 'client' && resource.data.verificationStatus == 'PENDING'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verificationStatus', 'isVerified', 'updatedAt'])
+          && request.resource.data.verificationStatus in ['VERIFIED', 'REJECTED']
+          && request.resource.data.isVerified == (request.resource.data.verificationStatus == 'VERIFIED')
+          && request.resource.data.updatedAt == request.time
+          && decision.status == request.resource.data.verificationStatus
+          && decision.reviewedBy == request.auth.uid && decision.reviewedAt == request.time;
+      }
       allow read: if signedIn();
       allow create: if owns(userId) && validRole() && validProfilePhoto()
         && request.resource.data.uid == request.auth.uid
@@ -212,6 +232,35 @@ service cloud.firestore {
       match /pushTokens/{tokenId} {
         allow read, create, update, delete: if owns(userId) && active();
       }
+    }
+    match /businessVerificationRequests/{businessId} {
+      function validSubmission() {
+        let data = request.resource.data;
+        let business = get(/databases/$(database)/documents/users/$(businessId)).data;
+        return owns(businessId) && active() && business.role == 'client'
+          && data.keys().hasOnly(['businessId', 'status', 'businessName', 'fullName', 'email', 'phone', 'address', 'businessCategory', 'businessDetails', 'details', 'submittedAt'])
+          && data.businessId == businessId && data.status == 'PENDING' && data.submittedAt == request.time
+          && data.businessName == business.businessName && data.businessName is string && data.businessName.size() > 0
+          && data.email == business.email && data.email is string && data.email.size() > 0
+          && data.phone == business.phone && data.phone is string && data.phone.size() > 0
+          && data.address == business.address && data.address is string && data.address.size() > 0
+          && data.businessDetails == business.businessDetails && data.businessDetails is string && data.businessDetails.size() > 0
+          && data.fullName == business.get('fullName', '') && data.businessCategory == business.get('businessCategory', '')
+          && data.details is string && data.details.size() >= 5 && data.details.size() <= 2000
+          && business.get('verificationStatus', '') in ['', 'REJECTED']
+          && getAfter(/databases/$(database)/documents/users/$(businessId)).data.verificationStatus == 'PENDING';
+      }
+      allow read: if isAdmin() || (owns(businessId) && active());
+      allow create: if validSubmission();
+      allow update: if (resource.data.status == 'REJECTED' && validSubmission())
+        || (isAdmin() && resource.data.status == 'PENDING'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rejectionReason', 'reviewedBy', 'reviewedAt'])
+          && request.resource.data.status in ['VERIFIED', 'REJECTED']
+          && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time
+          && request.resource.data.rejectionReason is string && request.resource.data.rejectionReason.size() <= 500
+          && (request.resource.data.status == 'VERIFIED' ? request.resource.data.rejectionReason == '' : request.resource.data.rejectionReason.size() >= 5)
+          && getAfter(/databases/$(database)/documents/users/$(businessId)).data.verificationStatus == request.resource.data.status);
+      allow delete: if false;
     }
     match /referralCodes/{code} {
       // Public lookup exposes only the code owner ID, never profile or contact data.

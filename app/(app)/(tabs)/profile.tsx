@@ -274,14 +274,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   backButton: {
-    padding: spacing.xs,
+    padding: spacing.xs
+,
     minWidth: 44,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   editHeaderButton: {
-    padding: spacing.xs,
+    padding: spacing.xs
+,
     minWidth: 44,
     minHeight: 44,
     alignItems: 'center',

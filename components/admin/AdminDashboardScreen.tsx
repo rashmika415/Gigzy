@@ -1,3 +1,4 @@
+import BusinessVerificationPanel from './BusinessVerificationPanel';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,11 +14,14 @@ import { auth } from '../../FirebaseConfig';
 import { colors, fonts } from '../../constants/theme';
 import { fetchAdminPage, fetchAdminStats, removeGigFromDiscovery } from '../../services/adminService';
 import type { AdminCursor, AdminStats, AdminUser } from '../../services/adminService';
+import type { Application } from '../../types/application';
+import { formatDate } from '../../localization/format';
 import type { Gig } from '../../types/gig';
 
 type Panel = 'overview' | 'users' | 'gigs' | 'notifications';
 type Action = { kind: 'remove'; id: string; name: string };
 const PANELS: { key: Panel; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'verification', label: 'Business verification', icon: 'shield-checkmark-outline' },
   { key: 'overview', label: 'Overview', icon: 'grid-outline' },
   { key: 'users', label: 'Users', icon: 'people-outline' },
   { key: 'gigs', label: 'Gigs', icon: 'briefcase-outline' },
@@ -33,7 +37,7 @@ export default function AdminDashboardScreen() {
   const [stats, setStats] = useState<AdminStats>();
   const [statsError, setStatsError] = useState('');
   const [statsLoading, setStatsLoading] = useState(true);
-  const [rows, setRows] = useState<(AdminUser | Gig)[]>([]);
+  const [rows, setRows] = useState<(AdminUser | Gig | Application)[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState('');
   const [hasMore, setHasMore] = useState(false);
@@ -107,14 +111,14 @@ export default function AdminDashboardScreen() {
     finally { if (mounted.current) setLoggingOut(false); }
   };
   const label = (value: string) => t(({ all: 'All', active: 'Active', suspended: 'Suspended', freelancer: 'Youth', client: 'Business', admin: 'Administrator', removed: 'Removed' } as Record<string, string>)[value] || value);
-  const filters = panel === 'users' ? ['all', 'active', 'suspended', 'freelancer', 'client', 'admin'] : ['all', 'open', 'filled', 'in-progress', 'completed', 'closed', 'removed'];
+  const filters = panel === 'users' ? ['all', 'active', 'suspended', 'freelancer', 'client', 'admin'] : panel === 'applications' ? ['all', 'pending', 'accepted', 'rejected', 'completed'] : ['all', 'open', 'filled', 'in-progress', 'completed', 'closed', 'cancelled', 'removed'];
   const visible = rows.filter(row => {
-    const item = row as AdminUser & Gig;
-    const words = panel === 'users' ? [item.fullName, item.businessName, item.email, item.id] : [item.title, item.location, item.postedBy?.fullName, item.id];
+    const item = row as AdminUser & Gig & Application;
+    const words = panel === 'users' ? [item.fullName, item.businessName, item.email, item.id] : panel === 'applications' ? [item.gigTitle, item.youthName, item.businessName, item.message, item.gigId, item.youthId, item.businessId, item.id] : [item.title, item.location, item.postedBy?.fullName, item.id];
     const matchesText = words.some(value => value?.toLowerCase().includes(search.trim().toLowerCase()));
     const matchesFilter = filter === 'all' || (panel === 'users'
       ? filter === 'suspended' ? item.suspended : filter === 'active' ? !item.suspended : item.role === filter
-      : filter === 'removed' ? item.moderationRemoved : item.status === filter && !item.moderationRemoved);
+      : panel === 'applications' ? item.status === filter : filter === 'removed' ? item.moderationRemoved : item.status === filter && !item.moderationRemoved);
     return matchesText && matchesFilter;
   });
   const cards: { label: string; key: keyof AdminStats; icon: keyof typeof Ionicons.glyphMap; color: string }[] = [
@@ -129,22 +133,30 @@ export default function AdminDashboardScreen() {
     </TouchableOpacity>)}</View>;
   return <SafeAreaView style={styles.page}>
     <View style={[styles.shell, wide && styles.shellWide]}>
-      {wide && <View style={styles.sidebar}><View style={styles.brand}><Ionicons name="shield-checkmark" size={25} color={colors.primary} /><Text style={styles.brandText}>Gigzy</Text></View>
-        <Text style={styles.secondary}>{t('Administration')}</Text>{navigation}<Text style={styles.sidebarNote}>{t('Manage your community and opportunities.')}</Text></View>}
+      {wide && <View style={styles.sidebar}><View style={styles.brand}><Ionicons name="shield-checkmark" size={25} color="#B9ACFF" /><Text style={styles.brandText}>Gigzy</Text></View>
+        <Text style={styles.sidebarText}>{t('Administration')}</Text>{navigation}<Text style={styles.sidebarNote}>{t('Manage your community and opportunities.')}</Text></View>}
       <View style={styles.main}>
         <View style={[styles.header, !wide && styles.mobileHeader]}><View style={styles.headerCopy}><Text accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={[styles.heading, !wide && styles.mobileHeading]}>{t('Admin dashboard')}</Text>
           <Text numberOfLines={1} ellipsizeMode="middle" style={styles.secondary}>{t('Signed in as {{email}}', { email: user?.email || '' })}</Text></View><Button title={t('Sign out')} icon="log-out-outline" busy={loggingOut} disabled={acting} onPress={logout} /></View>
         {!wide && navigation}
         <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={statsLoading && !!stats} onRefresh={refresh} tintColor={colors.primary} />}>
+          <View style={styles.hero}>
+            <View style={styles.heroOrb} pointerEvents="none" />
+            <View style={styles.heroCopy}><Text style={styles.heroEyebrow}>{t('Administration')}</Text>
+              <Text style={styles.heroTitle}>{t('Manage your community and opportunities.')}</Text>
+              <Text style={styles.heroCaption}>{t('Suspend accounts or remove gigs from discovery with a recorded reason.')}</Text>
+            </View>
+            <View style={styles.heroEmblem}><Ionicons name="shield-checkmark-outline" size={44} color="#D9D0FF" /></View>
+          </View>
           <View style={styles.toolbar}><LanguageSelector /><Button title={t('Refresh')} icon="refresh-outline" onPress={refresh} disabled={statsLoading || listLoading} /></View>
           {!!logoutError && <Text accessibilityRole="alert" style={styles.error}>{t(logoutError)}</Text>}
           {!!notice && <Text accessibilityLiveRegion="polite" style={styles.success}>{t(notice)}</Text>}
-          <View style={styles.statsGrid}>{cards.map(card => <View key={card.key} style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: card.color + '12' }]}><Ionicons name={card.icon} size={23} color={card.color} /></View>
+          <View style={styles.statsGrid}>{cards.map((card, index) => <TouchableOpacity key={card.key} accessibilityRole="button" onPress={() => selectPanel(card.key === 'users' ? 'users' : card.key === 'applications' ? 'applications' : 'gigs')} activeOpacity={0.85} style={[styles.statCard, { backgroundColor: STAT_TONES[index] }]}>
+            <View style={[styles.statIcon, { backgroundColor: '#FFFFFFB3' }]}><Ionicons name={card.icon} size={23} color={card.color} /></View>
             <Text style={styles.statValue}>{statsError ? '—' : stats ? stats[card.key].toLocaleString() : '…'}</Text><Text style={styles.secondary}>{t(card.label)}</Text>
-          </View>)}</View>
+          </TouchableOpacity>)}</View>
           {!!statsError && <View style={styles.errorBox}><Text accessibilityRole="alert" style={styles.error}>{t('Could not load platform statistics.')}</Text><Button title={t('Retry')} onPress={refresh} /></View>}
-          {panel === 'overview' ? <>
+          {panel === 'verification' ? <BusinessVerificationPanel /> : panel === 'overview' ? <>
             <View style={styles.section}><Text style={styles.sectionTitle}>{t('Community overview')}</Text>
               {statsLoading && !stats ? <ActivityIndicator color={colors.primary} /> : statsError ? <Text style={styles.secondary}>{t('Refresh to load current totals.')}</Text> : stats && <>
                 <SummaryRow label={t('Youth')} value={stats.youth} total={stats.users} /><SummaryRow label={t('Businesses')} value={stats.businesses} total={stats.users} />
@@ -170,6 +182,19 @@ export default function AdminDashboardScreen() {
                     {!!item.suspended && !!item.suspensionReason && <Text style={styles.secondary}>{item.suspensionReason}</Text>}</View>
                   {item.role !== 'admin' && item.id !== user?.uid && <Button title={t('Moderate')} danger={!!item.suspended}
                     onPress={() => { setNotice(''); setModeratingUser(item); }} />}</View>;
+              }
+              if (panel === 'applications') {
+                const item = row as Application;
+                const date = item.createdAt?.toDate?.();
+                return <View key={item.id} style={styles.row}><View style={styles.rowCopy}>
+                  <Text style={styles.rowTitle}>{item.gigTitle || item.gigId}</Text>
+                  <Text style={styles.secondary}>{t('Applicant')}: {item.youthName || item.youthId}</Text>
+                  <Text style={styles.secondary}>{t('Business')}: {item.businessName || item.businessId}</Text>
+                  <View style={styles.badges}><Badge label={t(item.status)} />{date && <Text style={styles.secondary}>{formatDate(date)}</Text>}</View>
+                  <Text style={styles.secondary}>{item.message}</Text>
+                  <Text style={styles.secondary}>{t('Availability confirmed')}: {item.availabilityConfirmed ? t('Yes') : t('No')}</Text>
+                  <Text selectable style={styles.recordId}>{item.id}</Text>
+                </View></View>;
               }
               const item = row as Gig;
               return <View key={item.id} style={styles.row}><View style={styles.rowCopy}><Text style={styles.rowTitle}>{item.title || t('Untitled gig')}</Text>
