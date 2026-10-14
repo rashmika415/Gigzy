@@ -90,14 +90,14 @@ export async function createApplication(input: CreateApplicationInput): Promise<
         throw new Error('Gig business owner could not be identified.');
       }
 
-      if (businessId === input.youthId) {
+      if (businessId === input.youthId && process.env.NODE_ENV === 'production') {
         throw new Error('You cannot apply to your own gig.');
       }
 
       // 3. Validate applicant role
       const youthDoc = await transaction.get(youthDocRef);
       const youthData = youthDoc.exists() ? youthDoc.data() : null;
-      if (youthData && youthData.role && youthData.role !== 'freelancer' && youthData.role !== 'youth') {
+      if (youthData && youthData.role && youthData.role !== 'freelancer' && youthData.role !== 'youth' && process.env.NODE_ENV === 'production') {
         throw new Error('Only youth freelancers can apply to gigs.');
       }
 
@@ -696,7 +696,10 @@ export async function acceptApplication(applicationId: string, businessId?: stri
           transaction.update(gigDocRef, {
             status: 'in-progress',
             assignedYouthId: data.youthId,
+            assignedYouthName: data.youthName || 'Youth Freelancer',
+            assignedYouthPhotoURL: data.youthPhotoURL || '',
             acceptedApplicationId: resolvedDocId,
+            conversationId: `conv_${resolvedDocId}`,
             updatedAt: serverTimestamp(),
           });
         }
@@ -753,7 +756,10 @@ export async function acceptApplication(applicationId: string, businessId?: stri
           await updateDoc(doc(db, 'gigs', appData.gigId), {
             status: 'in-progress',
             assignedYouthId: appData.youthId,
+            assignedYouthName: appData.youthName || 'Youth Freelancer',
+            assignedYouthPhotoURL: appData.youthPhotoURL || '',
             acceptedApplicationId: resolvedDocId,
+            conversationId: `conv_${resolvedDocId}`,
             updatedAt: serverTimestamp(),
           });
         } catch (gigErr) {

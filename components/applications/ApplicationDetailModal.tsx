@@ -1,10 +1,12 @@
 import { formatDate as localizedDate } from '../../localization/format';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../localization/i18n';
-import React from 'react';
-import { Modal, View, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState } from 'react';
+import { Modal, View, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application } from '../../types/application';
 import { addGigToCalendar } from '../../services/calendarService';
@@ -39,11 +41,17 @@ export default function ApplicationDetailModal({
   onClose,
 }: ApplicationDetailModalProps) {
   useTranslation();
+  const [calendarAdding, setCalendarAdding] = useState(false);
+  const [calendarAdded, setCalendarAdded] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+
   if (!application) return null;
 
   const statusTheme = getStatusTheme(application.status);
   const appliedDateStr = formatDate(application.createdAt);
   const isAccepted = application.status === 'accepted';
+  const isCompleted = application.status === 'completed';
+  const canTakeAction = isAccepted || isCompleted;
 
   const handleMessageBusiness = () => {
     try {
@@ -145,16 +153,20 @@ export default function ApplicationDetailModal({
             </View>
           </View>
 
-          {/* Accepted Action Card (Messaging & Calendar) */}
-          {isAccepted && (
+          {/* Action Card (Messaging, Calendar, Rating) */}
+          {canTakeAction && (
             <View style={styles.acceptedActionCard}>
               <View style={styles.acceptedActionHeader}>
                 <Ionicons name="sparkles" size={16} color={colors.primary} />
-                <Text style={styles.acceptedActionTitle}>Gig Confirmed & Assigned</Text>
+                <Text style={styles.acceptedActionTitle}>
+                  {isCompleted ? tr("Gig Completed") : tr("Gig Confirmed & Assigned")}
+                </Text>
               </View>
 
               <Text style={styles.acceptedActionSubtitle}>
-                You have been selected for this gig. Coordinate timing with the business owner and add the gig to your calendar.
+                {isCompleted
+                  ? tr("This gig is completed. You can leave a review and message the business owner.")
+                  : tr("You have been selected for this gig. Coordinate timing with the business owner and add the gig to your calendar.")}
               </Text>
 
               <View style={styles.acceptedButtonGroup}>
@@ -164,7 +176,7 @@ export default function ApplicationDetailModal({
                   activeOpacity={0.85}
                 >
                   <Ionicons name="chatbubbles" size={17} color={colors.primaryOnColor} />
-                  <Text style={styles.messageBizBtnText}>Message Business Owner</Text>
+                  <Text style={styles.messageBizBtnText}>{tr("Message Business Owner")}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -191,7 +203,7 @@ export default function ApplicationDetailModal({
                           calendarAdded && styles.calendarSyncBtnTextAdded,
                         ]}
                       >
-                        {calendarAdded ? 'Scheduled in Calendar ✓' : 'Add Gig to Calendar'}
+                        {calendarAdded ? tr("Scheduled in Calendar ✓") : tr("Add Gig to Calendar")}
                       </Text>
                     </>
                   )}
@@ -203,7 +215,7 @@ export default function ApplicationDetailModal({
                   activeOpacity={0.85}
                 >
                   <Ionicons name="star" size={17} color="#D97706" />
-                  <Text style={styles.rateBizBtnText}>Rate Business Owner</Text>
+                  <Text style={styles.rateBizBtnText}>{tr("Rate Business Owner")}</Text>
                 </TouchableOpacity>
               </View>
             </View>

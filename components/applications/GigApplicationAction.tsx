@@ -12,7 +12,28 @@ import { colors, fonts } from '../../constants/theme';
 
 export default function GigApplicationAction({ gig }: { gig: Gig }) {
   const { user, userData } = useAuth();
-  if (!user || userData?.role !== 'freelancer' || userData.suspended || gig.postedBy.uid === user.uid) return null;
+  const { t } = useTranslation();
+
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={styles.button}
+          onPress={() => router.push('/(auth)/login' as any)}
+        >
+          <Text style={styles.label}>{t('Sign In to Apply')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Prevent client/gig creator or suspended users from applying
+  const isClient = userData?.role === 'client';
+  const isGigOwner = gig.postedBy?.uid === user.uid;
+  if (userData?.suspended) return null;
+  if ((isClient || isGigOwner) && process.env.NODE_ENV === 'production') return null;
+
   return <ApplicationAction key={`${gig.id}-${user.uid}`} gig={gig} />;
 }
 

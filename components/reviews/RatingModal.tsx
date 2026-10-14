@@ -257,27 +257,47 @@ export default function RatingModal({
 
             {/* Star Rating Section */}
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionHeading}>{t('Overall Rating')}</Text>
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map((starNum) => (
-                  <TouchableOpacity
-                    key={starNum}
-                    onPress={() => handleStarPress(starNum)}
-                    activeOpacity={0.75}
-                    style={styles.starTouch}
-                    accessibilityLabel={`${starNum} stars`}
-                  >
-                    <Ionicons
-                      name={starNum <= rating ? 'star' : 'star-outline'}
-                      size={36}
-                      color={starNum <= rating ? '#F59E0B' : '#CBD5E1'}
-                    />
-                  </TouchableOpacity>
-                ))}
+              <View style={styles.ratingHeaderRow}>
+                <Text style={styles.sectionHeading}>{t('Overall Rating')}</Text>
+                <View style={styles.ratingScorePill}>
+                  <Ionicons name="star" size={13} color="#F59E0B" />
+                  <Text style={styles.ratingScoreNumber}>{rating}.0</Text>
+                  <Text style={styles.ratingScoreDivider}>•</Text>
+                  <Text style={styles.ratingScoreDescriptor}>
+                    {RATING_LABELS[rating] ? t(RATING_LABELS[rating]) : ''}
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.ratingDescriptor}>
-                {RATING_LABELS[rating] ? t(RATING_LABELS[rating]) : ''}
-              </Text>
+
+              <View style={styles.starsCard}>
+                <View style={styles.starsRow}>
+                  {[1, 2, 3, 4, 5].map((starNum) => {
+                    const isSelected = starNum <= rating;
+                    return (
+                      <TouchableOpacity
+                        key={starNum}
+                        onPress={() => handleStarPress(starNum)}
+                        activeOpacity={0.7}
+                        style={[
+                          styles.starTouch,
+                          starNum === rating && styles.starTouchCurrent,
+                        ]}
+                        accessibilityLabel={`${starNum} stars`}
+                      >
+                        <Ionicons
+                          name={isSelected ? 'star' : 'star-outline'}
+                          size={38}
+                          color={isSelected ? '#F59E0B' : '#CBD5E1'}
+                        />
+                        <Text style={[styles.starNumLabel, isSelected && styles.starNumLabelActive]}>
+                          {starNum}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={styles.tapToRateHint}>{t('Tap a star to set rating')}</Text>
+              </View>
             </View>
 
             {/* Quick Feedback Tags */}
@@ -535,22 +555,72 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: spacing.xs + 2,
   },
+  ratingHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  ratingScorePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
+    gap: 4,
+  },
+  ratingScoreNumber: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#B45309',
+  },
+  ratingScoreDivider: {
+    fontSize: 10,
+    color: '#D97706',
+  },
+  ratingScoreDescriptor: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  starsCard: {
+    backgroundColor: colors.surfaceElevated || '#F8FAFC',
+    borderRadius: borderRadius.lg || 16,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    alignItems: 'center',
+  },
   starsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    marginVertical: spacing.xs,
+    gap: 12,
   },
   starTouch: {
-    padding: 4,
+    alignItems: 'center',
+    padding: 6,
+    borderRadius: borderRadius.md,
   },
-  ratingDescriptor: {
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#D97706',
+  starTouchCurrent: {
+    backgroundColor: '#FFFBEB',
+  },
+  starNumLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
     marginTop: 2,
+  },
+  starNumLabelActive: {
+    color: '#D97706',
+    fontWeight: '700',
+  },
+  tapToRateHint: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
   },
   tagsWrap: {
     flexDirection: 'row',

@@ -12,6 +12,7 @@ import { acceptApplication, rejectApplication } from '../../services/application
 import { addGigToCalendar } from '../../services/calendarService';
 import { RatingModal } from '../reviews';
 import { getStatusTheme } from './ApplicationCard';
+import { router } from 'expo-router';
 import { useToast } from '../../context/ToastContext';
 
 interface ApplicantDetailModalProps {
@@ -130,6 +131,7 @@ export default function ApplicantDetailModal({
           tr("Application Accepted! 🎉"),
           tr("You have accepted {{value0}} for \"{{value1}}\". Work is now in progress and a notification has been sent to the youth freelancer's dashboard.", { value0: application.youthName || 'this applicant', value1: application.gigTitle || 'this gig' })
         );
+        router.push('/(app)/(tabs)/home' as any);
       }
       if (onStatusChanged) onStatusChanged('accepted');
       onClose();
@@ -140,9 +142,37 @@ export default function ApplicantDetailModal({
     }
   };
 
+  const executeReject = async () => {
+    setActing(true);
+    setErrorMsg('');
+    try {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+      await rejectApplication(application.id, businessId);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } catch {}
+      toast.success(tr("Application Rejected"), tr("The application has been rejected."));
+      if (onStatusChanged) onStatusChanged('rejected');
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to reject application.');
+    } finally {
+      setActing(false);
+    }
+  };
+
   const handleAccept = () => {
     if (Platform.OS === 'web') {
-      void executeAccept();
+      const confirmPrompt = tr("Are you sure you want to accept {{value0}} for \"{{value1}}\"?", { value0: application.youthName || 'this applicant', value1: application.gigTitle || 'this gig' });
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm(confirmPrompt)) {
+          void executeAccept();
+        }
+      } else {
+        void executeAccept();
+      }
     } else {
       Alert.alert(
         tr("Accept Application"),
@@ -160,37 +190,29 @@ export default function ApplicantDetailModal({
   };
 
   const handleReject = () => {
-    Alert.alert(
-      tr("Reject Application"),
-      tr("Are you sure you want to reject this application from {{value0}}?", { value0: application.youthName || 'this applicant' }),
-      [
-        { text: tr("Cancel"), style: 'cancel' },
-        {
-          text: tr("Reject"),
-          style: 'destructive',
-          onPress: async () => {
-            setActing(true);
-            setErrorMsg('');
-            try {
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              } catch {}
-              await rejectApplication(application.id, businessId);
-              try {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              } catch {}
-              toast.success(tr("Application Rejected"), tr("The application has been rejected."));
-              if (onStatusChanged) onStatusChanged('rejected');
-              onClose();
-            } catch (err: any) {
-              setErrorMsg(err.message || 'Failed to reject application.');
-            } finally {
-              setActing(false);
-            }
+    if (Platform.OS === 'web') {
+      const confirmPrompt = tr("Are you sure you want to reject this application from {{value0}}?", { value0: application.youthName || 'this applicant' });
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm(confirmPrompt)) {
+          void executeReject();
+        }
+      } else {
+        void executeReject();
+      }
+    } else {
+      Alert.alert(
+        tr("Reject Application"),
+        tr("Are you sure you want to reject this application from {{value0}}?", { value0: application.youthName || 'this applicant' }),
+        [
+          { text: tr("Cancel"), style: 'cancel' },
+          {
+            text: tr("Reject"),
+            style: 'destructive',
+            onPress: () => void executeReject(),
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   return (
@@ -374,14 +396,68 @@ export default function ApplicantDetailModal({
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.finalizedNotice}>
-              <Ionicons
-                name={application.status === 'accepted' ? 'checkmark-circle' : 'information-circle'}
-                size={20}
-                color={statusTheme.text}
-              />
-              <Text style={[styles.finalizedNoticeText, { color: statusTheme.text }]}>{tr("This application has already been")}{' '}{tr(application.status)}.
-              </Text>
+            <View>
+              <View style={styles.finalizedNotice}>
+                <Ionicons
+                  name={application.status === 'accepted' ? 'checkmark-circle' : 'information-circle'}
+                  size={20}
+                  color={statusTheme.text}
+                />
+                <Text style={[styles.finalizedNoticeText, { color: statusTheme.text }]}>{tr("This application has already been")}{' '}{tr(application.status)}.
+                </Text>
+              </View>
+
+              {(isAccepted || application.status === 'completed') && (
+                <View style={styles.acceptedActionsContainer}>
+                  <TouchableOpacity
+                    style={styles.actionChatBtn}
+                    onPress={handleMessageApplicant}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="chatbubbles" size={18} color={colors.primaryOnColor} />
+                    <Text style={styles.actionChatBtnText}>{tr("Message Freelancer")}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.actionCalendarBtn,
+                      calendarAdded && styles.actionCalendarBtnAdded,
+                    ]}
+                    onPress={handleAddToCalendar}
+                    disabled={calendarAdding || calendarAdded}
+                    activeOpacity={0.85}
+                  >
+                    {calendarAdding ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name={calendarAdded ? 'checkmark-circle' : 'calendar-outline'}
+                          size={18}
+                          color={calendarAdded ? '#059669' : colors.primary}
+                        />
+                        <Text
+                          style={[
+                            styles.actionCalendarBtnText,
+                            calendarAdded && styles.actionCalendarBtnTextAdded,
+                          ]}
+                        >
+                          {calendarAdded ? tr("Scheduled in Calendar ✓") : tr("Add to Calendar")}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.actionRateBtn}
+                    onPress={() => setShowRatingModal(true)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="star" size={18} color="#D97706" />
+                    <Text style={styles.actionRateBtnText}>{tr("Rate Freelancer")}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           )}
         </ScrollView>

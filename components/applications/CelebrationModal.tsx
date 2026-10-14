@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../localization/i18n';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
@@ -10,10 +10,12 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { router } from 'expo-router';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import { addGigToCalendar } from '../../services/calendarService';
 
 export interface CelebrationModalProps {
   visible: boolean;
@@ -45,6 +47,9 @@ export default function CelebrationModal({
   onOpenChat,
 }: CelebrationModalProps) {
   useTranslation();
+  const [calendarAdding, setCalendarAdding] = useState(false);
+  const [calendarAdded, setCalendarAdded] = useState(false);
+
   if (!visible) return null;
 
   const handleClose = () => {
@@ -52,6 +57,7 @@ export default function CelebrationModal({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     onClose();
+    router.push('/(app)/(tabs)/home' as any);
   };
 
   const displayName = youthName || 'Youth Freelancer';
@@ -190,15 +196,57 @@ export default function CelebrationModal({
             ) : null}
           </View>
 
-          {/* Dismiss / Confirmation Button */}
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleClose}
-            activeOpacity={0.88}
-          >
-            <Ionicons name="checkmark-done" size={20} color={colors.primaryOnColor} style={{ marginRight: 8 }} />
-            <Text style={styles.actionButtonText}>{tr("Done")}</Text>
-          </TouchableOpacity>
+          {/* Actions Stack */}
+          <View style={styles.buttonStack}>
+            <TouchableOpacity
+              style={styles.messageButton}
+              onPress={handleMessage}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="chatbubbles" size={19} color={colors.primaryOnColor} style={{ marginRight: 8 }} />
+              <Text style={styles.actionButtonText}>{tr("Message Freelancer")}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.calendarButton,
+                calendarAdded && styles.calendarButtonAdded,
+              ]}
+              onPress={handleAddToCalendar}
+              disabled={calendarAdding || calendarAdded}
+              activeOpacity={0.88}
+            >
+              {calendarAdding ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <>
+                  <Ionicons
+                    name={calendarAdded ? 'checkmark-circle' : 'calendar-outline'}
+                    size={19}
+                    color={calendarAdded ? '#059669' : colors.primary}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text
+                    style={[
+                      styles.calendarButtonText,
+                      calendarAdded && styles.calendarButtonTextAdded,
+                    ]}
+                  >
+                    {calendarAdded ? tr("Scheduled in Calendar ✓") : tr("Add to Calendar")}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.doneButton}
+              onPress={handleClose}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="home-outline" size={18} color={colors.textSecondary} style={{ marginRight: 6 }} />
+              <Text style={styles.doneButtonText}>{tr("Go to Dashboard")}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -401,5 +449,50 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
     letterSpacing: 0.2,
+  },
+  calendarButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated || '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    paddingVertical: 12,
+    borderRadius: borderRadius.md || 12,
+  },
+  calendarButtonAdded: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#059669',
+  },
+  calendarButtonText: {
+    fontSize: 14.5,
+    fontFamily: fonts.bodyBold,
+    color: colors.primary,
+  },
+  calendarButtonTextAdded: {
+    color: '#059669',
+  },
+  doneButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: borderRadius.md || 12,
+  },
+  doneButtonText: {
+    fontSize: 14,
+    fontFamily: fonts.bodyMedium,
+    color: colors.textSecondary,
+  },
+  actionButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    paddingVertical: 13,
+    borderRadius: borderRadius.md || 12,
   },
 });

@@ -14,6 +14,8 @@ import { borderRadius, colors, shadows, spacing, fonts } from "../../../constant
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from '../../../context/ToastContext';
 import SkeletonList from '../../../components/Skeleton';
+import { ApplicantListModal } from '../../../components/applications';
+import { RatingModal } from '../../../components/reviews';
 import {
     calculateBusinessGigStats,
     deleteGig,
@@ -33,10 +35,14 @@ import {
 const STATUS_CONFIG = STATUS_STYLES;
 
 export default function MyGigs() {
-  useTranslation();
+  const { t } = useTranslation();
   const { user, userData } = useAuth();
   const toast = useToast();
   const role = userData?.role;
+
+  const [selectedGigForApplicants, setSelectedGigForApplicants] = useState<Gig | null>(null);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [ratingTarget, setRatingTarget] = useState<{ userId: string; userName: string; gigId?: string; gigTitle?: string } | null>(null);
 
   // Role guard: only business owners (clients) can manage gigs
   // Data states
@@ -271,7 +277,7 @@ export default function MyGigs() {
             }}
             activeOpacity={0.8}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            accessibilityLabel={t("All Applications")}
+            accessibilityLabel={tr("All Applications")}
           >
             <Ionicons
               name="people-outline"
@@ -762,7 +768,7 @@ export default function MyGigs() {
                       <View style={styles.assignedHireBanner}>
                         <Ionicons name="checkmark-circle" size={13} color="#059669" />
                         <Text style={styles.assignedHireBannerText}>
-                          {t("Accepted Freelancer Assigned")}
+                          {tr("Accepted Freelancer Assigned")}
                         </Text>
                       </View>
                     )}
@@ -821,12 +827,20 @@ export default function MyGigs() {
                         </Text>
                       </View>
 
-                      <View
+                      <TouchableOpacity
                         style={[
                           styles.applicantsChip,
                           gig.applicantsCount > 0 &&
                             styles.applicantsChipActive,
                         ]}
+                        onPress={() => {
+                          try {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          } catch {}
+                          setSelectedGigForApplicants(gig);
+                        }}
+                        activeOpacity={0.7}
+                        accessibilityLabel={`${gig.applicantsCount || 0} ${gig.applicantsCount === 1 ? tr("Applicant") : tr("Applicants")}`}
                       >
                         <Ionicons
                           name="people"
@@ -849,7 +863,7 @@ export default function MyGigs() {
                             ? tr("Applicant")
                             : tr("Applicants")}
                         </Text>
-                      </View>
+                      </TouchableOpacity>
                     </View>
 
                     <CloseGigButton gig={gig} />
@@ -867,6 +881,26 @@ export default function MyGigs() {
                           color={colors.primaryOnColor}
                         />
                         <Text style={styles.actionUpdateBtnText}>{tr("Update")}</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.actionApplicantsBtn}
+                        onPress={() => {
+                          try {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          } catch {}
+                          setSelectedGigForApplicants(gig);
+                        }}
+                        activeOpacity={0.75}
+                      >
+                        <Ionicons
+                          name="people-outline"
+                          size={14}
+                          color={colors.primary}
+                        />
+                        <Text style={styles.actionApplicantsBtnText}>
+                          {tr("Applicants")} ({gig.applicantsCount || 0})
+                        </Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -888,7 +922,7 @@ export default function MyGigs() {
                           onPress={() => {
                             setRatingTarget({
                               userId: gig.assignedYouthId!,
-                              userName: t("Youth Freelancer"),
+                              userName: tr("Youth Freelancer"),
                               gigId: gig.id,
                               gigTitle: gig.title,
                             });
@@ -897,7 +931,7 @@ export default function MyGigs() {
                           activeOpacity={0.75}
                         >
                           <Ionicons name="star" size={13} color="#D97706" />
-                          <Text style={styles.actionRateBtnText}>{t("Rate Freelancer")}</Text>
+                          <Text style={styles.actionRateBtnText}>{tr("Rate Freelancer")}</Text>
                         </TouchableOpacity>
                       ) : null}
 
@@ -1313,6 +1347,42 @@ export default function MyGigs() {
           </View>
         </View>
       </Modal>
+      {/* Applicant List Modal */}
+      {selectedGigForApplicants && (
+        <ApplicantListModal
+          visible={Boolean(selectedGigForApplicants)}
+          gigId={selectedGigForApplicants.id}
+          gigTitle={selectedGigForApplicants.title}
+          businessId={user?.uid || ''}
+          gigDate={selectedGigForApplicants.date}
+          gigTime={selectedGigForApplicants.time}
+          gigLocation={selectedGigForApplicants.location}
+          gigPay={selectedGigForApplicants.pay}
+          gigPayType={selectedGigForApplicants.payType}
+          onClose={() => setSelectedGigForApplicants(null)}
+        />
+      )}
+
+      {/* Rating Modal */}
+      {ratingTarget && (
+        <RatingModal
+          visible={ratingModalVisible}
+          targetUserId={ratingTarget.userId}
+          targetUserName={ratingTarget.userName}
+          targetRole="freelancer"
+          gigId={ratingTarget.gigId}
+          gigTitle={ratingTarget.gigTitle}
+          onClose={() => {
+            setRatingModalVisible(false);
+            setRatingTarget(null);
+          }}
+          onSuccess={() => {
+            setRatingModalVisible(false);
+            setRatingTarget(null);
+            toast.success(tr("Review submitted successfully!"));
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -1969,6 +2039,41 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fonts.bodySemiBold,
     color: colors.text,
+  },
+  actionApplicantsBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: 7,
+    gap: 4,
+    minHeight: 44,
+  },
+  actionApplicantsBtnText: {
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.primary,
+  },
+  assignedHireBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    marginBottom: spacing.xs,
+  },
+  assignedHireBannerText: {
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
+    color: '#059669',
   },
   actionRateBtn: {
     flex: 1,

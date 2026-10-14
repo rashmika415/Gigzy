@@ -1,12 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../localization/i18n';
 import React, { useState, useEffect } from 'react';
-import { Modal, View, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, ActivityIndicator } from 'react-native';
+import { Modal, View, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, ActivityIndicator, Alert, Platform } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application, ApplicationFilterStatus } from '../../types/application';
-import { subscribeToGigApplicants } from '../../services/applicationService';
+import { subscribeToGigApplicants, acceptApplication, rejectApplication } from '../../services/applicationService';
+import { router } from 'expo-router';
+import { useToast } from '../../context/ToastContext';
 import ApplicantCard from './ApplicantCard';
 import ApplicantDetailModal from './ApplicantDetailModal';
 import CelebrationModal from './CelebrationModal';
@@ -37,6 +40,7 @@ export default function ApplicantListModal({
   gigPayType,
 }: ApplicantListModalProps) {
   useTranslation();
+  const toast = useToast();
   const [applicants, setApplicants] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -91,6 +95,106 @@ export default function ApplicantListModal({
         setLoading(false);
       }
     );
+  };
+
+  const handleQuickAccept = (app: Application) => {
+    if (Platform.OS === 'web') {
+      const confirmPrompt = tr("Are you sure you want to accept {{value0}} for \"{{value1}}\"?", {
+        value0: app.youthName || 'this applicant',
+        value1: app.gigTitle || gigTitle || 'this gig',
+      });
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm(confirmPrompt)) {
+          void executeAccept(app);
+        }
+      } else {
+        void executeAccept(app);
+      }
+    } else {
+      Alert.alert(
+        tr("Accept Application"),
+        tr("Are you sure you want to accept {{value0}} for \"{{value1}}\"?", {
+          value0: app.youthName || 'this applicant',
+          value1: app.gigTitle || gigTitle || 'this gig',
+        }),
+        [
+          { text: tr("Cancel"), style: 'cancel' },
+          {
+            text: tr("Accept Applicant"),
+            style: 'default',
+            onPress: () => void executeAccept(app),
+          },
+        ]
+      );
+    }
+  };
+
+  const executeAccept = async (app: Application) => {
+    try {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+      await acceptApplication(app.id, businessId);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      toast.success(
+        tr("Application Accepted! 🎉"),
+        tr("You have accepted {{value0}} for \"{{value1}}\". Work is now in progress and a notification has been sent to the youth freelancer's dashboard.", {
+          value0: app.youthName || 'this applicant',
+          value1: app.gigTitle || gigTitle || 'this gig',
+        })
+      );
+      onClose();
+      router.push('/(app)/(tabs)/home' as any);
+    } catch (err: any) {
+      toast.error(err.message || tr("Failed to accept application."));
+    }
+  };
+
+  const handleQuickReject = (app: Application) => {
+    if (Platform.OS === 'web') {
+      const confirmPrompt = tr("Are you sure you want to reject this application from {{value0}}?", {
+        value0: app.youthName || 'this applicant',
+      });
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm(confirmPrompt)) {
+          void executeReject(app);
+        }
+      } else {
+        void executeReject(app);
+      }
+    } else {
+      Alert.alert(
+        tr("Reject Application"),
+        tr("Are you sure you want to reject this application from {{value0}}?", {
+          value0: app.youthName || 'this applicant',
+        }),
+        [
+          { text: tr("Cancel"), style: 'cancel' },
+          {
+            text: tr("Reject"),
+            style: 'destructive',
+            onPress: () => void executeReject(app),
+          },
+        ]
+      );
+    }
+  };
+
+  const executeReject = async (app: Application) => {
+    try {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+      await rejectApplication(app.id, businessId);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } catch {}
+      toast.success(tr("Application Rejected"), tr("The application has been rejected."));
+    } catch (err: any) {
+      toast.error(err.message || tr("Failed to reject application."));
+    }
   };
 
   const filteredApplicants = applicants.filter((app) => {
@@ -209,6 +313,8 @@ export default function ApplicantListModal({
               <ApplicantCard
                 application={item}
                 onPress={() => setSelectedApplicant(item)}
+                onAccept={() => handleQuickAccept(item)}
+                onReject={() => handleQuickReject(item)}
               />
             )}
             contentContainerStyle={styles.listContent}
@@ -222,9 +328,10 @@ export default function ApplicantListModal({
           application={selectedApplicant}
           businessId={businessId}
           onClose={() => setSelectedApplicant(null)}
-          onAccepted={(app) => {
-            setAcceptedCelebrationApp(app);
+          onAccepted={() => {
             setSelectedApplicant(null);
+            onClose();
+            router.push('/(app)/(tabs)/home' as any);
           }}
           onStatusChanged={(newStatus) => {
             if (selectedApplicant) {
@@ -248,7 +355,10 @@ export default function ApplicantListModal({
           gigLocation={gigLocation || acceptedCelebrationApp?.gigLocation}
           gigPay={gigPay || acceptedCelebrationApp?.gigPay}
           gigPayType={gigPayType || acceptedCelebrationApp?.gigPayType}
-          onClose={() => setAcceptedCelebrationApp(null)}
+          onClose={() => {
+            setAcceptedCelebrationApp(null);
+            onClose();
+          }}
         />
       </SafeAreaView>
     </Modal>
