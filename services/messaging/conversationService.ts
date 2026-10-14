@@ -76,6 +76,9 @@ export async function createConversation(input: CreateConversationInput): Promis
   if (input.gigPay !== undefined) newConvData.gigPay = input.gigPay;
   if (input.gigPayType) newConvData.gigPayType = input.gigPayType;
   if (input.gigCategory) newConvData.gigCategory = input.gigCategory;
+  if (input.gigDate) newConvData.gigDate = input.gigDate;
+  if (input.gigTime) newConvData.gigTime = input.gigTime;
+  if (input.gigLocation) newConvData.gigLocation = input.gigLocation;
 
   await setDoc(convRef, newConvData);
 

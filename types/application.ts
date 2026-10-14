@@ -17,10 +17,12 @@ export interface Application {
   gigTitle?: string;
   gigLocation?: string;
   gigDate?: string;
+  gigTime?: string;
   gigPay?: number;
   gigPayType?: 'hourly' | 'fixed';
   gigCategory?: string;
   businessName?: string;
+  conversationId?: string;
   // Youth applicant details snapshot
   youthName?: string;
   youthPhotoURL?: string;

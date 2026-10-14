@@ -33,6 +33,9 @@ export interface Conversation {
   gigPay?: number;
   gigPayType?: 'fixed' | 'hourly';
   gigCategory?: string;
+  gigDate?: string;
+  gigTime?: string;
+  gigLocation?: string;
   lastMessage: string | { text: string; senderId?: string; createdAt?: any };
   lastMessageAt: any;
   createdAt: any;
@@ -50,6 +53,9 @@ export interface CreateConversationInput {
   gigPay?: number;
   gigPayType?: 'fixed' | 'hourly';
   gigCategory?: string;
+  gigDate?: string;
+  gigTime?: string;
+  gigLocation?: string;
   youthName?: string;
   youthPhotoURL?: string;
   businessName?: string;

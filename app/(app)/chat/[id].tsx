@@ -18,6 +18,8 @@ import {
     subscribeToChatMessages,
     uploadChatImage,
 } from "../../../services/chatService";
+import { addGigToCalendar } from "../../../services/calendarService";
+import { RatingModal } from "../../../components/reviews";
 import {
     BUSINESS_QUICK_REPLIES,
     Chat,
@@ -66,6 +68,8 @@ export default function ChatRoomScreen() {
   >(null);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [showGigBanner, setShowGigBanner] = useState(true);
+  const [calendarAdding, setCalendarAdding] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
 
@@ -239,6 +243,27 @@ export default function ChatRoomScreen() {
       !prevMessage ||
       formatDateDivider(item.createdAt) !==
         formatDateDivider(prevMessage.createdAt);
+
+    if (item.type === 'system') {
+      return (
+        <View style={styles.messageRowWrapper}>
+          {showDateDivider && (
+            <View style={styles.dateDivider}>
+              <Text style={styles.dateDividerText}>
+                {formatDateDivider(item.createdAt)}
+              </Text>
+            </View>
+          )}
+          <View style={styles.systemMessageContainer}>
+            <View style={styles.systemMessagePill}>
+              <Ionicons name="sparkles" size={14} color="#047857" style={{ marginRight: 6 }} />
+              <Text style={styles.systemMessageText}>{item.text}</Text>
+            </View>
+            <Text style={styles.systemMessageTime}>{formatMessageTime(item.createdAt)}</Text>
+          </View>
+        </View>
+      );
+    }
 
     return (
       <View style={styles.messageRowWrapper}>
@@ -608,6 +633,23 @@ export default function ChatRoomScreen() {
           )}
         </View>
       </Modal>
+
+      {/* Rating Modal for Chat Counterpart */}
+      {otherParticipant.uid ? (
+        <RatingModal
+          visible={showRatingModal}
+          targetUserId={otherParticipant.uid}
+          targetUserName={otherParticipant.fullName}
+          targetUserPhotoURL={otherParticipant.photoURL}
+          targetRole={otherParticipant.role === 'client' ? 'client' : 'freelancer'}
+          gigId={chat?.gigId}
+          gigTitle={chat?.gigTitle}
+          onClose={() => setShowRatingModal(false)}
+          onSuccess={() => {
+            setShowRatingModal(false);
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -745,6 +787,27 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
     marginTop: 1,
   },
+  gigBannerActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  gigBannerCalendarBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    gap: 4,
+  },
+  gigBannerCalendarText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.primary,
+  },
   gigBannerAction: {
     backgroundColor: colors.surfaceElevated,
     paddingHorizontal: 10,
@@ -759,6 +822,50 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: fonts.bodyBold,
     color: colors.primary,
+  },
+  gigBannerRateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+    gap: 4,
+  },
+  gigBannerRateText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#D97706",
+  },
+  systemMessageContainer: {
+    alignItems: "center",
+    marginVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  systemMessagePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    maxWidth: "92%",
+  },
+  systemMessageText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: "#047857",
+    textAlign: "center",
+    flexShrink: 1,
+  },
+  systemMessageTime: {
+    fontSize: 10,
+    color: colors.textMuted,
+    marginTop: 4,
   },
   centerContainer: {
     flex: 1,

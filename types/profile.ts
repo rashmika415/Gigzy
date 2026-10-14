@@ -54,7 +54,11 @@ export interface ProfileReview {
   id: string;
   authorId: string;
   authorName: string;
+  authorPhotoURL?: string;
   rating: number;
   comment: string;
+  tags?: string[];
+  gigId?: string;
+  gigTitle?: string;
   createdAt?: unknown;
 }

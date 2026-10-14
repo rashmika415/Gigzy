@@ -9,7 +9,10 @@ import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application } from '../../types/application';
 import { acceptApplication, rejectApplication } from '../../services/applicationService';
+import { addGigToCalendar } from '../../services/calendarService';
+import { RatingModal } from '../reviews';
 import { getStatusTheme } from './ApplicationCard';
+import { router } from 'expo-router';
 import { useToast } from '../../context/ToastContext';
 
 interface ApplicantDetailModalProps {
@@ -50,6 +53,9 @@ export default function ApplicantDetailModal({
   const submitting = useRef(false);
   const toast = useToast();
   const [errorMsg, setErrorMsg] = useState('');
+  const [calendarAdding, setCalendarAdding] = useState(false);
+  const [calendarAdded, setCalendarAdded] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   if (!application) return null;
 
@@ -57,6 +63,56 @@ export default function ApplicantDetailModal({
   const appliedDateStr = formatDate(application.createdAt);
   const initial = (application.youthName?.[0] || 'Y').toUpperCase();
   const isPending = application.status === 'pending';
+  const isAccepted = application.status === 'accepted';
+
+  const handleMessageApplicant = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    onClose();
+    const convId = application.conversationId || `conv_${application.id}`;
+    router.push({
+      pathname: '/(app)/chat/[id]',
+      params: { id: convId },
+    } as any);
+  };
+
+  const handleAddToCalendar = async () => {
+    setCalendarAdding(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    const result = await addGigToCalendar({
+      title: application.gigTitle || 'Gig',
+      date: application.gigDate || new Date().toISOString().slice(0, 10),
+      time: undefined,
+      location: application.gigLocation,
+      pay: application.gigPay,
+      payType: application.gigPayType,
+      counterpartName: application.youthName,
+      counterpartRole: 'freelancer',
+      gigId: application.gigId,
+      applicationId: application.id,
+      description: `Accepted Gigzy gig with youth freelancer ${application.youthName || ''}`,
+    });
+
+    setCalendarAdding(false);
+    if (result.success) {
+      setCalendarAdded(true);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      Alert.alert(
+        'Gig Added to Calendar! 📅',
+        result.method === 'native'
+          ? `Added "${application.gigTitle || 'Gig'}" to your device calendar.`
+          : `Opened calendar for "${application.gigTitle || 'Gig'}".`
+      );
+    } else {
+      Alert.alert('Calendar', result.error || 'Could not add gig to calendar.');
+    }
+  };
 
   const executeAccept = async () => {
     if (submitting.current || !isPending) return;
@@ -78,6 +134,7 @@ export default function ApplicantDetailModal({
           tr("Application Accepted! 🎉"),
           tr("You have accepted {{value0}} for \"{{value1}}\". Work is now in progress and a notification has been sent to the youth freelancer's dashboard.", { value0: application.youthName || 'this applicant', value1: application.gigTitle || 'this gig' })
         );
+        router.push('/(app)/(tabs)/home' as any);
       }
       if (onStatusChanged) onStatusChanged('accepted');
       onClose();
@@ -89,9 +146,37 @@ export default function ApplicantDetailModal({
     }
   };
 
+  const executeReject = async () => {
+    setActing(true);
+    setErrorMsg('');
+    try {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+      await rejectApplication(application.id, businessId);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } catch {}
+      toast.success(tr("Application Rejected"), tr("The application has been rejected."));
+      if (onStatusChanged) onStatusChanged('rejected');
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to reject application.');
+    } finally {
+      setActing(false);
+    }
+  };
+
   const handleAccept = () => {
     if (Platform.OS === 'web') {
-      void executeAccept();
+      const confirmPrompt = tr("Are you sure you want to accept {{value0}} for \"{{value1}}\"?", { value0: application.youthName || 'this applicant', value1: application.gigTitle || 'this gig' });
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm(confirmPrompt)) {
+          void executeAccept();
+        }
+      } else {
+        void executeAccept();
+      }
     } else {
       Alert.alert(
         tr("Accept Application"),
@@ -120,11 +205,29 @@ export default function ApplicantDetailModal({
     } finally { submitting.current = false; setActing(false); }
   };
   const handleReject = () => {
-    if (Platform.OS === 'web') { void executeReject(); return; }
-    Alert.alert(tr('Reject Application'), tr('Are you sure you want to reject this application from {{value0}}?', { value0: application.youthName || 'this applicant' }), [
-      { text: tr('Cancel'), style: 'cancel' },
-      { text: tr('Reject'), style: 'destructive', onPress: () => void executeReject() },
-    ]);
+    if (Platform.OS === 'web') {
+      const confirmPrompt = tr("Are you sure you want to reject this application from {{value0}}?", { value0: application.youthName || 'this applicant' });
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm(confirmPrompt)) {
+          void executeReject();
+        }
+      } else {
+        void executeReject();
+      }
+    } else {
+      Alert.alert(
+        tr("Reject Application"),
+        tr("Are you sure you want to reject this application from {{value0}}?", { value0: application.youthName || 'this applicant' }),
+        [
+          { text: tr("Cancel"), style: 'cancel' },
+          {
+            text: tr("Reject"),
+            style: 'destructive',
+            onPress: () => void executeReject(),
+          },
+        ]
+      );
+    }
   };
 
   return (
@@ -308,17 +411,85 @@ export default function ApplicantDetailModal({
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.finalizedNotice}>
-              <Ionicons
-                name={application.status === 'accepted' ? 'checkmark-circle' : 'information-circle'}
-                size={20}
-                color={statusTheme.text}
-              />
-              <Text style={[styles.finalizedNoticeText, { color: statusTheme.text }]}>{tr("This application has already been")}{' '}{tr(application.status)}.
-              </Text>
+            <View>
+              <View style={styles.finalizedNotice}>
+                <Ionicons
+                  name={application.status === 'accepted' ? 'checkmark-circle' : 'information-circle'}
+                  size={20}
+                  color={statusTheme.text}
+                />
+                <Text style={[styles.finalizedNoticeText, { color: statusTheme.text }]}>{tr("This application has already been")}{' '}{tr(application.status)}.
+                </Text>
+              </View>
+
+              {(isAccepted || application.status === 'completed') && (
+                <View style={styles.acceptedActionsContainer}>
+                  <TouchableOpacity
+                    style={styles.actionChatBtn}
+                    onPress={handleMessageApplicant}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="chatbubbles" size={18} color={colors.primaryOnColor} />
+                    <Text style={styles.actionChatBtnText}>{tr("Message Freelancer")}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.actionCalendarBtn,
+                      calendarAdded && styles.actionCalendarBtnAdded,
+                    ]}
+                    onPress={handleAddToCalendar}
+                    disabled={calendarAdding || calendarAdded}
+                    activeOpacity={0.85}
+                  >
+                    {calendarAdding ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name={calendarAdded ? 'checkmark-circle' : 'calendar-outline'}
+                          size={18}
+                          color={calendarAdded ? '#059669' : colors.primary}
+                        />
+                        <Text
+                          style={[
+                            styles.actionCalendarBtnText,
+                            calendarAdded && styles.actionCalendarBtnTextAdded,
+                          ]}
+                        >
+                          {calendarAdded ? tr("Scheduled in Calendar ✓") : tr("Add to Calendar")}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.actionRateBtn}
+                    onPress={() => setShowRatingModal(true)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="star" size={18} color="#D97706" />
+                    <Text style={styles.actionRateBtnText}>{tr("Rate Freelancer")}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           )}
         </ScrollView>
+
+        {application?.youthId ? (
+          <RatingModal
+            visible={showRatingModal}
+            targetUserId={application.youthId}
+            targetUserName={application.youthName || 'Youth Freelancer'}
+            targetUserPhotoURL={application.youthPhotoURL}
+            targetRole="freelancer"
+            gigId={application.gigId}
+            gigTitle={application.gigTitle}
+            onClose={() => setShowRatingModal(false)}
+            onSuccess={() => setShowRatingModal(false)}
+          />
+        ) : null}
       </SafeAreaView>
     </Modal>
   );
@@ -595,6 +766,68 @@ const styles = StyleSheet.create({
   disabledBtn: {
     opacity: 0.6,
   },
+  acceptedActionsContainer: {
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  actionChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  actionChatBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.primaryOnColor,
+  },
+  actionCalendarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+  },
+  actionCalendarBtnAdded: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#059669',
+  },
+  actionCalendarBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  actionCalendarBtnTextAdded: {
+    color: '#059669',
+  },
+  actionRateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+  },
+  actionRateBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#D97706',
+  },
   finalizedNotice: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -605,7 +838,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
-    marginTop: spacing.sm,
+    marginTop: 2,
   },
   finalizedNoticeText: {
     fontSize: 13,
