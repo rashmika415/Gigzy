@@ -7,7 +7,7 @@ const { doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp } = require('
 
 test('applications and ratings firestore security rules validate access, roles, and schema', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async (t) => {
   const environment = await initializeTestEnvironment({
-    projectId: 'demo-gigzy-apps-ratings',
+    projectId: 'demo-localworks-apps-ratings',
     firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') },
   });
 

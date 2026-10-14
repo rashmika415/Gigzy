@@ -23,7 +23,7 @@ export default function RoleSelect() {
     if (Platform.OS !== 'web') void Haptics.selectionAsync().catch(() => {});
     router.push({ pathname: '/(auth)/register', params: { role } });
   };
-  return <AuthScreen title={t("How will you use Gigzy?")} subtitle={t("Pick the one that fits you best.")} photo>
+  return <AuthScreen title={t("How will you use LocalWorks?")} subtitle={t("Pick the one that fits you best.")} photo>
     <View style={styles.roles}>
       {ROLES.map((role, index) => <Animated.View key={role.key} entering={authEntrance(3 + index)}>
         <PressableScale accessibilityRole="button" accessibilityLabel={`${t(role.title)}. ${t(role.subtitle)}`}

@@ -77,7 +77,7 @@ export default function Login() {
       <AuthButton title={t("Sign in")} onPress={handleLogin} loading={loading} />
     </View>
     <View style={authStyles.footer}>
-      <Text style={authStyles.footerText}>{t("New to Gigzy?")}</Text>
+      <Text style={authStyles.footerText}>{t("New to LocalWorks?")}</Text>
       <Pressable style={({ pressed }) => [authStyles.footerLink, pressed && styles.pressed]} accessibilityRole="link" onPress={() => router.push('/(auth)/role-select')} disabled={loading}>
         <Text style={authStyles.link}>{t("Create an account")}</Text>
       </Pressable>

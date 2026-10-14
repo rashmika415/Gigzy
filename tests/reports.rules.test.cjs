@@ -7,7 +7,7 @@ const { doc, setDoc, updateDoc, deleteDoc, collection, getDoc, getDocs, serverTi
 
 test('reports security rules isolate access, allow creation, and restrict moderation to admin', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async () => {
   const env = await initializeTestEnvironment({
-    projectId: 'demo-gigzy-reports',
+    projectId: 'demo-localworks-reports',
     firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') },
   });
 

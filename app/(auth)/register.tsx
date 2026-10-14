@@ -215,7 +215,7 @@ export default function Register() {
       <AuthError message={t(error ?? "")} />
       <AuthButton title={t("Create account")} onPress={handleRegister} loading={loading} />
     </Animated.View>}
-    <View style={authStyles.footer}><Text style={authStyles.footerText}>{t("Already part of Gigzy?")}</Text>
+    <View style={authStyles.footer}><Text style={authStyles.footerText}>{t("Already part of LocalWorks?")}</Text>
       <Pressable style={({ pressed }) => [authStyles.footerLink, pressed && styles.pressed]} accessibilityRole="link" onPress={() => router.replace('/(auth)/login')} disabled={loading}><Text style={authStyles.link}>{t("Sign in")}</Text></Pressable>
     </View>
   </AuthScreen>;

@@ -57,38 +57,7 @@ export default function GigDetailScreen() {
   const [startingChat, setStartingChat] = useState(false);
   const [showApplicantsModal, setShowApplicantsModal] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [reportModalConfig, setReportModalConfig] = useState<{
-    targetType: 'user' | 'gig' | 'no-show';
-    defaultReason?: ReportReason;
-    targetUserId?: string;
-    targetUserName?: string;
-  }>({ targetType: 'gig' });
-
-  const handleOpenReportGig = () => {
-    setReportModalConfig({
-      targetType: 'gig',
-      targetUserId: typeof gig?.postedBy === 'object' ? gig?.postedBy?.uid : gig?.postedBy,
-      targetUserName: typeof gig?.postedBy === 'object' ? gig?.postedBy?.fullName : undefined,
-    });
-    setShowReportModal(true);
-  };
-
-  const handleOpenNoShowReport = () => {
-    const targetUid = gigOwner
-      ? (gig?.assignedYouthId || '')
-      : (typeof gig?.postedBy === 'object' ? gig?.postedBy?.uid : gig?.postedBy || '');
-    const targetName = gigOwner
-      ? (gig?.assignedYouthName || tr("Youth Freelancer"))
-      : (typeof gig?.postedBy === 'object' ? gig?.postedBy?.fullName : tr("Business Owner"));
-    setReportModalConfig({
-      targetType: 'no-show',
-      defaultReason: 'no-show',
-      targetUserId: targetUid,
-      targetUserName: targetName,
-    });
-    setShowReportModal(true);
-  };
+  const [report, setReport] = useState<{ targetType: 'gig' | 'no-show'; defaultReason?: ReportReason; targetUserId?: string; targetUserName?: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,12 +88,30 @@ export default function GigDetailScreen() {
   const canMessage = isWorker && !!gig && (gig.status === 'open' || isHiredWorker);
   const canRate = !!gig && gig.status === 'completed' && (gigOwner ? !!gig.assignedYouthId : isHiredWorker);
   const cat = gig ? resolveCategory(gig.category) : null;
+  // Either side of a hired gig can report the other for not showing up.
+  const canReportNoShow = !!gig && (gig.status === 'in-progress' || gig.status === 'completed')
+    && (gigOwner ? !!gig.assignedYouthId : isHiredWorker);
+
+  const openGigReport = () => {
+    if (!gig) return;
+    setReport({ targetType: 'gig', targetUserId: gig.postedBy?.uid, targetUserName: gig.postedBy?.fullName });
+  };
+
+  const openNoShowReport = () => {
+    if (!gig) return;
+    setReport({
+      targetType: 'no-show',
+      defaultReason: 'no-show',
+      targetUserId: gigOwner ? gig.assignedYouthId : gig.postedBy?.uid,
+      targetUserName: gigOwner ? (gig.assignedYouthName || tr('Youth Freelancer')) : (gig.postedBy?.fullName || tr('Business Owner')),
+    });
+  };
 
   const handleShare = async () => {
     if (!gig) return;
     try {
       await Share.share({
-        message: tr('Check out {{title}} on Gigzy: {{pay}} {{rate}}', { title: gig.title, pay: formatCurrency(gig.pay), rate: gig.payType === 'hourly' ? tr('/hr') : tr(' Fixed Price').trim() }),
+        message: tr('Check out {{title}} on LocalWorks: {{pay}} {{rate}}', { title: gig.title, pay: formatCurrency(gig.pay), rate: gig.payType === 'hourly' ? tr('/hr') : tr(' Fixed Price').trim() }),
       });
     } catch {}
   };
@@ -183,28 +170,11 @@ export default function GigDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <Header onBack={() => router.back()} onShare={handleShare} />
+      <Header onBack={() => router.back()} onShare={handleShare} onReport={gigOwner ? undefined : openGigReport} />
 
       <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* ── Title block ── */}
         <View style={styles.hero}>
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <Header
-        onBack={() => router.back()}
-        onShare={handleShare}
-        onEdit={gigOwner ? handleEditGig : undefined}
-        onReport={!gigOwner ? handleOpenReportGig : undefined}
-      />
-
-      <ScrollView
-        style={styles.flex}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ── Hero Section ── */}
-        <View style={styles.heroSection}>
-          {/* Category & Status row */}
           <View style={styles.badgeRow}>
             <Chip label={t(cat!.name)} icon={cat!.icon as any} size="sm" />
             <StatusPill status={gig.status} />
@@ -286,6 +256,14 @@ export default function GigDetailScreen() {
             </Pressable>
           )}
         </Section>
+
+        {canReportNoShow && (
+          <Pressable onPress={openNoShowReport} accessibilityRole="button"
+            style={({ pressed }) => [styles.reportLink, pressed && styles.pressed]}>
+            <Ionicons name="flag-outline" size={16} color={colors.error} />
+            <Text style={styles.reportText}>{t('Report No-Show')}</Text>
+          </Pressable>
+        )}
       </ScrollView>
 
       {/* ── Sticky action bar ── */}
@@ -313,62 +291,6 @@ export default function GigDetailScreen() {
               style={({ pressed }) => [styles.barIcon, pressed && styles.pressed]}>
               <Ionicons name="star-outline" size={20} color={colors.star} />
             </Pressable>
-
-          {Boolean(gig.assignedYouthId === user?.uid && (gig.status === 'in-progress' || gig.status === 'completed')) && (
-            <>
-              <TouchableOpacity
-                style={styles.rateFreelancerBtn}
-                onPress={() => setShowRatingModal(true)}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="star" size={16} color={colors.star} />
-                <Text style={styles.rateFreelancerBtnText}>{tr("Rate Client")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.reportNoShowBtn}
-                onPress={handleOpenNoShowReport}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="flag-outline" size={15} color={colors.error} />
-                <Text style={styles.reportNoShowBtnText}>{tr("No-Show")}</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      )}
-
-      {gigOwner && (
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={styles.applicantsBtn}
-            onPress={() => setShowApplicantsModal(true)}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="people-outline" size={17} color={colors.primaryOnColor} />
-            <Text style={styles.applicantsBtnText}>
-              {tr("Applicants")} ({gig.applicantsCount || 0})
-            </Text>
-          </TouchableOpacity>
-
-          {Boolean(gig.assignedYouthId && (gig.status === 'in-progress' || gig.status === 'completed')) && (
-            <>
-              <TouchableOpacity
-                style={styles.rateFreelancerBtn}
-                onPress={() => setShowRatingModal(true)}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="star" size={16} color={colors.star} />
-                <Text style={styles.rateFreelancerBtnText}>{tr("Rate Freelancer")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.reportNoShowBtn}
-                onPress={handleOpenNoShowReport}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="flag-outline" size={15} color={colors.error} />
-                <Text style={styles.reportNoShowBtnText}>{tr("No-Show")}</Text>
-              </TouchableOpacity>
-            </>
           )}
           <Pressable onPress={handleEditGig} accessibilityRole="button"
             style={({ pressed }) => [styles.barButton, styles.barSecondary, pressed && styles.pressed]}>
@@ -389,27 +311,26 @@ export default function GigDetailScreen() {
           visible
           targetUserId={gigOwner ? (gig.assignedYouthId || '') : (gig.postedBy?.uid || '')}
           targetUserName={gigOwner ? (gig.assignedYouthName || tr('Youth Freelancer')) : (gig.postedBy?.fullName || tr('Business Owner'))}
-          targetUserName={gigOwner ? (gig.assignedYouthName || tr("Youth Freelancer")) : (gig.postedBy?.fullName || tr("Business Owner"))}
           targetUserPhotoURL={gigOwner ? gig.assignedYouthPhotoURL : undefined}
           targetRole={gigOwner ? 'freelancer' : 'client'}
           gigId={gig.id}
           gigTitle={gig.title}
           onClose={() => setShowRatingModal(false)}
-          onSuccess={() => { setShowRatingModal(false); toast.success(tr('Review submitted successfully!')); }}
+          onSuccess={() => setShowRatingModal(false)}
         />
       )}
 
-      {gig && showReportModal && (
+      {report && (
         <ReportModal
-          visible={showReportModal}
-          onClose={() => setShowReportModal(false)}
-          targetType={reportModalConfig.targetType}
-          targetId={reportModalConfig.targetType === 'no-show' ? `${gig.id}_${reportModalConfig.targetUserId || ''}` : gig.id}
+          visible
+          onClose={() => setReport(null)}
+          targetType={report.targetType}
+          targetId={report.targetType === 'no-show' ? `${gig.id}_${report.targetUserId || ''}` : gig.id}
           targetGigId={gig.id}
           targetGigTitle={gig.title}
-          targetUserId={reportModalConfig.targetUserId}
-          targetUserName={reportModalConfig.targetUserName}
-          defaultReason={reportModalConfig.defaultReason}
+          targetUserId={report.targetUserId}
+          targetUserName={report.targetUserName}
+          defaultReason={report.defaultReason}
         />
       )}
     </SafeAreaView>
@@ -418,73 +339,27 @@ export default function GigDetailScreen() {
 
 // ── Sub-components ──
 
-function Header({ onBack, onShare }: { onBack: () => void; onShare?: () => void }) {
+function Header({ onBack, onShare, onReport }: { onBack: () => void; onShare?: () => void; onReport?: () => void }) {
   const { t } = useTranslation();
   return <View style={styles.header}>
-    <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel={t('Go back')}
-      style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}>
-      <Ionicons name="chevron-back" size={24} color={colors.text} />
-    </Pressable>
+    <View style={styles.headerSide}>
+      <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel={t('Go back')}
+        style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}>
+        <Ionicons name="chevron-back" size={24} color={colors.text} />
+      </Pressable>
+    </View>
     <Text accessibilityRole="header" style={styles.headerTitle}>{t('Gig Details')}</Text>
-    {onShare
-      ? <Pressable onPress={onShare} accessibilityRole="button" accessibilityLabel={t('Share')}
+    <View style={[styles.headerSide, styles.headerSideEnd]}>
+      {onReport && <Pressable onPress={onReport} accessibilityRole="button" accessibilityLabel={t('Report')}
+        style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}>
+        <Ionicons name="flag-outline" size={20} color={colors.textSecondary} />
+      </Pressable>}
+      {onShare && <Pressable onPress={onShare} accessibilityRole="button" accessibilityLabel={t('Share')}
         style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}>
         <Ionicons name="share-outline" size={20} color={colors.primary} />
-      </Pressable>
-      : <View style={styles.headerBtn} />}
-  </View>;
-function Header({ onBack, onShare, onEdit, onReport }: { onBack: () => void; onShare?: () => void; onEdit?: () => void; onReport?: () => void }) {
-  useTranslation();
-  return (
-    <View style={styles.header}>
-      <TouchableOpacity
-        style={styles.headerBtn}
-        onPress={onBack}
-        activeOpacity={0.7}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Ionicons name="chevron-back" size={24} color={colors.text} />
-      </TouchableOpacity>
-
-      <Text style={styles.headerTitle}>{tr("Gig Details")}</Text>
-
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        {onEdit && (
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={onEdit}
-            activeOpacity={0.7}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="create-outline" size={20} color={colors.primary} />
-          </TouchableOpacity>
-        )}
-        {onReport && (
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={onReport}
-            activeOpacity={0.7}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel={tr("Report")}
-          >
-            <Ionicons name="flag-outline" size={18} color={colors.error} />
-          </TouchableOpacity>
-        )}
-        {onShare ? (
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={onShare}
-            activeOpacity={0.7}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="share-outline" size={20} color={colors.primary} />
-          </TouchableOpacity>
-        ) : !onEdit && !onReport ? (
-          <View style={{ width: 38 }} />
-        ) : null}
-      </View>
+      </Pressable>}
     </View>
-  );
+  </View>;
 }
 
 function Section({ icon, title, children }: { icon: keyof typeof Ionicons.glyphMap; title: string; children: ReactNode }) {
@@ -522,7 +397,11 @@ const styles = StyleSheet.create({
   scrollContent: { padding: spacing.md, paddingBottom: spacing.xl, gap: spacing.lg },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  headerSide: { width: 88, flexDirection: 'row' },
+  headerSideEnd: { justifyContent: 'flex-end' },
   headerBtn: { width: 44, height: 44, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
+  reportLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs + 2, minHeight: 44, alignSelf: 'center', paddingHorizontal: spacing.md },
+  reportText: { ...typography.label, color: colors.error },
   headerTitle: { ...typography.title, color: colors.text },
 
   hero: { gap: spacing.sm },
@@ -572,412 +451,4 @@ const styles = StyleSheet.create({
   barSecondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
   barSecondaryText: { ...typography.title, fontSize: 15, color: colors.primary },
   barIcon: { width: 48, height: 48, borderRadius: borderRadius.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.surfaceBorder, backgroundColor: colors.surface },
-  padH: { paddingHorizontal: spacing.lg },
-  scrollContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 120,
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceBorder,
-  },
-  headerBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-    letterSpacing: -0.2,
-  },
-
-  // Hero
-  heroSection: {
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-    gap: spacing.md,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  categoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primaryLight,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    gap: 6,
-  },
-  categoryText: {
-    fontSize: 12,
-    fontFamily: fonts.bodyBold,
-    color: colors.primary,
-  },
-  gigTitle: {
-    fontSize: 24,
-    fontFamily: fonts.heading,
-    color: colors.text,
-    letterSpacing: -0.5,
-    lineHeight: 30,
-  },
-  postedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  posterAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primaryLight,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  posterAvatarText: {
-    fontSize: 14,
-    fontFamily: fonts.bodyBold,
-    color: colors.primary,
-  },
-  posterInfo: {
-    gap: 1,
-  },
-  posterName: {
-    fontSize: 14,
-    fontFamily: fonts.bodySemiBold,
-    color: colors.text,
-  },
-  postedTime: {
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-
-  // Details Card
-  detailsCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  paySection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  payLabel: {
-    fontSize: 10,
-    fontFamily: fonts.bodyBold,
-    color: colors.textMuted,
-    letterSpacing: 0.8,
-    marginBottom: 4,
-  },
-  payRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  payAmount: {
-    fontSize: 28,
-    fontFamily: fonts.display,
-    color: colors.primary,
-    letterSpacing: -0.5,
-  },
-  payType: {
-    fontSize: 14,
-    fontFamily: fonts.bodySemiBold,
-    color: colors.textSecondary,
-  },
-  payIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.surfaceElevated,
-    marginVertical: spacing.md,
-  },
-  specsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  specItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '48%',
-    gap: 8,
-    paddingVertical: 6,
-  },
-  specIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  specTextWrap: {
-    flex: 1,
-    gap: 1,
-  },
-  specLabel: {
-    fontSize: 10,
-    fontFamily: fonts.bodySemiBold,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  specValue: {
-    fontSize: 13,
-    fontFamily: fonts.bodySemiBold,
-    color: colors.text,
-  },
-
-  // Sections
-  section: {
-    marginBottom: spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-    marginBottom: spacing.sm,
-  },
-  descriptionText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 22,
-  },
-  skillsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-
-  // Poster card
-  posterCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    padding: spacing.md,
-    gap: 12,
-  },
-  posterCardAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primaryLight,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  posterCardAvatarText: {
-    fontSize: 18,
-    fontFamily: fonts.bodyBold,
-    color: colors.primary,
-  },
-  posterCardInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  posterCardName: {
-    fontSize: 15,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-  },
-  posterCardEmail: {
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  posterChatBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Gig ID
-  gigIdRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: spacing.md,
-    opacity: 0.5,
-  },
-  gigIdText: {
-    fontSize: 11,
-    color: colors.textMuted,
-    fontFamily: 'monospace',
-  },
-
-  // Bottom bar
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceBorder,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: 28,
-    gap: spacing.md,
-  },
-  bottomPayPreview: {
-    gap: 1,
-  },
-  bottomPayLabel: {
-    fontSize: 10,
-    fontFamily: fonts.bodySemiBold,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  bottomPayValue: {
-    fontSize: 20,
-    fontFamily: fonts.heading,
-    color: colors.primary,
-  },
-  contactBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.lg,
-    paddingVertical: 14,
-    gap: 8,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  contactBtnText: {
-    fontSize: 15,
-    fontFamily: fonts.bodyBold,
-    color: colors.primaryOnColor,
-  },
-  applicantsBtn: {
-    flex: 1.4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.lg,
-    paddingVertical: 14,
-    gap: 6,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  applicantsBtnText: {
-    fontSize: 14,
-    fontFamily: fonts.bodyBold,
-    color: colors.primaryOnColor,
-  },
-  updateBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primaryLight,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: borderRadius.lg,
-    paddingVertical: 14,
-    gap: 6,
-  },
-  updateBtnText: {
-    fontSize: 14,
-    fontFamily: fonts.bodyBold,
-    color: colors.primary,
-  },
-  manageBtn: {
-    flex: 0.8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: borderRadius.lg,
-    paddingVertical: 14,
-    gap: 6,
-  },
-  manageBtnText: {
-    fontSize: 14,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-  },
-  rateFreelancerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primaryLight,
-    borderWidth: 1.5,
-    borderColor: colors.primaryBorder,
-    borderRadius: borderRadius.lg,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    gap: 6,
-  },
-  rateFreelancerBtnText: {
-    fontSize: 13,
-    fontFamily: fonts.bodyBold,
-    color: colors.warning,
-  },
-  reportNoShowBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.errorLight,
-    borderWidth: 1,
-    borderColor: colors.errorBorder,
-    borderRadius: borderRadius.lg,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    gap: 6,
-  },
-  reportNoShowBtnText: {
-    fontSize: 13,
-    fontFamily: fonts.bodyBold,
-    color: colors.error,
-  },
 });

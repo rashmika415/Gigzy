@@ -90,21 +90,20 @@ export default function ResolveReportModal({
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Reset the form for each report (deferred so it doesn't cascade renders).
   useEffect(() => {
-    if (visible && report) {
+    if (!visible || !report) return;
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
       // Default recommended action based on target
-      if (report.targetType === 'gig') {
-        setAction('gig_removed');
-      } else if (report.reason === 'no-show') {
-        setAction('warning');
-      } else {
-        setAction('warning');
-      }
+      setAction(report.targetType === 'gig' ? 'gig_removed' : 'warning');
       setNotes('');
       setDurationDays(7);
       setErrorMsg('');
       setSubmitting(false);
-    }
+    });
+    return () => { active = false; };
   }, [visible, report]);
 
   if (!report) return null;

@@ -137,7 +137,7 @@ export default function AdminDashboardScreen() {
     </TouchableOpacity>)}</View>;
   return <SafeAreaView style={styles.page}>
     <View style={[styles.shell, wide && styles.shellWide]}>
-      {wide && <View style={styles.sidebar}><View style={styles.brand}><Ionicons name="shield-checkmark" size={25} color={colors.primary} /><Text style={styles.brandText}>Gigzy</Text></View>
+      {wide && <View style={styles.sidebar}><View style={styles.brand}><Ionicons name="shield-checkmark" size={25} color={colors.primary} /><Text style={styles.brandText}>LocalWorks</Text></View>
         <Text style={styles.sidebarText}>{t('Administration')}</Text>{navigation}<Text style={styles.sidebarNote}>{t('Manage your community and opportunities.')}</Text></View>}
       <View style={styles.main}>
         <View style={[styles.header, !wide && styles.mobileHeader]}><View style={styles.headerCopy}><Text accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={[styles.heading, !wide && styles.mobileHeading]}>{t('Admin dashboard')}</Text>

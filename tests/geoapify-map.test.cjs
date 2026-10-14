@@ -36,7 +36,7 @@ test('map bridge opens the selected pin, fits locations, handles GPS and reports
   assert.equal(fit.length, 2);
   markers[1].click();
   assert.equal(events.at(-1).key, 'b');
-  context.window.gigzyCommand({ type: 'locate', latitude: 6.5, longitude: 79.5 });
+  context.window.localworksCommand({ type: 'locate', latitude: 6.5, longitude: 79.5 });
   assert.equal(views.at(-1)[0][0], 6.5);
   tileEvents.load();
   assert.equal(events.at(-1).type, 'error');

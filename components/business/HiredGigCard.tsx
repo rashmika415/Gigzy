@@ -17,10 +17,12 @@ interface HiredGigCardProps {
   onCalendar: (gig: Gig) => void;
   onComplete: (gig: Gig) => void;
   onRate: (gig: Gig) => void;
+  /** Report the hired freelancer (e.g. a no-show) */
+  onReport?: (gig: Gig) => void;
 }
 
 /** A gig where the owner has hired someone: who, when, where, and the next action. */
-export default function HiredGigCard({ gig, calendarState, reviewed, onOpen, onMessage, onCalendar, onComplete, onRate }: HiredGigCardProps) {
+export default function HiredGigCard({ gig, calendarState, reviewed, onOpen, onMessage, onCalendar, onComplete, onRate, onReport }: HiredGigCardProps) {
   const { t } = useTranslation();
   const completed = gig.status === 'completed';
   const name = gig.assignedYouthName || t('Assigned Freelancer');
@@ -83,6 +85,12 @@ export default function HiredGigCard({ gig, calendarState, reviewed, onOpen, onM
           style={({ pressed }) => [styles.button, styles.secondary, pressed && styles.pressed]}>
           <Ionicons name="star-outline" size={16} color={colors.star} />
           <Text style={styles.secondaryText}>{t('Rate')}</Text>
+        </Pressable>
+      )}
+      {onReport && (
+        <Pressable onPress={() => onReport(gig)} accessibilityRole="button" accessibilityLabel={t('Report Freelancer')}
+          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+          <Ionicons name="flag-outline" size={18} color={colors.error} />
         </Pressable>
       )}
     </View>

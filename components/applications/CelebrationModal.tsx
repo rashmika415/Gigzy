@@ -99,7 +99,7 @@ export default function CelebrationModal({
         counterpartRole: 'freelancer',
         gigId,
         applicationId,
-        description: `Gigzy scheduled gig with ${displayName}`,
+        description: `LocalWorks scheduled gig with ${displayName}`,
       });
       if (!result.success) throw new Error(result.error || 'Could not add gig to calendar.');
       setCalendarAdded(true);

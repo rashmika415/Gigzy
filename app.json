@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "Gigzy",
-    "slug": "Gigzy",
+    "name": "LocalWorks",
+    "slug": "LocalWorks",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "gigzy",
+    "scheme": "localworks",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.isuru.gigzy",
+      "bundleIdentifier": "com.isuru.localworks",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
@@ -32,8 +32,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Gigzy to select a profile photo or business logo.",
-          "cameraPermission": "Allow Gigzy to take a profile photo or business logo.",
+          "photosPermission": "Allow LocalWorks to select a profile photo or business logo.",
+          "cameraPermission": "Allow LocalWorks to take a profile photo or business logo.",
           "microphonePermission": false
         }
       ],
@@ -56,13 +56,13 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow Gigzy to find nearby gigs and set gig locations."
+          "locationWhenInUsePermission": "Allow LocalWorks to find nearby gigs and set gig locations."
         }
       ],
       [
         "expo-calendar",
         {
-          "calendarPermission": "Allow Gigzy to add scheduled gigs to your calendar."
+          "calendarPermission": "Allow LocalWorks to add scheduled gigs to your calendar."
         }
       ]
     ],

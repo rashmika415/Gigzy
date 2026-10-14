@@ -7,7 +7,7 @@ const { doc, setDoc, getDoc, getDocs, collection, updateDoc, deleteDoc, serverTi
 
 test('messaging firestore rules enforce participant-only access and validation', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async (t) => {
   const environment = await initializeTestEnvironment({
-    projectId: 'demo-gigzy-messaging',
+    projectId: 'demo-localworks-messaging',
     firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') },
   });
 

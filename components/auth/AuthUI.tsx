@@ -18,7 +18,7 @@ import { LANGUAGES } from '../../localization/language';
 import LanguageSelector from '../LanguageSelector';
 import PressableScale from '../PressableScale';
 
-export const authPhoto = require('../../assets/images/auth/gigzy-cafe-hero.png');
+export const authPhoto = require('../../assets/images/auth/localworks-cafe-hero.png');
 
 // Minimum comfortable touch target and form control height.
 const TOUCH = 44;
@@ -28,7 +28,7 @@ export function AuthBrand() {
   useTranslation();
   return <View style={styles.brand}>
     <View style={styles.brandIcon}><Ionicons name="flash" size={20} color={palette.primary} /></View>
-    <Text style={styles.brandName}>{tr("Gigzy")}<Text style={styles.brandDot}>.</Text></Text>
+    <Text style={styles.brandName}>{tr("LocalWorks")}<Text style={styles.brandDot}>.</Text></Text>
   </View>;
 }
 

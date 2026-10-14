@@ -103,22 +103,30 @@ export default function ModerationQueuePanel() {
     }
   };
 
+  // Filter changes start a fresh page (deferred so the resets don't cascade renders).
   useEffect(() => {
     mounted.current = true;
-    setCursor(undefined);
-    setReports([]);
-    loadReports(true);
+    void Promise.resolve().then(() => {
+      if (!mounted.current) return;
+      setCursor(undefined);
+      setReports([]);
+      loadReports(true);
+    });
     return () => {
       mounted.current = false;
     };
   }, [statusFilter, typeFilter]);
 
   useEffect(() => {
-    if (activeTab === 'reviews') {
+    if (activeTab !== 'reviews') return;
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
       setReviewsCursor(undefined);
       setReviews([]);
       loadReviews(true);
-    }
+    });
+    return () => { active = false; };
   }, [activeTab, ratingFilter]);
 
   const handleRefresh = () => {
@@ -827,7 +835,7 @@ export default function ModerationQueuePanel() {
                     style={styles.detailsText}
                     numberOfLines={isExpanded ? undefined : 3}
                   >
-                    "{rev.comment}"
+                    {'“'}{rev.comment}{'”'}
                   </Text>
 
                   {rev.comment.length > 120 && (
@@ -940,7 +948,7 @@ export default function ModerationQueuePanel() {
               {Boolean(deletingReview?.comment) && (
                 <View style={styles.modalPreviewBox}>
                   <Text style={styles.modalPreviewText} numberOfLines={3}>
-                    "{deletingReview?.comment}"
+                    {'“'}{deletingReview?.comment}{'”'}
                   </Text>
                 </View>
               )}

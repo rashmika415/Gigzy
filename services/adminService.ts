@@ -82,7 +82,7 @@ export async function setUserSuspension(userId: string, suspended: boolean, reas
       userId,
       type: 'system',
       title: suspended ? (type === 'temporary' ? 'Account temporarily suspended' : 'Account suspended') : 'Account reinstated',
-      body: suspended ? clean : 'Your access to Gigzy has been restored.',
+      body: suspended ? clean : 'Your access to LocalWorks has been restored.',
       read: false,
       createdAt: now,
     });

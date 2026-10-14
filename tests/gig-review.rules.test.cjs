@@ -6,7 +6,7 @@ const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@fir
 const { doc, setDoc, updateDoc, serverTimestamp } = require('firebase/firestore');
 
 test('reviews enforce completion, participants, identity, rating and uniqueness', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async () => {
-  const env = await initializeTestEnvironment({ projectId: 'demo-gigzy-reviews', firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') } });
+  const env = await initializeTestEnvironment({ projectId: 'demo-localworks-reviews', firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') } });
   try {
     await env.withSecurityRulesDisabled(async context => {
       const db = context.firestore();

@@ -11,4 +11,4 @@ The badge uses the live user profile and appears only for `role == client` and `
 Deploy the updated `firestore.rules` before using this feature. They deny public account creation with a verification status, direct self-approval, isolated request/profile status changes, and non-admin decisions. Rules require both writes to commit together.
 
 Service checks: `node --test tests/business-verification.test.cjs`.
-Permission checks with Firebase emulator: `firebase emulators:exec --only firestore --project demo-gigzy-verification --config firebase.test.json "node --test tests/business-verification.rules.test.cjs tests/admin-dashboard.rules.test.cjs"`.
+Permission checks with Firebase emulator: `firebase emulators:exec --only firestore --project demo-localworks-verification --config firebase.test.json "node --test tests/business-verification.rules.test.cjs tests/admin-dashboard.rules.test.cjs"`.

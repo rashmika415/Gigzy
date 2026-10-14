@@ -30,7 +30,7 @@ export async function registerDeviceForPush(userId: string) {
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
-      name: 'Gigzy updates',
+      name: 'LocalWorks updates',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#6FD8C7',
