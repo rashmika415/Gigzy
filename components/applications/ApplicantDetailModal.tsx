@@ -1,7 +1,7 @@
 import { formatDate as localizedDate } from '../../localization/format';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../localization/i18n';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Modal, View, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView, Image, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
@@ -50,6 +50,7 @@ export default function ApplicantDetailModal({
 }: ApplicantDetailModalProps) {
   useTranslation();
   const [acting, setActing] = useState(false);
+  const submitting = useRef(false);
   const toast = useToast();
   const [errorMsg, setErrorMsg] = useState('');
   const [calendarAdding, setCalendarAdding] = useState(false);
@@ -114,6 +115,8 @@ export default function ApplicantDetailModal({
   };
 
   const executeAccept = async () => {
+    if (submitting.current || !isPending) return;
+    submitting.current = true;
     setActing(true);
     setErrorMsg('');
     try {
@@ -138,6 +141,7 @@ export default function ApplicantDetailModal({
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to accept application.');
     } finally {
+      submitting.current = false;
       setActing(false);
     }
   };
@@ -189,6 +193,17 @@ export default function ApplicantDetailModal({
     }
   };
 
+  const executeReject = async () => {
+    if (submitting.current || !isPending) return;
+    submitting.current = true; setActing(true); setErrorMsg('');
+    try {
+      await rejectApplication(application.id, businessId);
+      toast.success(tr('Application Rejected'), tr('The application has been rejected.'));
+      onStatusChanged?.('rejected'); onClose();
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Failed to reject application.');
+    } finally { submitting.current = false; setActing(false); }
+  };
   const handleReject = () => {
     if (Platform.OS === 'web') {
       const confirmPrompt = tr("Are you sure you want to reject this application from {{value0}}?", { value0: application.youthName || 'this applicant' });

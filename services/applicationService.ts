@@ -849,93 +849,44 @@ export async function acceptApplication(applicationId: string, businessId?: stri
       }
     }
 
-    // Send in-app notification to youth freelancer
-    if (acceptedData && acceptedData.youthId) {
-      try {
-        await sendNotification(acceptedData.youthId, {
-          userId: acceptedData.youthId,
-          type: 'application',
-          title: 'Application Accepted! 🎉',
-          body: `Great news! ${acceptedData.businessName || 'The business owner'} accepted your application for "${acceptedData.gigTitle || 'the gig'}". Work is now in progress and a notification has been sent to your dashboard!`,
-          read: false,
-          route: `/(app)/gig/${acceptedData.gigId}`,
-          entityId: applicationId,
-        });
-      } catch (notifErr) {
-        console.warn('Could not deliver acceptance notification:', notifErr);
-      }
+/** Accept one pending applicant and reserve the gig atomically. */
+export async function acceptApplication(applicationId: string, businessId?: string): Promise<void> {
+  const uid = requireBusinessActor(businessId);
+  await runTransaction(db, async transaction => {
+    const appRef = doc(db, 'applications', applicationId);
+    const appSnap = await transaction.get(appRef);
+    if (!appSnap.exists()) throw new Error('Application not found.');
+    const data = appSnap.data() as Application;
+    if (data.businessId !== uid) throw new Error('Unauthorized. You can only manage applications for your own gigs.');
+    if (data.status !== 'pending') throw new Error(`Cannot accept an application that is already ${data.status}.`);
+    const gigRef = doc(db, 'gigs', data.gigId);
+    const gigSnap = await transaction.get(gigRef);
+    if (!gigSnap.exists()) throw new Error('Gig not found.');
+    const gig = gigSnap.data();
+    if (gig.postedBy?.uid !== uid) throw new Error('Unauthorized. You can only manage applications for your own gigs.');
+    if (gig.status !== 'open' || gig.assignedYouthId || gig.acceptedApplicationId || gig.moderationRemoved) {
+      throw new Error('This gig has already been accepted or is no longer open. A youth cannot be accepted twice for this gig.');
     }
-  } catch (error: any) {
-    if (error.message && (
-      error.message.includes('Unauthorized') ||
-      error.message.includes('Cannot accept') ||
-      error.message.includes('cannot be accepted twice') ||
-      error.message.includes('already been accepted') ||
-      error.message.includes('not found')
-    )) {
-      throw error;
-    }
-    throw new Error(parseFirebaseError(error));
-  }
+    transaction.update(appRef, { status: 'accepted', updatedAt: serverTimestamp() });
+    transaction.update(gigRef, { status: 'in-progress', assignedYouthId: data.youthId, acceptedApplicationId: applicationId, updatedAt: serverTimestamp() });
+    writeDecisionNotification(transaction, applicationId, data, true);
+  });
 }
 
-/**
- * Rejects an application. Validates business ownership and pending status.
- */
+/** Reject a pending application; other applicants remain available for review. */
 export async function rejectApplication(applicationId: string, businessId?: string): Promise<void> {
-  const effectiveBusinessId = businessId || auth?.currentUser?.uid;
-  const appRef = doc(db, 'applications', applicationId);
-
-  let rejectedData: any = null;
-
-  try {
-    await runTransaction(db, async (transaction) => {
-      const appSnap = await transaction.get(appRef);
-      if (!appSnap.exists()) {
-        throw new Error('Application not found.');
-      }
-
-      const data = appSnap.data();
-      if (effectiveBusinessId && data.businessId !== effectiveBusinessId) {
-        throw new Error('Unauthorized. You can only manage applications for your own gigs.');
-      }
-
-      if (data.status !== 'pending') {
-        throw new Error(`Cannot reject an application that is already ${data.status}.`);
-      }
-
-      transaction.update(appRef, {
-        status: 'rejected',
-        updatedAt: serverTimestamp(),
-      });
-
-      rejectedData = data;
-    });
-
-    // Send in-app notification to youth freelancer
-    if (rejectedData && rejectedData.youthId) {
-      try {
-        await sendNotification(rejectedData.youthId, {
-          userId: rejectedData.youthId,
-          type: 'application',
-          title: 'Application Status Update',
-          body: `Your application for "${rejectedData.gigTitle || 'the gig'}" was not selected this time.`,
-          read: false,
-          route: `/(app)/gig/${rejectedData.gigId}`,
-          entityId: applicationId,
-        });
-      } catch (notifErr) {
-        console.warn('Could not deliver rejection notification:', notifErr);
-      }
-    }
-  } catch (error: any) {
-    if (error.message && (
-      error.message.includes('Unauthorized') ||
-      error.message.includes('Cannot reject') ||
-      error.message.includes('not found')
-    )) {
-      throw error;
-    }
-    throw new Error(parseFirebaseError(error));
-  }
+  const uid = requireBusinessActor(businessId);
+  await runTransaction(db, async transaction => {
+    const appRef = doc(db, 'applications', applicationId);
+    const snapshot = await transaction.get(appRef);
+    if (!snapshot.exists()) throw new Error('Application not found.');
+    const data = snapshot.data() as Application;
+    if (data.businessId !== uid) throw new Error('Unauthorized. You can only manage applications for your own gigs.');
+    if (data.status !== 'pending') throw new Error(`Cannot reject an application that is already ${data.status}.`);
+    const gig = await transaction.get(doc(db, 'gigs', data.gigId));
+    if (!gig.exists()) throw new Error('Gig not found.');
+    if (gig.data().postedBy?.uid !== uid) throw new Error('Unauthorized. You can only manage applications for your own gigs.');
+    transaction.update(appRef, { status: 'rejected', updatedAt: serverTimestamp() });
+    writeDecisionNotification(transaction, applicationId, data, false);
+  });
 }

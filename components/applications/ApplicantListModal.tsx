@@ -44,6 +44,7 @@ export default function ApplicantListModal({
   const [applicants, setApplicants] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [retry, setRetry] = useState(0);
   const [filter, setFilter] = useState<ApplicationFilterStatus>('all');
   const [selectedApplicant, setSelectedApplicant] = useState<Application | null>(null);
   const [acceptedCelebrationApp, setAcceptedCelebrationApp] = useState<Application | null>(null);
@@ -77,25 +78,9 @@ export default function ApplicantListModal({
       active = false;
       unsubscribe();
     };
-  }, [visible, gigId, businessId]);
+  }, [visible, gigId, businessId, retry]);
 
-  const handleRetry = () => {
-    setLoading(true);
-    setLoadError('');
-    subscribeToGigApplicants(
-      gigId,
-      businessId,
-      (apps: Application[]) => {
-        setApplicants(apps);
-        setLoading(false);
-        setLoadError('');
-      },
-      (error: Error) => {
-        setLoadError(error.message || 'Failed to load applicants.');
-        setLoading(false);
-      }
-    );
-  };
+  const handleRetry = () => setRetry(value => value + 1);
 
   const handleQuickAccept = (app: Application) => {
     if (Platform.OS === 'web') {
@@ -325,7 +310,7 @@ export default function ApplicantListModal({
         {/* Applicant Detail Modal */}
         <ApplicantDetailModal
           visible={!!selectedApplicant}
-          application={selectedApplicant}
+          application={applicants.find(item => item.id === selectedApplicant?.id) || selectedApplicant}
           businessId={businessId}
           onClose={() => setSelectedApplicant(null)}
           onAccepted={() => {

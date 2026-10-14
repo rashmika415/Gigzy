@@ -1,4 +1,6 @@
-import { formatNumber } from '../../../localization/format';
+import ProfileRatingActions from '../../../components/ProfileRatingActions';
+import { ReviewSummary, ReviewHistory } from '../../../components/ProfileReviews';
+import { useProfileReviews } from '../../../hooks/useProfileReviews';
 import { Text } from '../../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
@@ -16,14 +18,13 @@ export default function PublicProfileScreen() {
   const { user } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [profile, setProfile] = useState<UserData | null>(null);
-  const [reviews, setReviews] = useState<ProfileReview[]>([]);
+  const reviewState = useProfileReviews(id);
   const [loading, setLoading] = useState(true);
   const [showRatingModal, setShowRatingModal] = useState(false);
   useEffect(() => {
     if (!id) return;
     const stopProfile = subscribeToProfile(id, (value) => { setProfile(value); setLoading(false); }, () => setLoading(false));
-    const stopReviews = subscribeToProfileReviews(id, setReviews, () => {});
-    return () => { stopProfile(); stopReviews(); };
+    return () => { stopProfile(); };
   }, [id]);
   if (loading) return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
   if (!profile) return <View style={styles.center}><Text style={styles.title}>{t("Profile not found")}</Text></View>;
@@ -47,6 +48,7 @@ export default function PublicProfileScreen() {
         </TouchableOpacity>
       )}
     </View>
+    {youth && <ProfileRatingActions key={id} userId={id} />}
     <Card title={youth ? t("About") : t("Business description")}><Text style={styles.body}>{youth ? profile.bio || t("No bio yet.") : profile.businessDetails || t("No description yet.")}</Text></Card>
     <Card title={t("Details")}><Text style={styles.body}>{profile.location || profile.address || t("Location not provided")}</Text>{youth && profile.age ? <Text style={styles.body}>{t('Age: {{age}}', { age: profile.age })}</Text> : null}<Text style={styles.body}>{profile.availability || profile.phone || ''}</Text></Card>
     {youth && skills.length > 0 && <Card title={t("Skills")}><View style={styles.tags}>{skills.map((skill) => <View key={skill} style={styles.tag}><Text style={styles.tagText}>{skill}</Text></View>)}</View></Card>}
