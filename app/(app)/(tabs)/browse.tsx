@@ -21,6 +21,10 @@ import {
   SkeletonList,
   ErrorState,
 } from '../../../components';
+import ApplyModal from '../../../components/applications/ApplyModal';
+import { subscribeToMyApplications } from '../../../services/applicationService';
+import type { Application } from '../../../types/application';
+import { useToast } from '../../../context/ToastContext';
 import type { Gig, GigSortOption, LocationType, GigFilterOptions } from '../../../types/gig';
 import { GIG_CATEGORIES } from '../../../types/gig';
 
@@ -44,6 +48,7 @@ const LOCATION_OPTIONS: { key: LocationType | 'all'; label: string; icon: keyof 
 export default function BrowseScreen() {
   const { t } = useTranslation();
   const { user, userData } = useAuth();
+  const toast = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('list');
   const [keyword, setKeyword] = useState('');
@@ -53,6 +58,19 @@ export default function BrowseScreen() {
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<GigFilterOptions>({});
+  const [myApplications, setMyApplications] = useState<Application[]>([]);
+  const [selectedGigForApply, setSelectedGigForApply] = useState<Gig | null>(null);
+
+  useEffect(() => {
+    if (!user || userData?.role === 'client') return;
+    const unsub = subscribeToMyApplications(
+      user.uid,
+      (apps) => setMyApplications(apps),
+      () => {}
+    );
+    return () => unsub();
+  }, [user, userData?.role]);
+
   useEffect(() => {
     const timer = setTimeout(() => setKeyword(searchQuery.trim()), 300);
     return () => clearTimeout(timer);
@@ -105,12 +123,58 @@ export default function BrowseScreen() {
 
   // ── Render helpers ──
   const renderGigItem = useCallback(
-    ({ item }: { item: Gig }) => (
-      <View style={styles.cardWrapper}>
-        <GigCard gig={item} onPress={handleGigPress} showBookmark />
-      </View>
-    ),
-    [handleGigPress],
+    ({ item }: { item: Gig }) => {
+      const isClient = userData?.role === 'client';
+      const hasApplied = myApplications.some((a) => a.gigId === item.id);
+
+      return (
+        <View style={styles.cardWrapper}>
+          <GigCard
+            gig={item}
+            onPress={handleGigPress}
+            showBookmark={!isClient}
+            renderActions={!isClient ? (gig) => (
+              <View style={styles.cardActionsRow}>
+                <TouchableOpacity
+                  style={styles.detailsBtn}
+                  onPress={() => handleGigPress(gig)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.detailsBtnText}>{t("Details")}</Text>
+                </TouchableOpacity>
+
+                {hasApplied ? (
+                  <TouchableOpacity
+                    style={styles.appliedBtn}
+                    onPress={() => router.push('/(app)/applications' as any)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="checkmark-circle" size={15} color={colors.success} />
+                    <Text style={styles.appliedBtnText}>{t("Applied")}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.applyBtn}
+                    onPress={() => {
+                      if (!user) {
+                        router.push('/(auth)/login' as any);
+                        return;
+                      }
+                      setSelectedGigForApply(gig);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="paper-plane" size={14} color={colors.primaryOnColor} />
+                    <Text style={styles.applyBtnText}>{t("Apply Now")}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : undefined}
+          />
+        </View>
+      );
+    },
+    [handleGigPress, myApplications, userData, user, t],
   );
 
   const currentSortLabel = SORT_OPTIONS.find((s) => s.key === selectedSort)?.label ?? 'Newest';
@@ -333,6 +397,42 @@ export default function BrowseScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {selectedGigForApply && user && (
+        <ApplyModal
+          visible={Boolean(selectedGigForApply)}
+          gig={selectedGigForApply}
+          youthId={user.uid}
+          youthName={userData?.fullName || user.displayName || 'Youth Freelancer'}
+          youthPhotoURL={userData?.photoURL || ''}
+          youthSkills={userData?.skills?.split(',').map((s) => s.trim()).filter(Boolean)}
+          youthBio={userData?.bio || ''}
+          onClose={() => setSelectedGigForApply(null)}
+          onSuccess={() => {
+            const appliedGig = selectedGigForApply;
+            setSelectedGigForApply(null);
+            toast.success(tr("Application Submitted! 🎉"), tr("Your application has been sent to the business owner."));
+            if (user && appliedGig) {
+              setMyApplications((prev) => [
+                {
+                  id: `app_${appliedGig.id}_${user.uid}`,
+                  gigId: appliedGig.id,
+                  youthId: user.uid,
+                  gigTitle: appliedGig.title,
+                  gigLocation: appliedGig.location,
+                  gigPay: appliedGig.pay,
+                  gigPayType: appliedGig.payType,
+                  businessName: appliedGig.postedBy?.fullName || 'Business Owner',
+                  status: 'pending',
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                } as any,
+                ...prev.filter((a) => a.gigId !== appliedGig.id),
+              ]);
+            }
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -589,5 +689,64 @@ const styles = StyleSheet.create({
   sortOptionTextActive: {
     color: colors.text,
     fontFamily: fonts.bodyBold,
+  },
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  detailsBtn: {
+    flex: 1,
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    borderRadius: borderRadius.md,
+  },
+  detailsBtnText: {
+    fontSize: 13,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.text,
+  },
+  applyBtn: {
+    flex: 1.3,
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  applyBtnText: {
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+    color: colors.primaryOnColor,
+  },
+  appliedBtn: {
+    flex: 1.3,
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.successLight,
+    borderWidth: 1,
+    borderColor: colors.successBorder,
+    borderRadius: borderRadius.md,
+  },
+  appliedBtnText: {
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+    color: colors.success,
   },
 });

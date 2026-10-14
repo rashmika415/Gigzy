@@ -12,6 +12,8 @@ import { getStatusTheme } from './ApplicationCard';
 interface ApplicantCardProps {
   application: Application;
   onPress: () => void;
+  onAccept?: () => void;
+  onReject?: () => void;
 }
 
 function formatDate(timestamp: any): string {
@@ -29,12 +31,18 @@ function formatDate(timestamp: any): string {
   });
 }
 
-export default function ApplicantCard({ application, onPress }: ApplicantCardProps) {
+export default function ApplicantCard({
+  application,
+  onPress,
+  onAccept,
+  onReject,
+}: ApplicantCardProps) {
   useTranslation();
   const statusTheme = getStatusTheme(application.status);
   const appliedDate = formatDate(application.createdAt);
   const initial = (application.youthName?.[0] || 'Y').toUpperCase();
   const skills = (application.youthSkills || []).slice(0, 3);
+  const isPending = (application.status || '').toLowerCase() === 'pending';
 
   return (
     <TouchableOpacity
@@ -90,6 +98,16 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
         </View>
       </View>
 
+      {/* Gig Title Tag if available */}
+      {application.gigTitle ? (
+        <View style={styles.gigTagContainer}>
+          <Ionicons name="briefcase-outline" size={12} color={colors.primary} />
+          <Text style={styles.gigTagText} numberOfLines={1}>
+            {application.gigTitle}
+          </Text>
+        </View>
+      ) : null}
+
       {/* Message preview */}
       {application.message ? (
         <Text style={styles.messagePreview} numberOfLines={2}>
@@ -114,15 +132,51 @@ export default function ApplicantCard({ application, onPress }: ApplicantCardPro
 
       {/* Action Footer */}
       <View style={styles.footerRow}>
-        <View style={styles.availabilityBadge}>
-          <Ionicons name="checkmark-circle" size={13} color={colors.success} />
-          <Text style={styles.availabilityText}>{tr("Available")}</Text>
-        </View>
-
         <View style={styles.viewApplicantBtn}>
-          <Text style={styles.viewApplicantText}>{tr("View Applicant")}</Text>
+          <Text style={styles.viewApplicantText}>{tr("View Details")}</Text>
           <Ionicons name="chevron-forward" size={14} color={colors.primary} />
         </View>
+
+        {isPending && (onAccept || onReject) ? (
+          <View style={styles.decisionBtnsRow}>
+            {onReject && (
+              <TouchableOpacity
+                style={styles.cardRejectBtn}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onReject();
+                }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={tr("Reject")}
+              >
+                <Ionicons name="close-circle-outline" size={15} color={colors.error} />
+                <Text style={styles.cardRejectBtnText}>{tr("Reject")}</Text>
+              </TouchableOpacity>
+            )}
+
+            {onAccept && (
+              <TouchableOpacity
+                style={styles.cardAcceptBtn}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onAccept();
+                }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={tr("Accept")}
+              >
+                <Ionicons name="checkmark-circle" size={15} color={colors.primaryOnColor} />
+                <Text style={styles.cardAcceptBtnText}>{tr("Accept")}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <View style={styles.availabilityBadge}>
+            <Ionicons name="checkmark-circle" size={13} color={colors.success} />
+            <Text style={styles.availabilityText}>{tr("Available")}</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -274,5 +328,56 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fonts.bodySemiBold,
     color: colors.primary,
+  },
+  gigTagContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
+  },
+  gigTagText: {
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.primary,
+  },
+  decisionBtnsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  cardRejectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.error,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+  },
+  cardRejectBtnText: {
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.error,
+  },
+  cardAcceptBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+  },
+  cardAcceptBtnText: {
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.primaryOnColor,
   },
 });

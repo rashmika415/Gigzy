@@ -25,11 +25,8 @@ function tokenDocumentId(token: string) {
 }
 
 export async function registerDeviceForPush(userId: string) {
-  if (Platform.OS === 'web' || !Device.isDevice) return null;
-  if (isExpoGo) {
-    console.warn('Push notifications are not supported in Expo Go for SDK 53+.');
-    return null;
-  }
+  // Expo Go cannot register this app's native push credentials.
+  if (isExpoGo || Platform.OS === 'web' || !Device.isDevice) return null;
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {

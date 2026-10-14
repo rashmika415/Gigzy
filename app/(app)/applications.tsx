@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../localization/i18n';
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, TouchableOpacity, StyleSheet, SafeAreaView, FlatList, ActivityIndicator, RefreshControl, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, SafeAreaView, FlatList, ActivityIndicator, RefreshControl, Platform, Alert } from 'react-native';
 import { Text, TextInput } from '../../components/LocalizedText';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application, ApplicationFilterStatus } from '../../types/application';
 import {
@@ -13,17 +15,21 @@ import {
   getMyApplications,
   subscribeToBusinessApplications,
   getApplicationsForBusiness,
+  acceptApplication,
+  rejectApplication,
 } from '../../services/applicationService';
 import {
   ApplicationCard,
   ApplicationDetailModal,
   ApplicantCard,
   ApplicantDetailModal,
+  CelebrationModal,
 } from '../../components/applications';
 
 export default function MyApplicationsScreen() {
   useTranslation();
   const { user, userData } = useAuth();
+  const toast = useToast();
   const isBusiness = userData?.role === 'client';
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +39,7 @@ export default function MyApplicationsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [selectedApplicant, setSelectedApplicant] = useState<Application | null>(null);
+  const [acceptedCelebrationApp, setAcceptedCelebrationApp] = useState<Application | null>(null);
 
   // Real-time synchronization of applications (freelancer youth or business client)
   useEffect(() => {
@@ -100,6 +107,109 @@ export default function MyApplicationsScreen() {
       completed: applications.filter((a) => (a.status || '').toLowerCase() === 'completed').length,
     };
   }, [applications]);
+
+  const handleQuickAccept = (app: Application) => {
+    if (!user) return;
+    if (Platform.OS === 'web') {
+      const confirmPrompt = tr("Are you sure you want to accept {{value0}} for \"{{value1}}\"?", {
+        value0: app.youthName || 'this applicant',
+        value1: app.gigTitle || 'this gig',
+      });
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm(confirmPrompt)) {
+          void executeAccept(app);
+        }
+      } else {
+        void executeAccept(app);
+      }
+    } else {
+      Alert.alert(
+        tr("Accept Application"),
+        tr("Are you sure you want to accept {{value0}} for \"{{value1}}\"?", {
+          value0: app.youthName || 'this applicant',
+          value1: app.gigTitle || 'this gig',
+        }),
+        [
+          { text: tr("Cancel"), style: 'cancel' },
+          {
+            text: tr("Accept Applicant"),
+            style: 'default',
+            onPress: () => void executeAccept(app),
+          },
+        ]
+      );
+    }
+  };
+
+  const executeAccept = async (app: Application) => {
+    if (!user) return;
+    try {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+      await acceptApplication(app.id, user.uid);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      toast.success(
+        tr("Application Accepted! 🎉"),
+        tr("You have accepted {{value0}} for \"{{value1}}\". Work is now in progress and a notification has been sent to the youth freelancer's dashboard.", {
+          value0: app.youthName || 'this applicant',
+          value1: app.gigTitle || 'this gig',
+        })
+      );
+      router.push('/(app)/(tabs)/home' as any);
+    } catch (err: any) {
+      toast.error(err.message || tr("Failed to accept application."));
+    }
+  };
+
+  const handleQuickReject = (app: Application) => {
+    if (!user) return;
+    if (Platform.OS === 'web') {
+      const confirmPrompt = tr("Are you sure you want to reject this application from {{value0}}?", {
+        value0: app.youthName || 'this applicant',
+      });
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm(confirmPrompt)) {
+          void executeReject(app);
+        }
+      } else {
+        void executeReject(app);
+      }
+    } else {
+      Alert.alert(
+        tr("Reject Application"),
+        tr("Are you sure you want to reject this application from {{value0}}?", {
+          value0: app.youthName || 'this applicant',
+        }),
+        [
+          { text: tr("Cancel"), style: 'cancel' },
+          {
+            text: tr("Reject"),
+            style: 'destructive',
+            onPress: () => void executeReject(app),
+          },
+        ]
+      );
+    }
+  };
+
+  const executeReject = async (app: Application) => {
+    if (!user) return;
+    try {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+      await rejectApplication(app.id, user.uid);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } catch {}
+      toast.success(tr("Application Rejected"), tr("The application has been rejected."));
+    } catch (err: any) {
+      toast.error(err.message || tr("Failed to reject application."));
+    }
+  };
 
   // Filtered applications
   const filteredApplications = useMemo(() => {
@@ -284,6 +394,8 @@ export default function MyApplicationsScreen() {
               <ApplicantCard
                 application={item}
                 onPress={() => setSelectedApplicant(item)}
+                onAccept={() => handleQuickAccept(item)}
+                onReject={() => handleQuickReject(item)}
               />
             ) : (
               <ApplicationCard
@@ -320,6 +432,10 @@ export default function MyApplicationsScreen() {
           application={selectedApplicant}
           businessId={user?.uid || ''}
           onClose={() => setSelectedApplicant(null)}
+          onAccepted={() => {
+            setSelectedApplicant(null);
+            router.push('/(app)/(tabs)/home' as any);
+          }}
           onStatusChanged={(newStatus) => {
             if (selectedApplicant) {
               setSelectedApplicant({
@@ -330,6 +446,20 @@ export default function MyApplicationsScreen() {
           }}
         />
       )}
+
+      {/* Celebration Modal on Gig Acceptance */}
+      <CelebrationModal
+        visible={!!acceptedCelebrationApp}
+        youthName={acceptedCelebrationApp?.youthName || 'Youth Freelancer'}
+        gigTitle={acceptedCelebrationApp?.gigTitle || 'Gig'}
+        applicationId={acceptedCelebrationApp?.id}
+        gigId={acceptedCelebrationApp?.gigId}
+        gigDate={acceptedCelebrationApp?.gigDate}
+        gigLocation={acceptedCelebrationApp?.gigLocation}
+        gigPay={acceptedCelebrationApp?.gigPay}
+        gigPayType={acceptedCelebrationApp?.gigPayType}
+        onClose={() => setAcceptedCelebrationApp(null)}
+      />
     </SafeAreaView>
   );
 }

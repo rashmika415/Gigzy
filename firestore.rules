@@ -68,11 +68,32 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/referralCodes/$(request.resource.data.referralCode)).data.ownerId == userId);
     }
     match /users/{userId} {
+      function verificationSubmission() {
+        let requestDoc = getAfter(/databases/$(database)/documents/businessVerificationRequests/$(userId)).data;
+        return owns(userId) && active() && resource.data.role == 'client'
+          && resource.data.get('verificationStatus', '') in ['', 'REJECTED']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verificationStatus', 'updatedAt'])
+          && request.resource.data.verificationStatus == 'PENDING'
+          && request.resource.data.updatedAt == request.time
+          && requestDoc.status == 'PENDING' && requestDoc.businessId == userId
+          && requestDoc.submittedAt == request.time;
+      }
+      function verificationDecision() {
+        let decision = getAfter(/databases/$(database)/documents/businessVerificationRequests/$(userId)).data;
+        return isAdmin() && resource.data.role == 'client' && resource.data.verificationStatus == 'PENDING'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verificationStatus', 'isVerified', 'updatedAt'])
+          && request.resource.data.verificationStatus in ['VERIFIED', 'REJECTED']
+          && request.resource.data.isVerified == (request.resource.data.verificationStatus == 'VERIFIED')
+          && request.resource.data.updatedAt == request.time
+          && decision.status == request.resource.data.verificationStatus
+          && decision.reviewedBy == request.auth.uid && decision.reviewedAt == request.time;
+      }
       allow read: if signedIn();
       allow create: if owns(userId) && validRole() && validProfilePhoto()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.get('suspended', false) != true
+
         && request.resource.data.get('isVerified', false) != true
         && !request.resource.data.keys().hasAny(['referralCode']);
       allow update: if (isAdmin() && userId != request.auth.uid && resource.data.role != 'admin'
@@ -118,7 +139,20 @@ service cloud.firestore {
           && request.resource.data.suspendedUntil == null
           && request.resource.data.updatedAt == request.time)
         || (owns(userId) && active() && protectedUserFieldsUnchanged() && validReferralCodeUpdate(userId)
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || validProfilePhoto()));
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || validProfilePhoto()))
+        // Rating aggregates: admin-only client updates. Prefer trusted server-side aggregation.
+        || (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'ratingAverage', 'ratingCount', 'updatedAt'
+          ])
+          && request.resource.data.get('ratingAverage', 0) is number
+          && request.resource.data.get('ratingAverage', 0) >= 0
+          && request.resource.data.get('ratingAverage', 0) <= 5
+          && request.resource.data.get('ratingCount', 0) is int
+          && request.resource.data.get('ratingCount', 0) >= 0
+          && request.resource.data.updatedAt == request.time);
+
+
       allow delete: if false;
       match /moderationHistory/{eventId} {
         allow read: if owns(userId) || isAdmin();
@@ -181,26 +215,13 @@ service cloud.firestore {
       }
       match /reviews/{reviewId} {
         allow read: if signedIn();
-        function validGigReview() {
-          let data = request.resource.data;
-          let gig = get(/databases/$(database)/documents/gigs/$(data.gigId)).data;
-          let owner = gig.postedBy.uid;
-          let worker = gig.assignedYouthId;
-          return gig.status == 'completed' && gig.get('moderationRemoved', false) != true
-            && owner != worker && request.auth.uid != userId
-            && ((request.auth.uid == owner && userId == worker && currentUser().data.role == 'client')
-              || (request.auth.uid == worker && userId == owner && currentUser().data.role in ['freelancer', 'youth']))
-            && reviewId == data.gigId + '_' + request.auth.uid
-            && data.keys().hasOnly(['gigId', 'reviewerId', 'reviewedUserId', 'reviewerRole', 'authorId', 'authorName', 'rating', 'comment', 'createdAt'])
-            && data.authorId == request.auth.uid && data.authorName is string
-            && data.reviewerId == request.auth.uid && data.reviewedUserId == userId
-            && data.reviewerRole == currentUser().data.role
-            && data.rating is int && data.rating >= 1 && data.rating <= 5
-            && data.comment is string && data.comment.size() <= 1000
-            && data.createdAt == request.time;
-        }
-        allow create: if active() && validGigReview();
-        allow update, delete: if false;
+        allow create: if active() && request.auth.uid != userId
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.rating is number
+          && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+          && request.resource.data.comment is string && request.resource.data.comment.size() >= 5 && request.resource.data.comment.size() <= 1000;
+        allow update: if active() && resource.data.authorId == request.auth.uid;
+        allow delete: if isAdmin() || (active() && resource.data.authorId == request.auth.uid);
       }
       match /endorsements/{endorsementId} {
         allow read: if signedIn();
@@ -212,6 +233,35 @@ service cloud.firestore {
       match /pushTokens/{tokenId} {
         allow read, create, update, delete: if owns(userId) && active();
       }
+    }
+    match /businessVerificationRequests/{businessId} {
+      function validSubmission() {
+        let data = request.resource.data;
+        let business = get(/databases/$(database)/documents/users/$(businessId)).data;
+        return owns(businessId) && active() && business.role == 'client'
+          && data.keys().hasOnly(['businessId', 'status', 'businessName', 'fullName', 'email', 'phone', 'address', 'businessCategory', 'businessDetails', 'details', 'submittedAt'])
+          && data.businessId == businessId && data.status == 'PENDING' && data.submittedAt == request.time
+          && data.businessName == business.businessName && data.businessName is string && data.businessName.size() > 0
+          && data.email == business.email && data.email is string && data.email.size() > 0
+          && data.phone == business.phone && data.phone is string && data.phone.size() > 0
+          && data.address == business.address && data.address is string && data.address.size() > 0
+          && data.businessDetails == business.businessDetails && data.businessDetails is string && data.businessDetails.size() > 0
+          && data.fullName == business.get('fullName', '') && data.businessCategory == business.get('businessCategory', '')
+          && data.details is string && data.details.size() >= 5 && data.details.size() <= 2000
+          && business.get('verificationStatus', '') in ['', 'REJECTED']
+          && getAfter(/databases/$(database)/documents/users/$(businessId)).data.verificationStatus == 'PENDING';
+      }
+      allow read: if isAdmin() || (owns(businessId) && active());
+      allow create: if validSubmission();
+      allow update: if (resource.data.status == 'REJECTED' && validSubmission())
+        || (isAdmin() && resource.data.status == 'PENDING'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rejectionReason', 'reviewedBy', 'reviewedAt'])
+          && request.resource.data.status in ['VERIFIED', 'REJECTED']
+          && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time
+          && request.resource.data.rejectionReason is string && request.resource.data.rejectionReason.size() <= 500
+          && (request.resource.data.status == 'VERIFIED' ? request.resource.data.rejectionReason == '' : request.resource.data.rejectionReason.size() >= 5)
+          && getAfter(/databases/$(database)/documents/users/$(businessId)).data.verificationStatus == request.resource.data.status);
+      allow delete: if false;
     }
     match /referralCodes/{code} {
       // Public lookup exposes only the code owner ID, never profile or contact data.
@@ -238,66 +288,88 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     match /applications/{applicationId} {
-      function participant() { return request.auth.uid == resource.data.youthId || request.auth.uid == resource.data.businessId; }
-      allow get: if active() && (!exists(/databases/$(database)/documents/applications/$(applicationId)) || participant());
-      allow list: if isAdmin() || (active() && participant());
-      allow create: if active() && currentUser().data.role == 'freelancer'
-        && request.resource.data.youthId == request.auth.uid
-        && applicationId == 'app_' + request.resource.data.gigId + '_' + request.auth.uid
-        && request.resource.data.applicationId == applicationId
-        && request.resource.data.businessId == get(/databases/$(database)/documents/gigs/$(request.resource.data.gigId)).data.postedBy.uid
-        && request.resource.data.businessId != request.auth.uid
-        && get(/databases/$(database)/documents/gigs/$(request.resource.data.gigId)).data.status == 'open'
-        && getAfter(/databases/$(database)/documents/gigs/$(request.resource.data.gigId)).data.status == 'open'
+      function participant() {
+        return request.auth.uid == resource.data.youthId
+          || request.auth.uid == resource.data.businessId
+          || (resource.data.keys().hasAny(['businessId']) && resource.data.businessId is map && resource.data.businessId.get('uid', '') == request.auth.uid)
+          || request.auth.uid == resource.data.get('businessUid', '')
+          || request.auth.uid == resource.data.get('clientId', '');
+      }
+      function isBusiness() {
+        return signedIn() && (
+          request.auth.uid == resource.data.get('businessId', '')
+          || (resource.data.keys().hasAny(['businessId']) && resource.data.businessId is map && resource.data.businessId.get('uid', '') == request.auth.uid)
+          || request.auth.uid == resource.data.get('businessUid', '')
+          || request.auth.uid == resource.data.get('clientId', '')
+          || request.auth.uid == resource.data.get('userId', '')
+        );
+      }
+      function isYouth() {
+        return signedIn() && request.auth.uid == resource.data.youthId;
+      }
+      function willBeYouth() {
+        return signedIn() && request.auth.uid == request.resource.data.youthId;
+      }
+
+      allow get: if active() && (!exists(/databases/$(database)/documents/applications/$(applicationId)) || participant() || isBusiness() || isYouth() || isAdmin());
+      allow list: if isAdmin() || (active() && (participant() || isBusiness() || isYouth()));
+
+      allow create: if active() && willBeYouth()
+        && currentUser().data.role == 'freelancer'
         && request.resource.data.status == 'pending'
-        && request.resource.data.message is string && request.resource.data.message.size() >= 5 && request.resource.data.message.size() <= 500
-        && request.resource.data.availabilityConfirmed == true
-        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
-      allow update: if active() && request.auth.uid == resource.data.businessId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-        && request.resource.data.updatedAt == request.time
-        && ((resource.data.status == 'pending' && request.resource.data.status == 'rejected')
-          || (resource.data.status == 'pending' && request.resource.data.status == 'accepted'
-            && get(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.status == 'open'
-            && getAfter(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.assignedYouthId == resource.data.youthId
-            && getAfter(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.acceptedApplicationId == applicationId
-            && getAfter(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.status in ['in-progress', 'filled'])
-          || (resource.data.status == 'accepted' && request.resource.data.status == 'completed'
-            && getAfter(/databases/$(database)/documents/gigs/$(resource.data.gigId)).data.status == 'completed'));
-      allow delete: if false;
+        && request.resource.data.message is string && request.resource.data.message.size() >= 5
+        && request.resource.data.availabilityConfirmed == true;
+
+      allow update: if signedIn() && (
+        isAdmin()
+        || isBusiness()
+        || (isYouth() && resource.data.status == 'pending' && request.resource.data.status in ['withdrawn', 'cancelled'])
+        || (active() && (request.auth.uid == resource.data.businessId || isBusiness())
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'conversationId']))
+      );
+
+      allow delete: if isAdmin() || (signedIn() && isYouth() && resource.data.status == 'pending');
     }
     match /gigs/{gigId} {
+      function isGigOwner() {
+        return (resource.data.keys().hasAny(['postedBy']) && resource.data.postedBy is map && (resource.data.postedBy.get('uid', '') == request.auth.uid || resource.data.postedBy.get('id', '') == request.auth.uid))
+          || resource.data.get('postedBy', '') == request.auth.uid
+          || resource.data.get('businessId', '') == request.auth.uid
+          || resource.data.get('clientId', '') == request.auth.uid
+          || resource.data.get('userId', '') == request.auth.uid
+          || resource.data.get('ownerId', '') == request.auth.uid;
+      }
       allow read: if signedIn();
       allow create: if active() && currentUser().data.role == 'client'
-        && request.resource.data.postedBy.uid == request.auth.uid
+        && ((request.resource.data.keys().hasAny(['postedBy']) && request.resource.data.postedBy is map && request.resource.data.postedBy.get('uid', '') == request.auth.uid) || request.resource.data.get('postedBy', '') == request.auth.uid)
         && request.resource.data.title is string && request.resource.data.title.size() >= 5
         && request.resource.data.description is string && request.resource.data.description.size() >= 20
         && request.resource.data.pay is number && request.resource.data.pay > 0
         && !request.resource.data.keys().hasAny(['moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt'])
         && request.resource.data.status == 'open';
-      allow update: if (isAdmin()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt', 'updatedAt'])
-        && request.resource.data.status == 'closed' && request.resource.data.moderationRemoved == true
-        && request.resource.data.moderationReason is string
-        && request.resource.data.moderationReason.size() >= 5 && request.resource.data.moderationReason.size() <= 500
-        && request.resource.data.moderatedBy == request.auth.uid
-        && request.resource.data.moderatedAt == request.time && request.resource.data.updatedAt == request.time)
-        || (active() && resource.data.get('moderationRemoved', false) != true
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['moderationRemoved', 'moderationReason', 'moderatedBy', 'moderatedAt']) && (
-        (resource.data.postedBy.uid == request.auth.uid
-          && currentUser().data.role == 'client'
-          && request.resource.data.postedBy == resource.data.postedBy
-          && (request.resource.data.status != 'closed'
-            || resource.data.status in ['open', 'closed']))
-        || (resource.data.status == 'open'
-          && request.resource.data.status == 'open'
-          && getAfter(/databases/$(database)/documents/gigs/$(gigId)).data.status == 'open'
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount']))));
-      allow delete: if active() && resource.data.get('moderationRemoved', false) != true && resource.data.postedBy.uid == request.auth.uid;
+      allow update: if active() && (isGigOwner()
+        || resource.data.postedBy.uid == request.auth.uid
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount']));
+      allow delete: if active() && resource.data.postedBy.uid == request.auth.uid;
     }
     match /chats/{chatId} {
-      allow read, update, delete: if active() && request.auth.uid in resource.data.participants;
-      allow create: if active() && request.auth.uid in request.resource.data.participants;
+      function isChatParticipant() {
+        return resource != null && (
+          (resource.data.keys().hasAny(['participants']) && request.auth.uid in resource.data.participants)
+          || request.auth.uid == resource.data.get('youthId', '')
+          || request.auth.uid == resource.data.get('businessId', '')
+        );
+      }
+      function willBeChatParticipant() {
+        return (request.resource.data.keys().hasAny(['participants']) && request.auth.uid in request.resource.data.participants)
+          || request.auth.uid == request.resource.data.get('youthId', '')
+          || request.auth.uid == request.resource.data.get('businessId', '');
+      }
+
+      allow get: if active() && (resource == null || isChatParticipant());
+      allow list: if active() && isChatParticipant();
+      allow create: if active() && willBeChatParticipant();
+      allow update, delete: if active() && isChatParticipant();
       match /messages/{messageId} {
         allow read: if active() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
         allow create: if active() && request.resource.data.senderId == request.auth.uid
@@ -307,29 +379,37 @@ service cloud.firestore {
     }
     match /conversations/{conversationId} {
       function isParticipant() {
-        return request.auth.uid == resource.data.youthId
-          || request.auth.uid == resource.data.businessId
-          || (resource.data.keys().hasAny(['participants']) && request.auth.uid in resource.data.participants);
+        return resource != null && (
+          request.auth.uid == resource.data.get('youthId', '')
+          || request.auth.uid == resource.data.get('businessId', '')
+          || (resource.data.keys().hasAny(['participants']) && request.auth.uid in resource.data.participants)
+        );
       }
       function willBeParticipant() {
-        return request.auth.uid == request.resource.data.youthId
-          || request.auth.uid == request.resource.data.businessId
+        return request.auth.uid == request.resource.data.get('youthId', '')
+          || request.auth.uid == request.resource.data.get('businessId', '')
           || (request.resource.data.keys().hasAny(['participants']) && request.auth.uid in request.resource.data.participants);
       }
 
-      allow read: if active() && isParticipant();
+      allow get: if active() && (resource == null || isParticipant());
+      allow list: if active() && isParticipant();
       allow create: if active() && willBeParticipant();
       allow update: if active() && (isParticipant() || willBeParticipant());
       allow delete: if isAdmin() || (active() && isParticipant());
 
       match /messages/{messageId} {
+        function hasParentConv() {
+          return exists(/databases/$(database)/documents/conversations/$(conversationId));
+        }
         function parentConv() {
           return get(/databases/$(database)/documents/conversations/$(conversationId)).data;
         }
         function isConvParticipant() {
-          return request.auth.uid == parentConv().youthId
-            || request.auth.uid == parentConv().businessId
-            || (parentConv().keys().hasAny(['participants']) && request.auth.uid in parentConv().participants);
+          return hasParentConv() && (
+            request.auth.uid == parentConv().get('youthId', '')
+            || request.auth.uid == parentConv().get('businessId', '')
+            || (parentConv().keys().hasAny(['participants']) && request.auth.uid in parentConv().participants)
+          );
         }
 
         allow read: if active() && isConvParticipant();
@@ -340,5 +420,6 @@ service cloud.firestore {
         allow delete: if active() && resource.data.senderId == request.auth.uid;
       }
     }
+
   }
 }

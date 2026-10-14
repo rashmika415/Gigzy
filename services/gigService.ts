@@ -39,7 +39,7 @@ export function parseFirebaseError(error: any): string {
   const message = error.message || '';
 
   if (code.includes('permission-denied') || message.includes('Missing or insufficient permissions')) {
-    return 'Permission denied. Please ensure you are logged in to create or view gigs.';
+    return 'Permission denied by Firestore security rules. Please ensure the updated firestore.rules are published in your Firebase Console.';
   }
   if (code.includes('unavailable') || message.includes('Failed to get document because the client is offline')) {
     return 'Unable to reach Firestore. Please check your internet connection and try again.';
@@ -570,6 +570,7 @@ export async function updateGigStatus(gigId: string, status: GigStatus): Promise
     const docRef = doc(db, 'gigs', gigId);
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('Please log in to manage your gigs.');
+    let acceptedAppId: string | undefined;
     await runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(docRef);
       if (!snapshot.exists()) throw new Error('Gig not found.');
@@ -581,8 +582,22 @@ export async function updateGigStatus(gigId: string, status: GigStatus): Promise
       if (status === 'closed' && gig.status !== 'open') {
         throw new Error('Only open gigs can be closed.');
       }
+      acceptedAppId = gig.acceptedApplicationId;
       transaction.update(docRef, { status, updatedAt: serverTimestamp() });
     });
+
+    // If gig is marked completed, synchronize linked application document
+    if (status === 'completed' && acceptedAppId) {
+      try {
+        const appRef = doc(db, 'applications', acceptedAppId);
+        await updateDoc(appRef, {
+          status: 'completed',
+          updatedAt: serverTimestamp(),
+        });
+      } catch (appErr) {
+        console.warn('Non-fatal: could not update application to completed:', appErr);
+      }
+    }
   } catch (error: any) {
     console.error('Firestore updateGigStatus error:', error);
     throw new Error(parseFirebaseError(error));
