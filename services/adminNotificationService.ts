@@ -42,7 +42,41 @@ export interface CreateAnnouncementInput {
   targetUserId?: string;
 }
 
+export interface AnnouncementRecipient {
+  id: string;
+  displayName: string;
+  email: string;
+  role: 'freelancer' | 'client';
+}
+
 const DELIVERY_PAGE_SIZE = 400;
+const RECIPIENT_PAGE_SIZE = 200;
+
+export async function fetchAnnouncementRecipients(): Promise<AnnouncementRecipient[]> {
+  const recipients: AnnouncementRecipient[] = [];
+  let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+  while (true) {
+    const constraints: QueryConstraint[] = [
+      orderBy(documentId()),
+      ...(cursor ? [startAfter(cursor)] : []),
+      limit(RECIPIENT_PAGE_SIZE),
+    ];
+    const snapshot: QuerySnapshot<DocumentData> = await getDocsFromServer(query(collection(db, 'users'), ...constraints));
+    for (const item of snapshot.docs) {
+      const data = item.data();
+      if (data.suspended === true || !['freelancer', 'client'].includes(data.role)) continue;
+      recipients.push({
+        id: item.id,
+        displayName: String(data.fullName || data.businessName || data.email || item.id),
+        email: typeof data.email === 'string' ? data.email : '',
+        role: data.role,
+      });
+    }
+    if (snapshot.size < RECIPIENT_PAGE_SIZE) break;
+    cursor = snapshot.docs[snapshot.docs.length - 1];
+  }
+  return recipients.sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
 
 function cleanAnnouncement(input: CreateAnnouncementInput) {
   const title = input.title.trim();
@@ -51,7 +85,7 @@ function cleanAnnouncement(input: CreateAnnouncementInput) {
   if (title.length < 3 || title.length > 80) throw new Error('Title must be between 3 and 80 characters.');
   if (body.length < 5 || body.length > 500) throw new Error('Message must be between 5 and 500 characters.');
   if (!['all', 'freelancer', 'client', 'user'].includes(input.audience)) throw new Error('Choose a valid audience.');
-  if (input.audience === 'user' && !targetUserId) throw new Error('Enter the recipient user ID.');
+  if (input.audience === 'user' && !targetUserId) throw new Error('Select a recipient.');
   if (targetUserId.includes('/')) throw new Error('Enter a valid recipient user ID.');
   return { title, body, targetUserId };
 }

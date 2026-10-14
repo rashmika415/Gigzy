@@ -1034,5 +1034,12 @@
   "Reinstated": "Reinstated",
   "Could not save moderation action. Please retry.": "Could not save moderation action. Please retry.",
   "Choose a suspension duration between 1 and 365 days.": "Choose a suspension duration between 1 and 365 days.",
-  "Access returns after {{date}}": "Access returns after {{date}}"
+  "Access returns after {{date}}": "Access returns after {{date}}",
+  "Select recipient": "Select recipient",
+  "Search by name or email": "Search by name or email",
+  "No matching users found.": "No matching users found.",
+  "Selected recipient": "Selected recipient",
+  "Could not load users. Please retry.": "Could not load users. Please retry.",
+  "Select a recipient.": "Select a recipient.",
+  "Complete a gig with this business to rate them.": "Complete a gig with this business to rate them."
 }

@@ -1034,5 +1034,12 @@
   "Reinstated": "නැවත සක්‍රිය කර ඇත",
   "Could not save moderation action. Please retry.": "පාලන ක්‍රියාමාර්ගය සුරැකීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
   "Choose a suspension duration between 1 and 365 days.": "දින 1ත් 365ත් අතර අත්හිටුවීමේ කාලයක් තෝරන්න.",
-  "Access returns after {{date}}": "{{date}} පසු ප්‍රවේශය නැවත ලැබේ"
+  "Access returns after {{date}}": "{{date}} පසු ප්‍රවේශය නැවත ලැබේ",
+  "Select recipient": "ලබන්නා තෝරන්න",
+  "Search by name or email": "නම හෝ ඊමේල් මගින් සොයන්න",
+  "No matching users found.": "ගැළපෙන පරිශීලකයන් හමු නොවීය.",
+  "Selected recipient": "තෝරාගත් ලබන්නා",
+  "Could not load users. Please retry.": "පරිශීලකයන් ලබාගත නොහැකි විය. නැවත උත්සාහ කරන්න.",
+  "Select a recipient.": "ලබන්නෙකු තෝරන්න.",
+  "Complete a gig with this business to rate them.": "මෙම ව්‍යාපාරය සමඟ gig එකක් සම්පූර්ණ කර ඔවුන්ට rating එකක් ලබා දෙන්න."
 }

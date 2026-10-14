@@ -34,7 +34,7 @@ export default function PublicProfileScreen() {
       <Text style={styles.role}>{youth ? t("Youth freelancer") : profile.businessCategory || t("Business")}</Text>
       <ReviewSummary {...reviewState} />
     </View>
-    {youth && <ProfileRatingActions key={id} userId={id} />}
+    <ProfileRatingActions key={id} userId={id} />
     <Card title={youth ? t("About") : t("Business description")}><Text style={styles.body}>{youth ? profile.bio || t("No bio yet.") : profile.businessDetails || t("No description yet.")}</Text></Card>
     <Card title={t("Details")}><Text style={styles.body}>{profile.location || profile.address || t("Location not provided")}</Text>{youth && profile.age ? <Text style={styles.body}>{t('Age: {{age}}', { age: profile.age })}</Text> : null}<Text style={styles.body}>{profile.availability || profile.phone || ''}</Text></Card>
     {youth && skills.length > 0 && <Card title={t("Skills")}><View style={styles.tags}>{skills.map((skill) => <View key={skill} style={styles.tag}><Text style={styles.tagText}>{skill}</Text></View>)}</View></Card>}
