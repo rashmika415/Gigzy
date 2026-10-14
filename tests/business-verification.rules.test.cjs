@@ -4,7 +4,7 @@ const fs = require('node:fs'); const path = require('node:path');
 const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
 const { doc, setDoc, updateDoc, getDoc, writeBatch, serverTimestamp } = require('firebase/firestore');
 test('verification rules isolate private requests and reserve decisions for admins', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async () => {
-  const env = await initializeTestEnvironment({ projectId: 'demo-gigzy-verification', firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') } });
+  const env = await initializeTestEnvironment({ projectId: 'demo-localworks-verification', firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') } });
   const db = uid => env.authenticatedContext(uid).firestore();
   const profile = { role: 'client', businessName: 'Cafe', fullName: 'Owner', email: 'owner@example.com', phone: '123', address: 'Colombo', businessCategory: 'Cafe', businessDetails: 'Local cafe' };
   try {

@@ -31,7 +31,7 @@ function LocationMapContent({ point, onChange, disabled, compact }: LocationMapP
   const receive = useCallback((value: unknown) => {
     if (!value || typeof value !== 'object') return;
     const event = value as { channel?: string; type?: string; point?: Coordinates };
-    if (event.channel !== 'gigzy-map') return;
+    if (event.channel !== 'localworks-map') return;
     if (event.type === 'ready') {
       setReady(true);
       lastSent.current = latestPoint.current;

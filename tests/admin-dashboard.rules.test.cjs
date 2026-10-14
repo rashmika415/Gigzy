@@ -5,7 +5,7 @@ const path = require('node:path');
 const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
 const { doc, setDoc, updateDoc, deleteDoc, collection, getCountFromServer, getDocs, serverTimestamp, Timestamp } = require('firebase/firestore');
 test('admin dashboard rules isolate counts, suspension and gig moderation', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async () => {
-  const env = await initializeTestEnvironment({ projectId: 'demo-gigzy-admin', firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') } });
+  const env = await initializeTestEnvironment({ projectId: 'demo-localworks-admin', firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') } });
   try {
     await env.withSecurityRulesDisabled(async ctx => {
       for (const [uid, data] of Object.entries({

@@ -56,14 +56,19 @@ export default function ReportModal({
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Reset the form each time the sheet opens (deferred so it doesn't cascade renders).
   useEffect(() => {
-    if (visible) {
+    if (!visible) return;
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
       setReason(defaultReason || (targetType === 'no-show' ? 'no-show' : 'other'));
       setDetails('');
       setNote('');
       setErrorMsg('');
       setSubmitting(false);
-    }
+    });
+    return () => { active = false; };
   }, [visible, defaultReason, targetType]);
 
   const handleSubmit = async () => {
@@ -229,7 +234,7 @@ export default function ReportModal({
             <View style={styles.safetyBox}>
               <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
               <Text style={styles.safetyText}>
-                {t('Your report is confidential and sent directly to Gigzy moderators.')}
+                {t('Your report is confidential and sent directly to LocalWorks moderators.')}
               </Text>
             </View>
 

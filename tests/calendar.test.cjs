@@ -97,7 +97,7 @@ test('buildEventDescription formats gig details with compensation, counterpart, 
   assert.match(desc, /Youth Freelancer: Nimali Silva/);
   assert.match(desc, /Compensation: \$150 fixed/);
   assert.match(desc, /Location: Galle Road, Colombo 03/);
-  assert.match(desc, /Gigzy Youth Employment Platform/);
+  assert.match(desc, /LocalWorks Youth Employment Platform/);
 });
 
 test('buildGoogleCalendarUrl builds valid Google Calendar TEMPLATE URL', () => {
@@ -139,9 +139,9 @@ test('generateIcsContent generates valid RFC 5545 iCalendar content with alarms'
 
   assert.match(ics, /BEGIN:VCALENDAR/);
   assert.match(ics, /VERSION:2\.0/);
-  assert.match(ics, /PRODID:-\/\/Gigzy\/\/Youth Employment App\/\/EN/);
+  assert.match(ics, /PRODID:-\/\/LocalWorks\/\/Youth Employment App\/\/EN/);
   assert.match(ics, /BEGIN:VEVENT/);
-  assert.match(ics, /UID:gigzy-gig-999-app-888@gigzy\.app/);
+  assert.match(ics, /UID:localworks-gig-999-app-888@localworks\.app/);
   assert.match(ics, /SUMMARY:Gig: Website Bug Fix/);
   assert.match(ics, /LOCATION:Colombo Tech Hub/);
   assert.match(ics, /STATUS:CONFIRMED/);

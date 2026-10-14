@@ -7,7 +7,7 @@ const { doc, setDoc, getDoc, updateDoc, serverTimestamp, runTransaction } = requ
 
 test('free-plan announcements enforce recipient, real gig content and read preservation', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async () => {
   const env = await initializeTestEnvironment({
-    projectId: 'demo-gigzy-saved',
+    projectId: 'demo-localworks-saved',
     firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') },
   });
   try {

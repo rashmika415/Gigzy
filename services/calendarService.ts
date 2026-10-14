@@ -88,7 +88,7 @@ export function buildEventDescription(input: CalendarEventInput): string {
     lines.push(`Compensation: $${input.pay}${input.payType === 'hourly' ? '/hr' : ' fixed'}`);
   }
   if (input.location) lines.push(`Location: ${input.location}`);
-  lines.push('Coordinated via Gigzy Youth Employment Platform');
+  lines.push('Coordinated via LocalWorks Youth Employment Platform');
   return lines.join('\n');
 }
 
@@ -115,7 +115,7 @@ export function generateIcsContent(input: CalendarEventInput): string {
   const startIso = formatUtcIsoCompact(startDate);
   const endIso = formatUtcIsoCompact(endDate);
   const stampIso = formatUtcIsoCompact(new Date());
-  const uid = `gigzy-${input.gigId || 'event'}-${input.applicationId || Date.now()}@gigzy.app`;
+  const uid = `localworks-${input.gigId || 'event'}-${input.applicationId || Date.now()}@localworks.app`;
 
   const cleanTitle = (input.title.startsWith('Gig:') ? input.title : `Gig: ${input.title}`).replace(/[\r\n]/g, ' ');
   const cleanDesc = buildEventDescription(input).replace(/\n/g, '\\n');
@@ -124,7 +124,7 @@ export function generateIcsContent(input: CalendarEventInput): string {
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Gigzy//Youth Employment App//EN',
+    'PRODID:-//LocalWorks//Youth Employment App//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
@@ -139,7 +139,7 @@ export function generateIcsContent(input: CalendarEventInput): string {
     'BEGIN:VALARM',
     'TRIGGER:-PT60M',
     'ACTION:DISPLAY',
-    'DESCRIPTION:Reminder: Upcoming Gigzy gig',
+    'DESCRIPTION:Reminder: Upcoming LocalWorks gig',
     'END:VALARM',
     'END:VEVENT',
     'END:VCALENDAR',
@@ -171,14 +171,14 @@ async function getWritableCalendarId(): Promise<{ id: string; name: string } | n
     // On Android, if no writable calendar exists, create one
     if (Platform.OS === 'android') {
       const newCalId = await Calendar.createCalendarAsync({
-        title: 'Gigzy Gigs',
+        title: 'LocalWorks Gigs',
         color: '#087F73',
         entityType: Calendar.EntityTypes.EVENT,
-        name: 'GigzyCalendar',
+        name: 'LocalWorksCalendar',
         ownerAccount: 'personal',
         accessLevel: Calendar.CalendarAccessLevel.OWNER,
       });
-      return { id: newCalId, name: 'Gigzy Gigs' };
+      return { id: newCalId, name: 'LocalWorks Gigs' };
     }
 
     return null;

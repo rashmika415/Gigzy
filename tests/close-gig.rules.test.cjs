@@ -8,7 +8,7 @@ const { doc, setDoc, getDoc, getDocs, collection, query, where, updateDoc, serve
 
 test('closing gigs enforces ownership and prevents new applicants', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async () => {
   const environment = await initializeTestEnvironment({
-    projectId: 'demo-gigzy-close',
+    projectId: 'demo-localworks-close',
     firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') },
   });
   try {

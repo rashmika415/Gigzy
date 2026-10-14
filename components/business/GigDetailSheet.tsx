@@ -17,12 +17,14 @@ interface GigDetailSheetProps {
   onEdit: (gig: Gig) => void;
   onChangeStatus: (gig: Gig) => void;
   onApplicants: (gig: Gig) => void;
+  /** Report the hired freelancer; shown once someone is hired */
+  onReport?: (gig: Gig) => void;
 }
 
 const LOCATION_LABEL: Record<string, string> = { remote: 'Remote', 'on-site': 'On-site', hybrid: 'Hybrid' };
 
 /** Read-only summary of a posted gig with the owner's main actions pinned to the bottom. */
-export default function GigDetailSheet({ gig, onClose, onEdit, onChangeStatus, onApplicants }: GigDetailSheetProps) {
+export default function GigDetailSheet({ gig, onClose, onEdit, onChangeStatus, onApplicants, onReport }: GigDetailSheetProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   if (!gig) return null;
@@ -96,6 +98,13 @@ export default function GigDetailSheet({ gig, onClose, onEdit, onChangeStatus, o
               <Text style={styles.secondaryText}>{t('Change status')}</Text>
             </Pressable>
           </View>
+          {!!onReport && !!gig.assignedYouthId && (
+            <Pressable onPress={() => onReport(gig)} accessibilityRole="button"
+              style={({ pressed }) => [styles.reportLink, pressed && styles.pressed]}>
+              <Ionicons name="flag-outline" size={16} color={colors.error} />
+              <Text style={styles.reportText}>{t('Report Freelancer')}</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </View>
@@ -132,5 +141,7 @@ const styles = StyleSheet.create({
   primaryText: { ...typography.title, fontSize: 15, color: colors.primaryOnColor },
   secondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
   secondaryText: { ...typography.title, fontSize: 15, color: colors.primary },
+  reportLink: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs + 2 },
+  reportText: { ...typography.label, color: colors.error },
   pressed: { opacity: 0.8 },
 });

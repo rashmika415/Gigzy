@@ -1,4 +1,4 @@
-// Shared warm-white and teal design tokens for Gigzy.
+// Shared warm-white and teal design tokens for LocalWorks.
 
 export const colors = {
   background: '#F7F8F8',

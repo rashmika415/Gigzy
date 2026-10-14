@@ -75,7 +75,7 @@ export async function submitReport(input: CreateReportInput): Promise<string> {
 
   // Fetch reporter profile data if available
   let reporterRole: 'client' | 'freelancer' | 'admin' = 'freelancer';
-  let reporterName = actor.displayName || 'Gigzy Member';
+  let reporterName = actor.displayName || 'LocalWorks Member';
 
   try {
     const userSnap = await getDoc(doc(db, 'users', actor.uid));
@@ -330,7 +330,7 @@ export async function resolveReport(input: ResolveReportInput): Promise<void> {
         title: input.action === 'dismissed' ? 'Report reviewed' : 'Report resolved',
         body: input.action === 'dismissed'
           ? 'Our moderation team reviewed your report and determined no further action is required at this time.'
-          : 'Our moderation team has investigated your report and taken appropriate action. Thank you for helping keep Gigzy safe.',
+          : 'Our moderation team has investigated your report and taken appropriate action. Thank you for helping keep LocalWorks safe.',
         read: false,
         createdAt: now,
       });

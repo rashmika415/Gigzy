@@ -58,6 +58,17 @@ export function ApplicationStatusPill({ status }: { status: Application['status'
   </View>;
 }
 
+/** Accepted, in progress or done. Older documents may say "approved" or "in-progress". */
+export function isHiredStatus(status: unknown): boolean {
+  return ['accepted', 'approved', 'in-progress', 'completed'].includes(String(status || '').toLowerCase());
+}
+
+/** Some older documents store a user reference object instead of the uid string. */
+export function uidOf(value: unknown): string {
+  if (value && typeof value === 'object') return String((value as any).uid || (value as any).id || '');
+  return String(value || '');
+}
+
 export function toDate(timestamp: any): Date | null {
   if (!timestamp) return null;
   const date = timestamp?.toDate ? timestamp.toDate() : timestamp?.toMillis ? new Date(timestamp.toMillis()) : new Date(timestamp);

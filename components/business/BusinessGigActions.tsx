@@ -12,10 +12,12 @@ interface BusinessGigActionsProps {
   onDelete: (gig: Gig) => void;
   /** Shown once a freelancer is hired */
   onRate?: (gig: Gig) => void;
+  /** Report the hired freelancer; shown once someone is hired */
+  onReport?: (gig: Gig) => void;
 }
 
-/** Owner's action row under a posted gig: Applicants (n) · Edit · [Rate] · Delete. */
-export default function BusinessGigActions({ gig, onApplicants, onEdit, onDelete, onRate }: BusinessGigActionsProps) {
+/** Owner's action row under a posted gig: Applicants (n) · Edit · [Rate] · [Report] · Delete. */
+export default function BusinessGigActions({ gig, onApplicants, onEdit, onDelete, onRate, onReport }: BusinessGigActionsProps) {
   const { t } = useTranslation();
   const canRate = !!onRate && !!gig.assignedYouthId && (gig.status === 'in-progress' || gig.status === 'completed');
   return <View style={styles.row}>
@@ -33,6 +35,12 @@ export default function BusinessGigActions({ gig, onApplicants, onEdit, onDelete
       <Pressable onPress={() => onRate!(gig)} accessibilityRole="button" accessibilityLabel={t('Rate Freelancer')}
         style={({ pressed }) => [styles.icon, pressed && styles.pressed]}>
         <Ionicons name="star-outline" size={18} color={colors.star} />
+      </Pressable>
+    )}
+    {!!onReport && !!gig.assignedYouthId && (
+      <Pressable onPress={() => onReport(gig)} accessibilityRole="button" accessibilityLabel={t('Report Freelancer')}
+        style={({ pressed }) => [styles.icon, pressed && styles.pressed]}>
+        <Ionicons name="flag-outline" size={18} color={colors.error} />
       </Pressable>
     )}
     <Pressable onPress={() => onDelete(gig)} accessibilityRole="button" accessibilityLabel={t('Delete gig')}

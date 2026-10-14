@@ -1,6 +1,6 @@
 # Language support
 
-Gigzy offers English, Sinhala and Tamil. Choose a language on the welcome or authentication screens, or in Profile. The interface updates immediately and the preference is saved on this device with AsyncStorage (`gigzy.language`). At startup a saved preference wins; otherwise the first supported device language is used, with English as the fallback.
+LocalWorks offers English, Sinhala and Tamil. Choose a language on the welcome or authentication screens, or in Profile. The interface updates immediately and the preference is saved on this device with AsyncStorage (`localworks.language`). At startup a saved preference wins; otherwise the first supported device language is used, with English as the fallback.
 
 Translations are bundled in `locales/en.json`, `locales/si.json` and `locales/ta.json`, so changing language does not need a network request. `localization/LanguageProvider.tsx` restores preferences before displaying the app. A failed save keeps the selected language active and shows a retry message beside the selector. A later device-language change is picked up on the next startup when no manual preference is saved.
 

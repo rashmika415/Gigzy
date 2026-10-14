@@ -163,7 +163,7 @@ export default function RatingModal({
 
       toast.success(
         t('Review Submitted! ⭐'),
-        t('Thank you for rating {{name}}. Your feedback helps keep the Gigzy community trusted and safe.', {
+        t('Thank you for rating {{name}}. Your feedback helps keep the LocalWorks community trusted and safe.', {
           name: targetUserName,
         })
       );
