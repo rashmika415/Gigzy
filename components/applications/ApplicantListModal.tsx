@@ -15,6 +15,7 @@ import ApplicantCard from './ApplicantCard';
 import ApplicantDetailModal from './ApplicantDetailModal';
 import CelebrationModal from './CelebrationModal';
 import useApplicantDecision from './useApplicantDecision';
+import { RatingModal } from '../reviews';
 
 interface ApplicantListModalProps {
   visible: boolean;
@@ -50,6 +51,9 @@ export default function ApplicantListModal({
 
   // Hiring someone shows the celebration (with calendar + chat shortcuts) on top of this list.
   const { request, busyId, sheet } = useApplicantDecision(businessId, { onAccepted: app => { setSelectedId(null); setHired(app); } });
+  const [selectedApplicant, setSelectedApplicant] = useState<Application | null>(null);
+  const [selectedApplicantForRating, setSelectedApplicantForRating] = useState<Application | null>(null);
+  const [acceptedCelebrationApp, setAcceptedCelebrationApp] = useState<Application | null>(null);
 
   useEffect(() => {
     if (!visible || !gigId) return;
@@ -123,6 +127,17 @@ export default function ApplicantListModal({
               onAccept={() => request(item, 'accept')}
               onReject={() => request(item, 'reject')} />}
             ItemSeparatorComponent={() => <View style={styles.separator} />}
+            data={filteredApplicants}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <ApplicantCard
+                application={item}
+                onPress={() => setSelectedApplicant(item)}
+                onAccept={() => handleQuickAccept(item)}
+                onReject={() => handleQuickReject(item)}
+                onRate={() => setSelectedApplicantForRating(item)}
+              />
+            )}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           />
@@ -136,6 +151,28 @@ export default function ApplicantListModal({
           onAccepted={app => { setSelectedId(null); setHired(app); }}
         />
 
+        {/* Rating Modal for Accepted Youth Freelancer */}
+        {selectedApplicantForRating && (
+          <RatingModal
+            visible={!!selectedApplicantForRating}
+            targetUserId={
+              typeof selectedApplicantForRating.youthId === 'object' && selectedApplicantForRating.youthId !== null
+                ? (selectedApplicantForRating.youthId as any).uid || (selectedApplicantForRating.youthId as any).id || ''
+                : String(selectedApplicantForRating.youthId || '')
+            }
+            targetUserName={selectedApplicantForRating.youthName || tr('Youth Freelancer')}
+            targetUserPhotoURL={selectedApplicantForRating.youthPhotoURL}
+            targetRole="freelancer"
+            gigId={selectedApplicantForRating.gigId || gigId}
+            gigTitle={selectedApplicantForRating.gigTitle || gigTitle}
+            onClose={() => setSelectedApplicantForRating(null)}
+            onSuccess={() => {
+              setSelectedApplicantForRating(null);
+            }}
+          />
+        )}
+
+        {/* Celebration Modal on Gig Acceptance */}
         <CelebrationModal
           visible={!!hired}
           youthName={hired?.youthName || t('Youth Freelancer')}

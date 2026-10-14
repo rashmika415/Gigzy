@@ -1,4 +1,5 @@
 import BusinessVerificationPanel from './BusinessVerificationPanel';
+import ModerationQueuePanel from './ModerationQueuePanel';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,10 +19,11 @@ import type { Application } from '../../types/application';
 import { formatDate } from '../../localization/format';
 import type { Gig } from '../../types/gig';
 
-type Panel = 'overview' | 'users' | 'gigs' | 'applications' | 'verification' | 'notifications';
+type Panel = 'overview' | 'users' | 'gigs' | 'applications' | 'verification' | 'notifications' | 'moderation';
 type Action = { kind: 'remove'; id: string; name: string };
 const PANELS: { key: Panel; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'verification', label: 'Business verification', icon: 'shield-checkmark-outline' },
+  { key: 'moderation', label: 'Moderation queue', icon: 'flag-outline' },
   { key: 'overview', label: 'Overview', icon: 'grid-outline' },
   { key: 'users', label: 'Users', icon: 'people-outline' },
   { key: 'gigs', label: 'Gigs', icon: 'briefcase-outline' },
@@ -158,7 +160,7 @@ export default function AdminDashboardScreen() {
             <Text style={styles.statValue}>{statsError ? '—' : stats ? stats[card.key].toLocaleString() : '…'}</Text><Text style={styles.secondary}>{t(card.label)}</Text>
           </TouchableOpacity>)}</View>
           {!!statsError && <View style={styles.errorBox}><Text accessibilityRole="alert" style={styles.error}>{t('Could not load platform statistics.')}</Text><Button title={t('Retry')} onPress={refresh} /></View>}
-          {panel === 'verification' ? <BusinessVerificationPanel /> : panel === 'overview' ? <>
+          {panel === 'verification' ? <BusinessVerificationPanel /> : panel === 'moderation' ? <ModerationQueuePanel /> : panel === 'overview' ? <>
             <View style={styles.section}><Text style={styles.sectionTitle}>{t('Community overview')}</Text>
               {statsLoading && !stats ? <ActivityIndicator color={colors.primary} /> : statsError ? <Text style={styles.secondary}>{t('Refresh to load current totals.')}</Text> : stats && <>
                 <SummaryRow label={t('Youth')} value={stats.youth} total={stats.users} /><SummaryRow label={t('Businesses')} value={stats.businesses} total={stats.users} />
@@ -166,7 +168,7 @@ export default function AdminDashboardScreen() {
               </>}
             </View>
             <View style={styles.section}><Text style={styles.sectionTitle}>{t('Quick actions')}</Text><View style={styles.actions}>
-              <Button title={t('Manage users')} icon="people-outline" onPress={() => selectPanel('users')} primary /><Button title={t('Manage gigs')} icon="briefcase-outline" onPress={() => selectPanel('gigs')} />
+              <Button title={t('Moderation queue')} icon="flag-outline" onPress={() => selectPanel('moderation')} primary /><Button title={t('Manage users')} icon="people-outline" onPress={() => selectPanel('users')} /><Button title={t('Manage gigs')} icon="briefcase-outline" onPress={() => selectPanel('gigs')} />
               <Button title={t('Send announcement')} icon="notifications-outline" onPress={() => selectPanel('notifications')} />
             </View><Text style={styles.secondary}>{t('Suspend accounts or remove gigs from discovery with a recorded reason.')}</Text></View>
           </> : panel === 'notifications' ? <AdminNotificationPanel /> : <View style={styles.section}>

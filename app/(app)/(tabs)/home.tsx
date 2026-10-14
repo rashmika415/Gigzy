@@ -14,7 +14,7 @@ import { colors, spacing, borderRadius, fonts, typography } from '../../../const
 import { formatNumber } from '../../../localization/format';
 import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig, updateGigStatus } from '../../../services/gigService';
 import { subscribeToUserChats, getOrCreateChat } from '../../../services/chatService';
-import { subscribeToMyApplications } from '../../../services/applicationService';
+import { subscribeToMyApplications, getApplicantsForGig } from '../../../services/applicationService';
 import { addGigToCalendar } from '../../../services/calendarService';
 import { Gig } from '../../../types/gig';
 import type { Application } from '../../../types/application';
@@ -27,6 +27,7 @@ import { useToast } from '../../../context/ToastContext';
 import ApplyModal from '../../../components/applications/ApplyModal';
 import { ApplicantListModal, ApplicationCard, ApplicationDetailModal } from '../../../components/applications';
 import { RatingModal } from '../../../components/reviews';
+import { ReportModal } from '../../../components/reports';
 import { hasUserReviewedGig } from '../../../services/reviewService';
 import ConfirmSheet from '../../../components/ConfirmSheet';
 import BusinessGigActions from '../../../components/business/BusinessGigActions';
@@ -65,6 +66,14 @@ export default function Home() {
     gigId: string;
     gigTitle: string;
   } | null>(null);
+  const [reportTarget, setReportTarget] = useState<{
+    targetType: 'user' | 'gig' | 'no-show';
+    targetId: string;
+    targetUserId?: string;
+    targetUserName?: string;
+    targetGigId?: string;
+    targetGigTitle?: string;
+  } | null>(null);
   const [reviewedGigIds, setReviewedGigIds] = useState<Record<string, boolean>>({});
 
   const totalApplicants = useMemo(
@@ -78,7 +87,7 @@ export default function Home() {
   );
 
   const inProgressGigs = useMemo(
-    () => (isClient ? gigs.filter((g) => g.status === 'in-progress' || g.status === 'completed') : []),
+    () => (isClient ? gigs.filter((g) => g.status === 'in-progress' || g.status === 'completed' || Boolean(g.assignedYouthId)) : []),
     [gigs, isClient]
   );
 
@@ -135,9 +144,21 @@ export default function Home() {
 
       if (isClient) {
         for (const gig of inProgressGigs) {
-          if (gig.assignedYouthId && gig.id) {
+          let youthId = gig.assignedYouthId;
+          if (!youthId && gig.id) {
             try {
-              const reviewed = await hasUserReviewedGig(user.uid, gig.assignedYouthId, gig.id);
+              const apps = await getApplicantsForGig(gig.id, user.uid);
+              const accepted = apps.find(a => ['accepted', 'approved', 'in-progress', 'completed'].includes(String(a.status || '').toLowerCase()));
+              if (accepted) {
+                youthId = typeof accepted.youthId === 'object' && accepted.youthId !== null
+                  ? (accepted.youthId as any).uid || (accepted.youthId as any).id || ''
+                  : String(accepted.youthId || '');
+              }
+            } catch {}
+          }
+          if (youthId && gig.id) {
+            try {
+              const reviewed = await hasUserReviewedGig(user.uid, youthId, gig.id);
               if (reviewed) results[gig.id] = true;
             } catch {}
           }
@@ -351,12 +372,39 @@ export default function Home() {
     }
   };
 
-  const handleRateFreelancer = (gig: Gig) => {
-    if (!gig.assignedYouthId) return;
+  const handleRateFreelancer = async (gig: Gig) => {
+    let youthId = gig.assignedYouthId;
+    let youthName = gig.assignedYouthName;
+    let youthPhoto = gig.assignedYouthPhotoURL;
+
+    if (!youthId && gig.id) {
+      try {
+        const apps = await getApplicantsForGig(gig.id, user?.uid);
+        const acceptedApp = apps.find((a) =>
+          ['accepted', 'approved', 'in-progress', 'completed'].includes(
+            String(a.status || '').toLowerCase()
+          )
+        );
+        if (acceptedApp) {
+          youthId =
+            typeof acceptedApp.youthId === 'object' && acceptedApp.youthId !== null
+              ? (acceptedApp.youthId as any).uid || (acceptedApp.youthId as any).id || ''
+              : String(acceptedApp.youthId || '');
+          youthName = youthName || acceptedApp.youthName;
+          youthPhoto = youthPhoto || acceptedApp.youthPhotoURL;
+        }
+      } catch {}
+    }
+
+    if (!youthId) {
+      toast.info(tr("Freelancer information unavailable."));
+      return;
+    }
+
     setRatingTarget({
-      userId: gig.assignedYouthId,
-      userName: gig.assignedYouthName || 'Youth Freelancer',
-      userPhotoURL: gig.assignedYouthPhotoURL,
+      userId: youthId,
+      userName: youthName || tr("Youth Freelancer"),
+      userPhotoURL: youthPhoto,
       targetRole: 'freelancer',
       gigId: gig.id,
       gigTitle: gig.title,
@@ -364,6 +412,96 @@ export default function Home() {
   };
 
   const handleCompleteGig = (gig: Gig) => { setConfirmError(''); setConfirmAction({ kind: 'complete', gig }); };
+  const handleReportGig = async (gig: Gig) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    let youthId = gig.assignedYouthId;
+    let youthName = gig.assignedYouthName;
+
+    if (!youthId && gig.id) {
+      try {
+        const apps = await getApplicantsForGig(gig.id, user?.uid);
+        const acceptedApp = apps.find((a) =>
+          ['accepted', 'approved', 'in-progress', 'completed'].includes(
+            String(a.status || '').toLowerCase()
+          )
+        );
+        if (acceptedApp) {
+          youthId =
+            typeof acceptedApp.youthId === 'object' && acceptedApp.youthId !== null
+              ? (acceptedApp.youthId as any).uid || (acceptedApp.youthId as any).id || ''
+              : String(acceptedApp.youthId || '');
+          youthName = youthName || acceptedApp.youthName;
+        }
+      } catch {}
+    }
+
+    if (youthId) {
+      setReportTarget({
+        targetType: 'user',
+        targetId: youthId,
+        targetUserId: youthId,
+        targetUserName: youthName || tr("Assigned Freelancer"),
+        targetGigId: gig.id,
+        targetGigTitle: gig.title,
+      });
+    } else {
+      setReportTarget({
+        targetType: 'gig',
+        targetId: gig.id,
+        targetGigId: gig.id,
+        targetGigTitle: gig.title,
+      });
+    }
+  };
+
+  const handleRateClient = (app: Application) => {
+    if (!app.businessId) return;
+    setRatingTarget({
+      userId: app.businessId,
+      userName: app.businessName || 'Business Owner',
+      targetRole: 'client',
+      gigId: app.gigId,
+      gigTitle: app.gigTitle || '',
+    });
+  };
+
+  const handleCompleteGig = (gig: Gig) => {
+    Alert.alert(
+      tr("Mark as Completed"),
+      tr("Are you sure you want to mark \"{{value0}}\" as completed? You can then rate and review the freelancer.", { value0: gig.title }),
+      [
+        { text: tr("Cancel"), style: 'cancel' },
+        {
+          text: tr("Complete Gig"),
+          style: 'default',
+          onPress: async () => {
+            try {
+              await updateGigStatus(gig.id, 'completed');
+              try {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } catch {}
+              toast.success(tr("Gig Marked as Completed! 🎉"), tr("Thank you! Please leave a review for the freelancer."));
+              if (gig.assignedYouthId) {
+                setRatingTarget({
+                  userId: gig.assignedYouthId,
+                  userName: gig.assignedYouthName || 'Youth Freelancer',
+                  userPhotoURL: gig.assignedYouthPhotoURL,
+                  targetRole: 'freelancer',
+                  gigId: gig.id,
+                  gigTitle: gig.title,
+                });
+              }
+            } catch (err: any) {
+              toast.error(tr("Failed to update gig status."), err.message);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const getRoleLabel = () => {
     if (role === 'admin') return 'Platform Admin';
@@ -398,6 +536,71 @@ export default function Home() {
     isClient ? (
       <BusinessGigActions gig={gig} onApplicants={setSelectedGigForApplicants}
         onEdit={target => tap(() => editGig(target))()} onDelete={handleDeleteGig} />
+      <View style={styles.actionsRow}>
+        <TouchableOpacity
+          style={[
+            styles.primaryAction,
+            {
+              backgroundColor: (gig.applicantsCount || 0) > 0 ? colors.primary : colors.surface,
+              borderWidth: 1,
+              borderColor: (gig.applicantsCount || 0) > 0 ? colors.primary : colors.surfaceBorder,
+              paddingHorizontal: spacing.md,
+            },
+          ]}
+          onPress={() => setSelectedGigForApplicants(gig)}
+          accessibilityRole="button"
+          accessibilityLabel={tr("Applicants")}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="people"
+            size={16}
+            color={(gig.applicantsCount || 0) > 0 ? colors.primaryOnColor : colors.primary}
+          />
+          <Text
+            style={[
+              styles.primaryActionText,
+              {
+                color: (gig.applicantsCount || 0) > 0 ? colors.primaryOnColor : colors.primary,
+                fontFamily: fonts.bodySemiBold,
+              },
+            ]}
+          >
+            {tr("Applicants")} ({gig.applicantsCount || 0})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryAction}
+          onPress={tap(() => editGig(gig))}
+          accessibilityRole="button"
+          accessibilityLabel={tr("Edit gig")}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="create-outline" size={17} color={colors.primary} />
+          <Text style={styles.secondaryActionText}>{tr("Edit")}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.reportIconAction}
+          onPress={() => handleReportGig(gig)}
+          accessibilityRole="button"
+          accessibilityLabel={tr("Report")}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="flag-outline" size={17} color={colors.error} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.iconAction}
+          onPress={() => handleDeleteGig(gig.id, gig.title)}
+          accessibilityRole="button"
+          accessibilityLabel={tr("Delete gig")}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="trash-outline" size={18} color={colors.error} />
+        </TouchableOpacity>
+      </View>
     ) : (
       <View style={styles.actionsRow}>
         <TouchableOpacity
@@ -600,6 +803,172 @@ export default function Home() {
                   onRate={handleRateFreelancer}
                 />
               ))}
+
+            <Text style={styles.inProgressSectionSubtitle}>
+              {tr("Talent is actively working on these projects. Coordinate, track progress, or mark as completed.")}
+            </Text>
+
+            <View style={styles.inProgressList}>
+              {inProgressGigs.map((gig) => {
+                const isAddingCal = calendarAddingGigId === gig.id;
+                const isAddedCal = !!calendarAddedGigIds[gig.id];
+                const isCompleted = gig.status === 'completed';
+                const hasReviewed = !!reviewedGigIds[gig.id];
+
+                return (
+                  <View key={gig.id} style={styles.projectCard}>
+                    {/* Top status bar with "You Accepted ✓" or "Completed 🎉" status */}
+                    <View style={styles.projectTopRow}>
+                      <View style={[
+                        styles.youAcceptedStatusPill,
+                        isCompleted && { backgroundColor: colors.successLight, borderColor: colors.successBorder },
+                      ]}>
+                        <Ionicons
+                          name={isCompleted ? "checkmark-done-circle" : "checkmark-circle"}
+                          size={14}
+                          color={colors.success}
+                        />
+                        <Text style={[styles.youAcceptedStatusText, isCompleted && { color: colors.success }]}>
+                          {isCompleted ? tr("Completed 🎉") : tr("You Accepted ✓")}
+                        </Text>
+                      </View>
+                      <View style={styles.projectTopRight}>
+                        <Text style={styles.projectPayText}>
+                          {formatCurrency(gig.pay || 0)}{gig.payType === 'hourly' ? tr('/hr') : tr(' fixed')}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.projectReportIconBtn}
+                          onPress={() => handleReportGig(gig)}
+                          activeOpacity={0.75}
+                          accessibilityRole="button"
+                          accessibilityLabel={tr("Report")}
+                        >
+                          <Ionicons name="flag-outline" size={16} color={colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Title */}
+                    <TouchableOpacity onPress={() => openGig(gig)} activeOpacity={0.85}>
+                      <Text style={styles.projectTitle} numberOfLines={2}>
+                        {gig.title}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Assigned Youth Freelancer Banner */}
+                    <View style={styles.talentBox}>
+                      <View style={styles.talentAvatarWrap}>
+                        {gig.assignedYouthPhotoURL ? (
+                          <Image source={{ uri: gig.assignedYouthPhotoURL }} style={styles.talentAvatar} contentFit="cover" />
+                        ) : (
+                          <View style={styles.talentAvatarFallback}>
+                            <Text style={styles.talentAvatarInitials}>
+                              {((gig.assignedYouthName || 'F')[0] || 'F').toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.talentInfo}>
+                        <View style={styles.talentNameRow}>
+                          <Text style={styles.talentName} numberOfLines={1}>
+                            {gig.assignedYouthName || tr("Assigned Freelancer")}
+                          </Text>
+                          <View style={styles.talentBadge}>
+                            <Ionicons name="checkmark-circle" size={12} color={colors.success} />
+                            <Text style={styles.talentBadgeText}>{tr("Hired")}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.talentSub}>
+                          {tr("Assigned youth talent for this gig")}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Schedule & Location Meta */}
+                    <View style={styles.projectMetaRow}>
+                      {gig.date ? (
+                        <View style={styles.projectMetaItem}>
+                          <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
+                          <Text style={styles.projectMetaText} numberOfLines={1}>
+                            {formatCalendarDate(gig.date)}{gig.time ? ` at ${gig.time}` : ''}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {gig.location ? (
+                        <View style={styles.projectMetaItem}>
+                          <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
+                          <Text style={styles.projectMetaText} numberOfLines={1}>
+                            {gig.location}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+
+                    {/* Real Project Actions */}
+                    <View style={styles.projectActionsGrid}>
+                      <TouchableOpacity
+                        style={styles.projectPrimaryAction}
+                        onPress={() => handleMessageAssignedFreelancer(gig)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="chatbubbles" size={16} color={colors.primaryOnColor} />
+                        <Text style={styles.projectPrimaryActionText}>{tr("Message Freelancer")}</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.projectSecondaryAction, isAddedCal && styles.projectCalendarAddedAction]}
+                        onPress={() => handleAddToCalendar(gig)}
+                        disabled={isAddingCal || isAddedCal}
+                        activeOpacity={0.85}
+                      >
+                        {isAddingCal ? (
+                          <ActivityIndicator size="small" color={colors.primary} />
+                        ) : (
+                          <>
+                            <Ionicons
+                              name={isAddedCal ? "checkmark-circle" : "calendar-outline"}
+                              size={16}
+                              color={isAddedCal ? colors.success : colors.primary}
+                            />
+                            <Text style={[styles.projectSecondaryActionText, isAddedCal && { color: colors.success }]}>
+                              {isAddedCal ? tr("Scheduled ✓") : tr("Calendar")}
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+
+                      {hasReviewed ? (
+                        <View style={styles.projectRatedAction}>
+                          <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                          <Text style={styles.projectRatedActionText}>{tr("Reviewed ✓")}</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.projectRateNowAction}
+                          onPress={() => handleRateFreelancer(gig)}
+                          activeOpacity={0.85}
+                          accessibilityRole="button"
+                          accessibilityLabel={tr("Rate Freelancer")}
+                        >
+                          <Ionicons name="star" size={16} color={colors.star} />
+                          <Text style={styles.projectRateNowActionText}>{tr("Rate Freelancer")}</Text>
+                        </TouchableOpacity>
+                      )}
+
+                      <TouchableOpacity
+                        style={styles.projectReportAction}
+                        onPress={() => handleReportGig(gig)}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                        accessibilityLabel={tr("Report Freelancer")}
+                      >
+                        <Ionicons name="flag-outline" size={16} color={colors.error} />
+                        <Text style={styles.projectReportActionText}>{tr("Report")}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           </View>
         )}
@@ -757,7 +1126,23 @@ export default function Home() {
               setReviewedGigIds((prev) => ({ ...prev, [ratingTarget.gigId]: true }));
             }
             setRatingTarget(null);
-            toast.success(tr("Review Submitted! 🌟"), tr("Thank you for sharing your feedback."));
+          }}
+        />
+      )}
+
+      {reportTarget && (
+        <ReportModal
+          visible={Boolean(reportTarget)}
+          targetType={reportTarget.targetType}
+          targetId={reportTarget.targetId}
+          targetUserId={reportTarget.targetUserId}
+          targetUserName={reportTarget.targetUserName}
+          targetGigId={reportTarget.targetGigId}
+          targetGigTitle={reportTarget.targetGigTitle}
+          onClose={() => setReportTarget(null)}
+          onSuccess={() => {
+            setReportTarget(null);
+            toast.success(tr("Report submitted"), tr("Our moderation team will review this report shortly."));
           }}
         />
       )}
@@ -1047,6 +1432,111 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   inlineError: {
+  iconAction: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.errorLight,
+    borderRadius: borderRadius.md,
+  },
+  reportIconAction: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+    borderRadius: borderRadius.md,
+  },
+  acceptedSectionContainer: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  acceptedSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  acceptedTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  acceptedSectionTitle: {
+    fontSize: 16,
+    fontFamily: fonts.bodyBold,
+    color: colors.success,
+  },
+  acceptedViewAllText: {
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+    color: colors.primary,
+  },
+  acceptedGigCard: {
+    backgroundColor: colors.successLight,
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.successBorder,
+    marginBottom: spacing.sm,
+  },
+  acceptedCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  acceptedStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.successLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.successBorder,
+  },
+  acceptedStatusText: {
+    fontSize: 11,
+    fontFamily: fonts.bodyBold,
+    color: colors.success,
+  },
+  acceptedPayText: {
+    fontSize: 15,
+    fontFamily: fonts.bodyBold,
+    color: colors.success,
+  },
+  acceptedGigTitle: {
+    fontSize: 16,
+    fontFamily: fonts.bodyBold,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  acceptedBusinessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: spacing.md,
+  },
+  acceptedBusinessText: {
+    fontSize: 13,
+    fontFamily: fonts.bodyMedium,
+    color: colors.textSecondary,
+  },
+  acceptedDot: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  acceptedLocationText: {
+    fontSize: 12,
+    fontFamily: fonts.bodyMedium,
+    color: colors.textMuted,
+  },
+  acceptedActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -1054,6 +1544,192 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.md,
     backgroundColor: colors.errorLight,
+  },
+  acceptedChatBtnText: {
+    color: colors.primaryOnColor,
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+  },
+  acceptedDetailsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: borderRadius.md,
+  },
+  acceptedDetailsBtnText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontFamily: fonts.bodySemiBold,
+  },
+  acceptedRateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: colors.warningLight,
+    borderWidth: 1,
+    borderColor: colors.warningBorder,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: borderRadius.md,
+  },
+  acceptedRateBtnText: {
+    color: colors.warning,
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+  },
+  acceptedRatedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: colors.warningLight,
+    borderWidth: 1,
+    borderColor: colors.warningBorder,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: borderRadius.md,
+  },
+  acceptedRatedBadgeText: {
+    color: colors.warning,
+    fontSize: 12,
+    fontFamily: fonts.bodyBold,
+  },
+
+  // Active in-progress gigs (Business Owner)
+  inProgressSectionContainer: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  inProgressSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  inProgressTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pulseDotWrap: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.accent,
+  },
+  inProgressSectionTitle: {
+    fontSize: 18,
+    fontFamily: fonts.bodyBold,
+    color: colors.text,
+  },
+  inProgressViewAllText: {
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+    color: colors.primary,
+  },
+  inProgressSectionSubtitle: {
+    fontSize: 13,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  inProgressList: {
+    gap: spacing.md,
+  },
+  projectCard: {
+    backgroundColor: colors.successLight,
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.successBorder,
+    marginBottom: spacing.sm,
+  },
+  projectTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  projectTopRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  projectReportIconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  youAcceptedStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.successLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    borderWidth: 1.5,
+    borderColor: colors.successBorder,
+  },
+  youAcceptedStatusText: {
+    fontSize: 12,
+    fontFamily: fonts.bodyBold,
+    color: colors.success,
+  },
+  projectStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.accentLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  projectStatusText: {
+    fontSize: 12,
+    fontFamily: fonts.bodyBold,
+    color: colors.accent,
+  },
+  projectPayText: {
+    fontSize: 16,
+    fontFamily: fonts.bodyBold,
+    color: colors.accent,
+  },
+  projectTitle: {
+    fontSize: 17,
+    fontFamily: fonts.bodyBold,
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  talentBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.surface,
+    padding: spacing.sm,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.errorBorder,
   },
@@ -1065,5 +1741,111 @@ const styles = StyleSheet.create({
   inlineErrorAction: {
     ...typography.label,
     color: colors.error,
+  projectCompleteActionText: {
+    color: colors.success,
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+  },
+  projectRateNowAction: {
+    flex: 1.4,
+    minWidth: 130,
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.warningLight,
+    borderWidth: 1.5,
+    borderColor: colors.warningBorder,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  projectRateNowActionText: {
+    color: colors.warning,
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+  },
+  projectRatedAction: {
+    flex: 1.2,
+    minWidth: 110,
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: colors.successLight,
+    borderWidth: 1.5,
+    borderColor: colors.success,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  projectRatedActionText: {
+    color: colors.success,
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+  },
+  projectReportAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    minHeight: 40,
+    paddingHorizontal: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+    borderRadius: borderRadius.md,
+  },
+  projectReportActionText: {
+    color: colors.error,
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+  },
+  allAssignedCard: {
+    backgroundColor: colors.successLight,
+    borderWidth: 1.5,
+    borderColor: colors.successBorder,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    textAlign: 'center',
+  },
+  allAssignedIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.successLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  allAssignedTitle: {
+    fontSize: 17,
+    fontFamily: fonts.bodyBold,
+    color: colors.success,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  allAssignedSubtitle: {
+    fontSize: 13,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    lineHeight: 18,
+  },
+  postAnotherBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+  },
+  postAnotherBtnText: {
+    color: colors.primaryOnColor,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold,
   },
 });

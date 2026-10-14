@@ -42,6 +42,7 @@ const normalizedStatus = (app: Application) => {
 };
 
 type Decision = { app: Application; action: 'accept' | 'reject' };
+import { RatingModal } from '../../components/reviews';
 
 export default function MyApplicationsScreen() {
   const { t } = useTranslation();
@@ -60,6 +61,8 @@ export default function MyApplicationsScreen() {
   const [decision, setDecision] = useState<Decision | null>(null);
   const [deciding, setDeciding] = useState(false);
   const [decisionError, setDecisionError] = useState('');
+  const [selectedApplicantForRating, setSelectedApplicantForRating] = useState<Application | null>(null);
+  const [acceptedCelebrationApp, setAcceptedCelebrationApp] = useState<Application | null>(null);
 
   // Real-time sync. `attempt` restarts the listener when the user taps Retry.
   useEffect(() => {
@@ -235,6 +238,102 @@ export default function MyApplicationsScreen() {
       </View>
 
       <View style={styles.flex}>{renderBody()}</View>
+      {/* Content Body */}
+      {loading ? (
+        <View style={styles.centerBox}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>
+            {isBusiness ? tr("Syncing received applications...") : tr("Syncing your applications...")}
+          </Text>
+        </View>
+      ) : errorMsg ? (
+        <View style={styles.centerBox}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
+          <Text style={styles.errorTitle}>{tr("Unable to load applications")}</Text>
+          <Text style={styles.errorSubtitle}>{tr(errorMsg)}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
+            <Text style={styles.retryBtnText}>{tr("Retry")}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : filteredApplications.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <View style={styles.emptyIconBg}>
+            <Ionicons
+              name={isBusiness ? 'people-outline' : 'document-text-outline'}
+              size={36}
+              color={colors.primary}
+            />
+          </View>
+          <Text style={styles.emptyTitle}>
+            {searchQuery
+              ? tr("No matching applications")
+              : activeFilter === 'all'
+              ? isBusiness
+                ? tr("No applicants yet")
+                : tr("No applications yet")
+              : tr("No {{value0}} applications", { value0: activeFilter })}
+          </Text>
+          <Text style={styles.emptySubtitle}>
+            {activeFilter === 'all'
+              ? isBusiness
+                ? tr("When youth freelancers apply to your gigs, their applications and details will appear here.")
+                : tr("When you apply to gigs, your applications and their statuses will appear here.")
+              : tr("You do not have any applications marked as \"{{value0}}\".", { value0: activeFilter })}
+          </Text>
+          {activeFilter === 'all' && !searchQuery ? (
+            <TouchableOpacity
+              style={styles.exploreBtn}
+              onPress={() =>
+                router.push(
+                  isBusiness
+                    ? ('/(app)/(tabs)/my-gigs' as any)
+                    : ('/(app)/(tabs)/browse' as any)
+                )
+              }
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name={isBusiness ? 'briefcase-outline' : 'compass-outline'}
+                size={18}
+                color={colors.primaryOnColor}
+              />
+              <Text style={styles.exploreBtnText}>
+                {isBusiness ? tr("Manage Your Gigs") : tr("Browse Available Gigs")}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : (
+        <FlatList
+          data={filteredApplications}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) =>
+            isBusiness ? (
+              <ApplicantCard
+                application={item}
+                onPress={() => setSelectedApplicant(item)}
+                onAccept={() => handleQuickAccept(item)}
+                onReject={() => handleQuickReject(item)}
+                onRate={() => setSelectedApplicantForRating(item)}
+              />
+            ) : (
+              <ApplicationCard
+                application={item}
+                onPress={() => setSelectedApplication(item)}
+              />
+            )
+          }
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+            />
+          }
+        />
+      )}
 
       {!isBusiness && (
         <ApplicationDetailModal
@@ -271,6 +370,39 @@ export default function MyApplicationsScreen() {
         error={decisionError}
         onConfirm={confirmDecision}
         onCancel={() => setDecision(null)}
+      {/* Rating Modal for Business Owner to Rate Accepted Youth Freelancer */}
+      {isBusiness && selectedApplicantForRating && (
+        <RatingModal
+          visible={!!selectedApplicantForRating}
+          targetUserId={
+            typeof selectedApplicantForRating.youthId === 'object' && selectedApplicantForRating.youthId !== null
+              ? (selectedApplicantForRating.youthId as any).uid || (selectedApplicantForRating.youthId as any).id || ''
+              : String(selectedApplicantForRating.youthId || '')
+          }
+          targetUserName={selectedApplicantForRating.youthName || tr('Youth Freelancer')}
+          targetUserPhotoURL={selectedApplicantForRating.youthPhotoURL}
+          targetRole="freelancer"
+          gigId={selectedApplicantForRating.gigId}
+          gigTitle={selectedApplicantForRating.gigTitle}
+          onClose={() => setSelectedApplicantForRating(null)}
+          onSuccess={() => {
+            setSelectedApplicantForRating(null);
+          }}
+        />
+      )}
+
+      {/* Celebration Modal on Gig Acceptance */}
+      <CelebrationModal
+        visible={!!acceptedCelebrationApp}
+        youthName={acceptedCelebrationApp?.youthName || 'Youth Freelancer'}
+        gigTitle={acceptedCelebrationApp?.gigTitle || 'Gig'}
+        applicationId={acceptedCelebrationApp?.id}
+        gigId={acceptedCelebrationApp?.gigId}
+        gigDate={acceptedCelebrationApp?.gigDate}
+        gigLocation={acceptedCelebrationApp?.gigLocation}
+        gigPay={acceptedCelebrationApp?.gigPay}
+        gigPayType={acceptedCelebrationApp?.gigPayType}
+        onClose={() => setAcceptedCelebrationApp(null)}
       />
     </SafeAreaView>
   );

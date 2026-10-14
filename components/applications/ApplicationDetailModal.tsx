@@ -13,6 +13,8 @@ import { addGigToCalendar } from '../../services/calendarService';
 import { useToast } from '../../context/ToastContext';
 import { RatingModal } from '../reviews';
 import { ApplicationStatusPill, getStatusTheme, toDate } from './ApplicationCard';
+import { ReportModal } from '../reports';
+import { getStatusTheme } from './ApplicationCard';
 
 interface ApplicationDetailModalProps {
   visible: boolean;
@@ -39,6 +41,7 @@ function ApplicationDetail({ application, onClose }: { application: Application;
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [calendarAdded, setCalendarAdded] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const statusTheme = getStatusTheme(application.status);
   const applied = toDate(application.createdAt);
@@ -145,6 +148,24 @@ function ApplicationDetail({ application, onClose }: { application: Application;
                   <Text style={styles.secondaryBtnText}>{t('Rate this business')}</Text>
                 </Pressable>
               )}
+                <TouchableOpacity
+                  style={styles.rateBizBtn}
+                  onPress={() => setShowRatingModal(true)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="star" size={17} color={colors.star} />
+                  <Text style={styles.rateBizBtnText}>{tr("Rate Business Owner")}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.reportNoShowBtn}
+                  onPress={() => setShowReportModal(true)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="flag-outline" size={17} color={colors.error} />
+                  <Text style={styles.reportNoShowBtnText}>{tr("Report No-Show")}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -196,9 +217,14 @@ function ApplicationDetail({ application, onClose }: { application: Application;
         </ScrollView>
 
         {isCompleted && !!application.businessId && (
+        {Boolean(application?.businessId) ? (
           <RatingModal
             visible={showRatingModal}
-            targetUserId={application.businessId}
+            targetUserId={
+              typeof application.businessId === 'object' && application.businessId !== null
+                ? (application.businessId as any).uid || (application.businessId as any).id || ''
+                : String(application.businessId || '')
+            }
             targetUserName={application.businessName || 'Business Owner'}
             targetRole="client"
             gigId={application.gigId}
@@ -207,6 +233,22 @@ function ApplicationDetail({ application, onClose }: { application: Application;
             onSuccess={() => setShowRatingModal(false)}
           />
         )}
+        ) : null}
+
+        {Boolean(application?.businessId) && showReportModal ? (
+          <ReportModal
+            visible={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            targetType="no-show"
+            targetId={`${application.gigId}_${typeof application.businessId === 'object' && application.businessId !== null ? (application.businessId as any).uid || (application.businessId as any).id : application.businessId}`}
+            targetUserId={typeof application.businessId === 'object' && application.businessId !== null ? (application.businessId as any).uid || (application.businessId as any).id : String(application.businessId)}
+            targetUserName={application.businessName || 'Business Owner'}
+            targetGigId={application.gigId}
+            targetGigTitle={application.gigTitle}
+            targetApplicationId={application.id}
+            defaultReason="no-show"
+          />
+        ) : null}
       </SafeAreaView>
     </Modal>
   );
@@ -246,4 +288,258 @@ const styles = StyleSheet.create({
   metaText: { ...typography.bodySmall, color: colors.textSecondary, flexShrink: 1 },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 52, paddingHorizontal: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
   linkText: { ...typography.label, color: colors.primary, flex: 1 },
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceBorder,
+    backgroundColor: colors.surface,
+  },
+  closeBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontFamily: fonts.bodyBold,
+    color: colors.text,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: spacing.lg,
+    gap: spacing.md,
+    paddingBottom: spacing.xxl,
+  },
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    gap: spacing.md,
+  },
+  statusBannerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusBannerTextWrap: {
+    flex: 1,
+  },
+  statusBannerTitle: {
+    fontSize: 16,
+    fontFamily: fonts.bodyBold,
+    marginBottom: 2,
+  },
+  statusBannerDesc: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  cardSectionLabel: {
+    fontSize: 11,
+    fontFamily: fonts.bodyBold,
+    color: colors.textMuted,
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  gigTitle: {
+    fontSize: 18,
+    fontFamily: fonts.bodyBold,
+    color: colors.text,
+    letterSpacing: -0.3,
+    marginBottom: spacing.xs,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 3,
+  },
+  metaLabel: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    width: 100,
+  },
+  metaVal: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+    fontFamily: fonts.bodyMedium,
+  },
+  messageBox: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    backgroundColor: colors.background,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+  },
+  messageText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 20,
+  },
+  availabilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.successLight,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.successBorder,
+  },
+  checkCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.successBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  availabilityText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.success,
+  },
+  dismissBtn: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  dismissBtnText: {
+    fontSize: 15,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.text,
+  },
+  acceptedActionCard: {
+    backgroundColor: colors.successLight,
+    borderWidth: 1,
+    borderColor: colors.successBorder,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  acceptedActionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  acceptedActionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.success,
+  },
+  acceptedActionSubtitle: {
+    fontSize: 12.5,
+    color: colors.success,
+    lineHeight: 18,
+  },
+  acceptedButtonGroup: {
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  messageBizBtn: {
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: borderRadius.md,
+    gap: 6,
+  },
+  messageBizBtnText: {
+    color: colors.primaryOnColor,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  calendarSyncBtn: {
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: borderRadius.md,
+    gap: 6,
+  },
+  calendarSyncBtnAdded: {
+    backgroundColor: colors.successLight,
+    borderColor: colors.success,
+  },
+  calendarSyncBtnText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  calendarSyncBtnTextAdded: {
+    color: colors.success,
+  },
+  rateBizBtn: {
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1.5,
+    borderColor: colors.primaryBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: borderRadius.md,
+    gap: 6,
+  },
+  rateBizBtnText: {
+    color: colors.warning,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  reportNoShowBtn: {
+    backgroundColor: colors.errorLight,
+    borderWidth: 1.5,
+    borderColor: colors.errorBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: borderRadius.md,
+    gap: 6,
+  },
+  reportNoShowBtnText: {
+    color: colors.error,
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });

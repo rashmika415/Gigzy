@@ -13,6 +13,7 @@ import { UserData, useAuth } from '../../../context/AuthContext';
 import { subscribeToProfile, subscribeToProfileReviews } from '../../../services/profileService';
 import { ProfileReview } from '../../../types/profile';
 import { RatingModal } from '../../../components/reviews';
+import { ReportModal } from '../../../components/reports';
 import { borderRadius, colors, spacing, fonts } from '../../../constants/theme';
 
 export default function PublicProfileScreen() {
@@ -24,6 +25,7 @@ export default function PublicProfileScreen() {
   const { reviews } = reviewState;
   const [loading, setLoading] = useState(true);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   useEffect(() => {
     if (!id) return;
     const stopProfile = subscribeToProfile(id, (value) => { setProfile(value); setLoading(false); }, () => setLoading(false));
@@ -35,7 +37,21 @@ export default function PublicProfileScreen() {
   const name = youth ? profile.fullName : profile.businessName || profile.fullName;
   const skills = profile.skills?.split(',').map((skill) => skill.trim()).filter(Boolean) ?? [];
   return <View style={styles.container}><ScrollView contentContainerStyle={styles.content}>
-    <View style={styles.header}><TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color={colors.text}/></TouchableOpacity><Text style={styles.headerTitle}>{t("Profile")}</Text><View style={{width:24}}/></View>
+    <View style={styles.header}>
+      <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><Ionicons name="arrow-back" size={24} color={colors.text}/></TouchableOpacity>
+      <Text style={styles.headerTitle}>{t("Profile")}</Text>
+      {user && user.uid !== profile.uid ? (
+        <TouchableOpacity
+          onPress={() => setShowReportModal(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel={t("Report User")}
+        >
+          <Ionicons name="flag-outline" size={21} color={colors.error} />
+        </TouchableOpacity>
+      ) : (
+        <View style={{ width: 24 }} />
+      )}
+    </View>
     <View style={styles.hero}>{profile.photoURL ? <Image source={{uri:profile.photoURL}} style={styles.avatar}/> : <View style={styles.fallback}><Text style={styles.initial}>{name?.[0]?.toUpperCase()}</Text></View>}
       <View style={styles.nameRow}><Text style={styles.name}>{name}</Text><VerifiedBusinessBadge key={id} userId={id} /></View>
       <Text style={styles.role}>{youth ? t("Youth freelancer") : profile.businessCategory || t("Business")}</Text>
@@ -87,6 +103,16 @@ export default function PublicProfileScreen() {
     targetRole={profile.role as 'freelancer' | 'client'}
     onSuccess={() => {}}
   />
+  {user && user.uid !== profile.uid && showReportModal && (
+    <ReportModal
+      visible={showReportModal}
+      onClose={() => setShowReportModal(false)}
+      targetType="user"
+      targetId={profile.uid}
+      targetUserId={profile.uid}
+      targetUserName={name || 'User'}
+    />
+  )}
   </View>;
 }
 
