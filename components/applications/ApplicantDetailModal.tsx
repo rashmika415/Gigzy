@@ -62,8 +62,9 @@ export default function ApplicantDetailModal({
   const statusTheme = getStatusTheme(application.status);
   const appliedDateStr = formatDate(application.createdAt);
   const initial = (application.youthName?.[0] || 'Y').toUpperCase();
-  const isPending = application.status === 'pending';
-  const isAccepted = application.status === 'accepted';
+  const statusLower = (application.status || '').toLowerCase();
+  const isPending = statusLower === 'pending';
+  const isAccepted = ['accepted', 'approved', 'in-progress', 'completed'].includes(statusLower);
 
   const handleMessageApplicant = () => {
     try {
@@ -469,17 +470,23 @@ export default function ApplicantDetailModal({
           )}
         </ScrollView>
 
-        {application?.youthId ? (
+        {Boolean(application?.youthId) ? (
           <RatingModal
             visible={showRatingModal}
-            targetUserId={application.youthId}
+            targetUserId={
+              typeof application.youthId === 'object' && application.youthId !== null
+                ? (application.youthId as any).uid || (application.youthId as any).id || ''
+                : String(application.youthId || '')
+            }
             targetUserName={application.youthName || 'Youth Freelancer'}
             targetUserPhotoURL={application.youthPhotoURL}
             targetRole="freelancer"
             gigId={application.gigId}
             gigTitle={application.gigTitle}
             onClose={() => setShowRatingModal(false)}
-            onSuccess={() => setShowRatingModal(false)}
+            onSuccess={() => {
+              setShowRatingModal(false);
+            }}
           />
         ) : null}
       </SafeAreaView>

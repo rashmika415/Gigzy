@@ -16,7 +16,7 @@ import { colors, spacing, borderRadius, fonts, typography } from '../../../const
 import { formatCurrency, formatNumber, formatCalendarDate } from '../../../localization/format';
 import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig, updateGigStatus } from '../../../services/gigService';
 import { subscribeToUserChats, getOrCreateChat } from '../../../services/chatService';
-import { subscribeToMyApplications } from '../../../services/applicationService';
+import { subscribeToMyApplications, getApplicantsForGig } from '../../../services/applicationService';
 import { addGigToCalendar } from '../../../services/calendarService';
 import { Gig } from '../../../types/gig';
 import type { Application } from '../../../types/application';
@@ -75,7 +75,7 @@ export default function Home() {
   );
 
   const inProgressGigs = useMemo(
-    () => (isClient ? gigs.filter((g) => g.status === 'in-progress' || g.status === 'completed') : []),
+    () => (isClient ? gigs.filter((g) => g.status === 'in-progress' || g.status === 'completed' || Boolean(g.assignedYouthId)) : []),
     [gigs, isClient]
   );
 
@@ -134,9 +134,21 @@ export default function Home() {
 
       if (isClient) {
         for (const gig of inProgressGigs) {
-          if (gig.assignedYouthId && gig.id) {
+          let youthId = gig.assignedYouthId;
+          if (!youthId && gig.id) {
             try {
-              const reviewed = await hasUserReviewedGig(user.uid, gig.assignedYouthId, gig.id);
+              const apps = await getApplicantsForGig(gig.id, user.uid);
+              const accepted = apps.find(a => ['accepted', 'approved', 'in-progress', 'completed'].includes(String(a.status || '').toLowerCase()));
+              if (accepted) {
+                youthId = typeof accepted.youthId === 'object' && accepted.youthId !== null
+                  ? (accepted.youthId as any).uid || (accepted.youthId as any).id || ''
+                  : String(accepted.youthId || '');
+              }
+            } catch {}
+          }
+          if (youthId && gig.id) {
+            try {
+              const reviewed = await hasUserReviewedGig(user.uid, youthId, gig.id);
               if (reviewed) results[gig.id] = true;
             } catch {}
           }
@@ -360,12 +372,39 @@ export default function Home() {
     }
   };
 
-  const handleRateFreelancer = (gig: Gig) => {
-    if (!gig.assignedYouthId) return;
+  const handleRateFreelancer = async (gig: Gig) => {
+    let youthId = gig.assignedYouthId;
+    let youthName = gig.assignedYouthName;
+    let youthPhoto = gig.assignedYouthPhotoURL;
+
+    if (!youthId && gig.id) {
+      try {
+        const apps = await getApplicantsForGig(gig.id, user?.uid);
+        const acceptedApp = apps.find((a) =>
+          ['accepted', 'approved', 'in-progress', 'completed'].includes(
+            String(a.status || '').toLowerCase()
+          )
+        );
+        if (acceptedApp) {
+          youthId =
+            typeof acceptedApp.youthId === 'object' && acceptedApp.youthId !== null
+              ? (acceptedApp.youthId as any).uid || (acceptedApp.youthId as any).id || ''
+              : String(acceptedApp.youthId || '');
+          youthName = youthName || acceptedApp.youthName;
+          youthPhoto = youthPhoto || acceptedApp.youthPhotoURL;
+        }
+      } catch {}
+    }
+
+    if (!youthId) {
+      toast.info(tr("Freelancer information unavailable."));
+      return;
+    }
+
     setRatingTarget({
-      userId: gig.assignedYouthId,
-      userName: gig.assignedYouthName || 'Youth Freelancer',
-      userPhotoURL: gig.assignedYouthPhotoURL,
+      userId: youthId,
+      userName: youthName || tr("Youth Freelancer"),
+      userPhotoURL: youthPhoto,
       targetRole: 'freelancer',
       gigId: gig.id,
       gigTitle: gig.title,
@@ -949,30 +988,21 @@ export default function Home() {
                         )}
                       </TouchableOpacity>
 
-                      {isCompleted ? (
-                        hasReviewed ? (
-                          <View style={styles.projectRatedAction}>
-                            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                            <Text style={styles.projectRatedActionText}>{tr("Reviewed ✓")}</Text>
-                          </View>
-                        ) : (
-                          <TouchableOpacity
-                            style={styles.projectRateNowAction}
-                            onPress={() => handleRateFreelancer(gig)}
-                            activeOpacity={0.85}
-                          >
-                            <Ionicons name="star" size={16} color={colors.star} />
-                            <Text style={styles.projectRateNowActionText}>{tr("Rate Freelancer")}</Text>
-                          </TouchableOpacity>
-                        )
+                      {hasReviewed ? (
+                        <View style={styles.projectRatedAction}>
+                          <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                          <Text style={styles.projectRatedActionText}>{tr("Reviewed ✓")}</Text>
+                        </View>
                       ) : (
                         <TouchableOpacity
-                          style={styles.projectCompleteAction}
-                          onPress={() => handleCompleteGig(gig)}
+                          style={styles.projectRateNowAction}
+                          onPress={() => handleRateFreelancer(gig)}
                           activeOpacity={0.85}
+                          accessibilityRole="button"
+                          accessibilityLabel={tr("Rate Freelancer")}
                         >
-                          <Ionicons name="checkmark-done-circle" size={17} color={colors.success} />
-                          <Text style={styles.projectCompleteActionText}>{tr("Complete & Rate")}</Text>
+                          <Ionicons name="star" size={16} color={colors.star} />
+                          <Text style={styles.projectRateNowActionText}>{tr("Rate Freelancer")}</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -1123,7 +1153,6 @@ export default function Home() {
               setReviewedGigIds((prev) => ({ ...prev, [ratingTarget.gigId]: true }));
             }
             setRatingTarget(null);
-            toast.success(tr("Review Submitted! 🌟"), tr("Thank you for sharing your feedback."));
           }}
         />
       )}

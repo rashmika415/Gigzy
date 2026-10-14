@@ -44,7 +44,7 @@ export default function MyGigs() {
 
   const [selectedGigForApplicants, setSelectedGigForApplicants] = useState<Gig | null>(null);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
-  const [ratingTarget, setRatingTarget] = useState<{ userId: string; userName: string; gigId?: string; gigTitle?: string } | null>(null);
+  const [ratingTarget, setRatingTarget] = useState<{ userId: string; userName: string; userPhotoURL?: string; gigId?: string; gigTitle?: string } | null>(null);
 
   // Role guard: only business owners (clients) can manage gigs
   // Data states
@@ -147,7 +147,8 @@ export default function MyGigs() {
       if (newStatus === "completed" && currentGig.assignedYouthId) {
         setRatingTarget({
           userId: currentGig.assignedYouthId,
-          userName: t("Youth Freelancer"),
+          userName: currentGig.assignedYouthName || t("Youth Freelancer"),
+          userPhotoURL: currentGig.assignedYouthPhotoURL,
           gigId: currentGig.id,
           gigTitle: currentGig.title,
         });
@@ -940,7 +941,8 @@ export default function MyGigs() {
                           onPress={() => {
                             setRatingTarget({
                               userId: gig.assignedYouthId!,
-                              userName: tr("Youth Freelancer"),
+                              userName: gig.assignedYouthName || tr("Youth Freelancer"),
+                              userPhotoURL: gig.assignedYouthPhotoURL,
                               gigId: gig.id,
                               gigTitle: gig.title,
                             });
@@ -1387,6 +1389,7 @@ export default function MyGigs() {
           visible={ratingModalVisible}
           targetUserId={ratingTarget.userId}
           targetUserName={ratingTarget.userName}
+          targetUserPhotoURL={ratingTarget.userPhotoURL}
           targetRole="freelancer"
           gigId={ratingTarget.gigId}
           gigTitle={ratingTarget.gigTitle}

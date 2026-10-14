@@ -401,7 +401,7 @@ export default function GigDetailScreen() {
               activeOpacity={0.85}
             >
               <Ionicons name="star" size={16} color={colors.star} />
-              <Text style={styles.rateFreelancerBtnText}>{tr("Rate")}</Text>
+              <Text style={styles.rateFreelancerBtnText}>{tr("Rate Freelancer")}</Text>
             </TouchableOpacity>
           )}
 
@@ -444,7 +444,8 @@ export default function GigDetailScreen() {
         <RatingModal
           visible={showRatingModal}
           targetUserId={gigOwner ? (gig.assignedYouthId || '') : (gig.postedBy?.uid || '')}
-          targetUserName={gigOwner ? tr("Youth Freelancer") : (gig.postedBy?.fullName || tr("Business Owner"))}
+          targetUserName={gigOwner ? (gig.assignedYouthName || tr("Youth Freelancer")) : (gig.postedBy?.fullName || tr("Business Owner"))}
+          targetUserPhotoURL={gigOwner ? gig.assignedYouthPhotoURL : undefined}
           targetRole={gigOwner ? 'freelancer' : 'client'}
           gigId={gig.id}
           gigTitle={gig.title}

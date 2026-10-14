@@ -191,18 +191,28 @@ export async function canReviewUser(
  * automatically recalculating the recipient's overall ratingAverage and ratingCount.
  */
 export async function submitReview(input: SubmitReviewInput): Promise<string> {
+  const cleanTargetUserId = (
+    typeof input.targetUserId === 'object' && input.targetUserId !== null
+      ? (input.targetUserId as any).uid || (input.targetUserId as any).id || ''
+      : String(input.targetUserId || '')
+  ).trim();
+  const cleanAuthorId = (
+    typeof input.authorId === 'object' && input.authorId !== null
+      ? (input.authorId as any).uid || (input.authorId as any).id || ''
+      : String(input.authorId || '')
+  ).trim();
   const cleanComment = (input.comment || '').trim();
   const cleanRating = Math.round(Number(input.rating));
 
-  if (!input.targetUserId) {
+  if (!cleanTargetUserId) {
     throw new Error('Target user ID is required to submit a review.');
   }
 
-  if (!input.authorId) {
+  if (!cleanAuthorId) {
     throw new Error('You must be signed in to submit a review.');
   }
 
-  if (input.targetUserId === input.authorId) {
+  if (cleanTargetUserId === cleanAuthorId) {
     throw new Error('You cannot rate or review yourself.');
   }
 
@@ -218,15 +228,15 @@ export async function submitReview(input: SubmitReviewInput): Promise<string> {
     throw new Error('Review comment cannot exceed 1000 characters.');
   }
 
-  if (!(await canReviewUser(input.authorId, input.targetUserId, input.gigId))) {
+  if (!(await canReviewUser(cleanAuthorId, cleanTargetUserId, input.gigId))) {
     throw new Error(REVIEW_LOCKED_MESSAGE);
   }
 
   try {
     const reviewData = {
-      targetUserId: input.targetUserId,
+      targetUserId: cleanTargetUserId,
       targetRole: input.targetRole,
-      authorId: input.authorId,
+      authorId: cleanAuthorId,
       authorName: input.authorName || 'User',
       authorPhotoURL: input.authorPhotoURL || '',
       authorRole: input.authorRole,
@@ -242,20 +252,20 @@ export async function submitReview(input: SubmitReviewInput): Promise<string> {
     let reviewId: string;
     if (input.gigId) {
       // Older gig reviews were saved with random ids, so also check by query.
-      if (await hasUserReviewedGig(input.authorId, input.targetUserId, input.gigId)) {
+      if (await hasUserReviewedGig(cleanAuthorId, cleanTargetUserId, input.gigId)) {
         throw new Error(ALREADY_REVIEWED_MESSAGE);
       }
-      const reviewRef = doc(db, 'users', input.targetUserId, 'reviews', gigReviewId(input.gigId, input.authorId));
+      const reviewRef = doc(db, 'users', cleanTargetUserId, 'reviews', gigReviewId(input.gigId, cleanAuthorId));
       await runTransaction(db, async (transaction) => {
         if ((await transaction.get(reviewRef)).exists()) throw new Error(ALREADY_REVIEWED_MESSAGE);
         transaction.set(reviewRef, reviewData);
       });
       reviewId = reviewRef.id;
     } else {
-      reviewId = (await addDoc(collection(db, 'users', input.targetUserId, 'reviews'), reviewData)).id;
+      reviewId = (await addDoc(collection(db, 'users', cleanTargetUserId, 'reviews'), reviewData)).id;
     }
 
-    await afterReviewSaved(input.targetUserId, reviewId, { authorRole: input.authorRole, authorName: input.authorName, rating: cleanRating, comment: cleanComment });
+    await afterReviewSaved(cleanTargetUserId, reviewId, { authorRole: input.authorRole, authorName: input.authorName, rating: cleanRating, comment: cleanComment });
     return reviewId;
   } catch (error: any) {
     console.error('Error submitting review:', error);

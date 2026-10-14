@@ -428,24 +428,38 @@ export default function ChatRoomScreen() {
           </View>
         </View>
 
-        {/* Action button */}
-        {chat?.gigId && (
-          <TouchableOpacity
-            style={styles.gigToggleBtn}
-            onPress={() => setShowGigBanner((v) => !v)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons
-              name={
-                showGigBanner
-                  ? "chevron-up-circle-outline"
-                  : "briefcase-outline"
-              }
-              size={22}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
-        )}
+        {/* Action buttons */}
+        <View style={styles.headerRightActions}>
+          {Boolean(otherParticipant?.uid) && (
+            <TouchableOpacity
+              style={styles.headerRateBtn}
+              onPress={() => setShowRatingModal(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={isOtherBusiness ? t("Rate Business Client") : t("Rate Freelancer")}
+            >
+              <Ionicons name="star" size={20} color={colors.star} />
+            </TouchableOpacity>
+          )}
+
+          {chat?.gigId && (
+            <TouchableOpacity
+              style={styles.gigToggleBtn}
+              onPress={() => setShowGigBanner((v) => !v)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={
+                  showGigBanner
+                    ? "chevron-up-circle-outline"
+                    : "briefcase-outline"
+                }
+                size={22}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Collapsible Gig Context Banner */}
@@ -751,6 +765,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
     fontFamily: fonts.bodyMedium,
+  },
+  headerRightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  headerRateBtn: {
+    padding: spacing.xs,
   },
   gigToggleBtn: {
     padding: spacing.xs,

@@ -96,7 +96,7 @@ service cloud.firestore {
 
         && request.resource.data.get('isVerified', false) != true
         && !request.resource.data.keys().hasAny(['referralCode']);
-      allow update: if (isAdmin() && userId != request.auth.uid && resource.data.role != 'admin'
+      allow update: if verificationSubmission() || verificationDecision() || (isAdmin() && userId != request.auth.uid && resource.data.role != 'admin'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'suspended', 'suspensionReason', 'suspensionType', 'suspendedUntil',
           'warningCount', 'lastWarningReason', 'lastWarnedAt', 'updatedAt'
@@ -140,8 +140,8 @@ service cloud.firestore {
           && request.resource.data.updatedAt == request.time)
         || (owns(userId) && active() && protectedUserFieldsUnchanged() && validReferralCodeUpdate(userId)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || validProfilePhoto()))
-        // Rating aggregates: admin-only client updates. Prefer trusted server-side aggregation.
-        || (isAdmin()
+        // Rating aggregates: allow active reviewers to update rating stats upon submitting a review
+        || (active()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'ratingAverage', 'ratingCount', 'updatedAt'
           ])
@@ -150,7 +150,7 @@ service cloud.firestore {
           && request.resource.data.get('ratingAverage', 0) <= 5
           && request.resource.data.get('ratingCount', 0) is int
           && request.resource.data.get('ratingCount', 0) >= 0
-          && request.resource.data.updatedAt == request.time);
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedAt']) || request.resource.data.updatedAt == request.time));
 
 
       allow delete: if false;
@@ -180,33 +180,6 @@ service cloud.firestore {
         allow delete: if owns(userId) && active();
       }
       match /notifications/{notificationId} {
-        function validApplicationAnnouncement() {
-          let data = request.resource.data;
-          let application = get(/databases/$(database)/documents/applications/$(data.entityId)).data;
-          let gig = get(/databases/$(database)/documents/gigs/$(application.gigId)).data;
-          let name = application.get('youthName', '') != '' ? application.youthName : 'A youth user';
-          return data.keys().hasOnly(['userId', 'type', 'title', 'body', 'read', 'route', 'entityId', 'createdAt'])
-            && notificationId == 'application-' + data.entityId
-            && data.userId == userId && application.businessId == userId
-            && gig.postedBy.uid == userId && application.youthId != userId
-            && data.type == 'application' && data.title == 'New gig application'
-            && data.body == name + ' applied to your gig.'
-            && data.route == '/(app)/gig/' + application.gigId
-            && data.read == false && data.createdAt == request.time;
-        }
-        function validGigAnnouncement() {
-          let data = request.resource.data;
-          let gig = get(/databases/$(database)/documents/gigs/$(data.entityId)).data;
-          return data.keys().hasOnly(['userId', 'type', 'title', 'body', 'read', 'route', 'entityId', 'createdAt'])
-            && notificationId == 'gig-posted-' + data.entityId
-            && data.userId == userId
-            && data.type == 'gig_posted'
-            && data.title == 'New gig posted'
-            && data.body == gig.title
-            && data.route == '/(app)/gig/' + data.entityId
-            && data.read == false && data.createdAt == request.time
-            && gig.status == 'open' && gig.postedBy.uid != userId;
-        }
         allow read: if owns(userId);
         allow create: if active();
         allow delete: if owns(userId) || isAdmin();
@@ -216,12 +189,12 @@ service cloud.firestore {
       match /reviews/{reviewId} {
         allow read: if signedIn();
         allow create: if active() && request.auth.uid != userId
-          && request.resource.data.authorId == request.auth.uid
+          && (request.resource.data.get('authorId', '') == request.auth.uid || request.resource.data.get('reviewerId', '') == request.auth.uid)
           && request.resource.data.rating is number
           && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
-          && request.resource.data.comment is string && request.resource.data.comment.size() >= 5 && request.resource.data.comment.size() <= 1000;
-        allow update: if active() && resource.data.authorId == request.auth.uid;
-        allow delete: if isAdmin() || (active() && resource.data.authorId == request.auth.uid);
+          && (!request.resource.data.keys().hasAny(['comment']) || (request.resource.data.comment is string && request.resource.data.comment.size() <= 1000));
+        allow update: if active() && (resource.data.get('authorId', '') == request.auth.uid || resource.data.get('reviewerId', '') == request.auth.uid);
+        allow delete: if isAdmin() || (active() && (resource.data.get('authorId', '') == request.auth.uid || resource.data.get('reviewerId', '') == request.auth.uid));
       }
       match /endorsements/{endorsementId} {
         allow read: if signedIn();

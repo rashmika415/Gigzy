@@ -318,10 +318,14 @@ export default function ApplicationDetailModal({
           </TouchableOpacity>
         </ScrollView>
 
-        {application?.businessId ? (
+        {Boolean(application?.businessId) ? (
           <RatingModal
             visible={showRatingModal}
-            targetUserId={application.businessId}
+            targetUserId={
+              typeof application.businessId === 'object' && application.businessId !== null
+                ? (application.businessId as any).uid || (application.businessId as any).id || ''
+                : String(application.businessId || '')
+            }
             targetUserName={application.businessName || 'Business Owner'}
             targetRole="client"
             gigId={application.gigId}
