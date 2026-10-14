@@ -1,4 +1,3 @@
-import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
 import AppBanner, { AppPhoto } from '../../../components/AppBanner';
@@ -11,7 +10,6 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../../context/AuthContext';
-import { useSavedGigs } from '../../../context/SavedGigsContext';
 import { colors, spacing, borderRadius, fonts, typography } from '../../../constants/theme';
 import { formatNumber } from '../../../localization/format';
 import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig, updateGigStatus } from '../../../services/gigService';
@@ -27,7 +25,7 @@ import ErrorState from '../../../components/ErrorState';
 import SkeletonList from '../../../components/Skeleton';
 import { useToast } from '../../../context/ToastContext';
 import ApplyModal from '../../../components/applications/ApplyModal';
-import { ApplicantListModal } from '../../../components/applications';
+import { ApplicantListModal, ApplicationCard, ApplicationDetailModal } from '../../../components/applications';
 import { RatingModal } from '../../../components/reviews';
 import { hasUserReviewedGig } from '../../../services/reviewService';
 import ConfirmSheet from '../../../components/ConfirmSheet';
@@ -39,7 +37,6 @@ const openGig = (gig: Gig) => router.push({ pathname: '/(app)/gig/[id]', params:
 export default function Home() {
   useTranslation();
   const { user, userData } = useAuth();
-  const { savedIds } = useSavedGigs();
   const toast = useToast();
   const firstName = userData?.fullName?.split(' ')[0] ?? user?.displayName?.split(' ')[0] ?? 'there';
   const role = userData?.role ?? 'freelancer';
@@ -55,6 +52,9 @@ export default function Home() {
   const [selectedGigForApply, setSelectedGigForApply] = useState<Gig | null>(null);
   const [selectedGigForApplicants, setSelectedGigForApplicants] = useState<Gig | null>(null);
   const [myApplications, setMyApplications] = useState<Application[]>([]);
+  const [appsError, setAppsError] = useState('');
+  const [appsAttempt, setAppsAttempt] = useState(0);
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [calendarAddingGigId, setCalendarAddingGigId] = useState<string | null>(null);
   const [calendarAddedGigIds, setCalendarAddedGigIds] = useState<Record<string, boolean>>({});
   const [ratingTarget, setRatingTarget] = useState<{
@@ -83,28 +83,26 @@ export default function Home() {
   );
 
   const spotlightApplications = useMemo(() => {
-    return [...myApplications].sort((a, b) => {
-      const aPriority = a.status === 'accepted' ? 2 : a.status === 'completed' ? 1 : 0;
-      const bPriority = b.status === 'accepted' ? 2 : b.status === 'completed' ? 1 : 0;
-      return bPriority - aPriority;
-    });
+    const priority: Record<string, number> = { accepted: 3, pending: 2, completed: 1 };
+    return myApplications
+      .filter((app) => priority[app.status])
+      .sort((a, b) => priority[b.status] - priority[a.status]);
   }, [myApplications]);
 
   const openGigs = useMemo(
-    () => (isClient ? gigs.filter((g) => g.status === 'open' || !g.status) : gigs),
+    () => gigs.filter((g) => g.status === 'open' || !g.status).slice(0, isClient ? undefined : 10),
     [gigs, isClient]
   );
 
   // Real-time synchronization of youth applications
   useEffect(() => {
     if (!user || isClient) return;
-    const unsubApps = subscribeToMyApplications(
+    return subscribeToMyApplications(
       user.uid,
-      (apps) => setMyApplications(apps),
-      () => {}
+      (apps) => { setMyApplications(apps); setAppsError(''); },
+      (err) => setAppsError(err.message || 'Failed to load applications.')
     );
-    return () => unsubApps();
-  }, [user, isClient]);
+  }, [user, isClient, appsAttempt]);
 
   // Real-time unread messages listener
   useEffect(() => {
@@ -144,15 +142,6 @@ export default function Home() {
             } catch {}
           }
         }
-      } else {
-        for (const app of acceptedApplications) {
-          if (app.businessId && app.gigId) {
-            try {
-              const reviewed = await hasUserReviewedGig(user.uid, app.businessId, app.gigId);
-              if (reviewed) results[app.gigId] = true;
-            } catch {}
-          }
-        }
       }
 
       if (!cancelled) {
@@ -164,7 +153,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [user, isClient, inProgressGigs, acceptedApplications]);
+  }, [user, isClient, inProgressGigs]);
 
   // Real-time Firestore synchronization
   useEffect(() => {
@@ -196,7 +185,7 @@ export default function Home() {
     } else {
       // Freelancer: subscribe to recent open gigs across the platform
       unsubscribe = subscribeToRecentGigs(
-        10,
+        30,
         (recentGigs) => {
           setLoadError('');
           setGigs(recentGigs);
@@ -371,17 +360,6 @@ export default function Home() {
       targetRole: 'freelancer',
       gigId: gig.id,
       gigTitle: gig.title,
-    });
-  };
-
-  const handleRateClient = (app: Application) => {
-    if (!app.businessId) return;
-    setRatingTarget({
-      userId: app.businessId,
-      userName: app.businessName || 'Business Owner',
-      targetRole: 'client',
-      gigId: app.gigId,
-      gigTitle: app.gigTitle || '',
     });
   };
 
@@ -577,145 +555,25 @@ export default function Home() {
           ))}
         </View>
 
-        {/* Applications & Gigs Spotlight (Youth Freelancer) */}
-        {!isClient && myApplications.length > 0 && (
-          <View style={styles.acceptedSectionContainer}>
-            <View style={styles.acceptedSectionHeader}>
-              <View style={styles.acceptedTitleRow}>
-                <Ionicons
-                  name={acceptedApplications.length > 0 ? 'checkmark-circle' : 'document-text'}
-                  size={20}
-                  color={acceptedApplications.length > 0 ? colors.success : colors.primary}
-                />
-                <Text style={styles.acceptedSectionTitle}>
-                  {acceptedApplications.length > 0
-                    ? `${tr("Accepted Gigs")} (${acceptedApplications.length})`
-                    : `${tr("My Applications")} (${myApplications.length})`}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/applications' as any)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                activeOpacity={0.75}
-              >
-                <Text style={styles.acceptedViewAllText}>{tr("View All")} ({myApplications.length}) →</Text>
-              </TouchableOpacity>
+        {/* My applications (Youth Freelancer) */}
+        {!isClient && (spotlightApplications.length > 0 || !!appsError) && (
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{tr("My Applications")}</Text>
+              <Pressable onPress={() => router.push('/(app)/applications' as any)} accessibilityRole="button" hitSlop={12}>
+                <Text style={styles.seeAllText}>{tr("See all ({{count}})", { count: myApplications.length })}</Text>
+              </Pressable>
             </View>
-
-            {spotlightApplications.slice(0, 3).map((app: Application) => {
-              const isAccepted = (app.status || '').toLowerCase() === 'accepted';
-              const isCompleted = (app.status || '').toLowerCase() === 'completed';
-              const hasReviewed = !!reviewedGigIds[app.gigId];
-              return (
-                <View key={app.id} style={styles.acceptedGigCard}>
-                  <View style={styles.acceptedCardTopRow}>
-                    <View style={[
-                      styles.acceptedStatusBadge,
-                      isCompleted ? { backgroundColor: colors.successLight, borderColor: colors.successBorder } :
-                      !isAccepted ? { backgroundColor: colors.warningLight, borderColor: colors.warningBorder } : null,
-                    ]}>
-                      <Ionicons
-                        name={isCompleted ? 'checkmark-circle' : isAccepted ? 'sparkles' : 'time-outline'}
-                        size={13}
-                        color={isCompleted ? colors.success : isAccepted ? colors.success : colors.warning}
-                      />
-                      <Text style={[styles.acceptedStatusText, !isAccepted && !isCompleted && { color: colors.warning }]}>
-                        {isCompleted ? tr("Completed 🎉") : isAccepted ? tr("Application Accepted! 🎉") : tr("Pending")}
-                      </Text>
-                    </View>
-                    {app.gigPay ? (
-                      <Text style={styles.acceptedPayText}>
-                        ${app.gigPay}{app.gigPayType === 'hourly' ? tr('/hr') : tr(' fixed')}
-                      </Text>
-                    ) : null}
-                  </View>
-
-                  <Text style={styles.acceptedGigTitle} numberOfLines={1}>
-                    {app.gigTitle || tr("Gig Title")}
-                  </Text>
-
-                  <View style={styles.acceptedBusinessRow}>
-                    <Ionicons name="business-outline" size={14} color={colors.textSecondary} />
-                    <Text style={styles.acceptedBusinessText} numberOfLines={1}>
-                      {app.businessName || tr("Business Owner")}
-                    </Text>
-                    {app.gigLocation ? (
-                      <>
-                        <Text style={styles.acceptedDot}>•</Text>
-                        <Ionicons name="location-outline" size={13} color={colors.textMuted} />
-                        <Text style={styles.acceptedLocationText} numberOfLines={1}>
-                          {app.gigLocation}
-                        </Text>
-                      </>
-                    ) : null}
-                  </View>
-
-                  <View style={styles.acceptedActionsRow}>
-                    {isAccepted || isCompleted ? (
-                      <TouchableOpacity
-                        style={styles.acceptedChatBtn}
-                        onPress={() => {
-                          const convId = app.conversationId || `conv_${app.id}`;
-                          router.push({
-                            pathname: '/(app)/chat/[id]',
-                            params: { id: convId },
-                          } as any);
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="chatbubbles" size={15} color={colors.primaryOnColor} />
-                        <Text style={styles.acceptedChatBtnText}>{tr("Message Client")}</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity
-                        style={styles.acceptedChatBtn}
-                        onPress={() => router.push('/(app)/applications' as any)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="document-text-outline" size={15} color={colors.primaryOnColor} />
-                        <Text style={styles.acceptedChatBtnText}>{tr("View my application")}</Text>
-                      </TouchableOpacity>
-                    )}
-
-                    {(isAccepted || isCompleted) && (
-                      hasReviewed ? (
-                        <View style={styles.acceptedRatedBadge}>
-                          <Ionicons name="star" size={13} color={colors.star} />
-                          <Text style={styles.acceptedRatedBadgeText}>{tr("Rated ★")}</Text>
-                        </View>
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.acceptedRateBtn}
-                          onPress={() => handleRateClient(app)}
-                          activeOpacity={0.8}
-                        >
-                          <Ionicons name="star-outline" size={14} color={colors.warning} />
-                          <Text style={styles.acceptedRateBtnText}>{tr("Rate Client")}</Text>
-                        </TouchableOpacity>
-                      )
-                    )}
-
-                    <TouchableOpacity
-                      style={styles.acceptedDetailsBtn}
-                      onPress={() => {
-                        if (app.gigId) {
-                          router.push({
-                            pathname: '/(app)/gig/[id]',
-                            params: { id: app.gigId },
-                          });
-                        } else {
-                          router.push('/(app)/applications' as any);
-                        }
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.acceptedDetailsBtnText}>{tr("Gig Details")}</Text>
-                      <Ionicons name="chevron-forward" size={14} color={colors.primary} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
+            {appsError ? (
+              <Pressable onPress={() => setAppsAttempt((n) => n + 1)} accessibilityRole="button"
+                style={({ pressed }) => [styles.inlineError, pressed && styles.pressed]}>
+                <Ionicons name="alert-circle-outline" size={18} color={colors.error} />
+                <Text style={styles.inlineErrorText}>{tr("Couldn't load your applications.")}</Text>
+                <Text style={styles.inlineErrorAction}>{tr("Retry")}</Text>
+              </Pressable>
+            ) : spotlightApplications.slice(0, 3).map((app) => (
+              <ApplicationCard key={app.id} application={app} onPress={() => setSelectedApplication(app)} />
+            ))}
           </View>
         )}
 
@@ -776,7 +634,7 @@ export default function Home() {
               actionIcon="add"
               onAction={goPostGig}
             />
-          ) : (isClient ? openGigs : gigs).length === 0 ? (
+          ) : openGigs.length === 0 ? (
             isClient ? (
               <EmptyState
                 icon="briefcase-outline"
@@ -797,7 +655,7 @@ export default function Home() {
             )
           ) : (
             <View style={styles.gigsList}>
-              {(isClient ? openGigs : gigs).map((gig) => (
+              {openGigs.map((gig) => (
                 <GigCard
                   key={gig.id}
                   gig={gig}
@@ -844,6 +702,14 @@ export default function Home() {
               ]);
             }
           }}
+        />
+      )}
+
+      {!isClient && (
+        <ApplicationDetailModal
+          visible={!!selectedApplication}
+          application={selectedApplication}
+          onClose={() => setSelectedApplication(null)}
         />
       )}
 
@@ -1180,163 +1046,24 @@ const styles = StyleSheet.create({
     borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.md,
   },
-  acceptedSectionContainer: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  acceptedSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  acceptedTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  acceptedSectionTitle: {
-    fontSize: 16,
-    fontFamily: fonts.bodyBold,
-    color: colors.success,
-  },
-  acceptedViewAllText: {
-    fontSize: 13,
-    fontFamily: fonts.bodyBold,
-    color: colors.primary,
-  },
-  acceptedGigCard: {
-    backgroundColor: colors.successLight,
-    borderRadius: borderRadius.xl,
-    padding: spacing.md,
-    borderWidth: 1.5,
-    borderColor: colors.successBorder,
-    marginBottom: spacing.sm,
-  },
-  acceptedCardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  acceptedStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.successLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.successBorder,
-  },
-  acceptedStatusText: {
-    fontSize: 11,
-    fontFamily: fonts.bodyBold,
-    color: colors.success,
-  },
-  acceptedPayText: {
-    fontSize: 15,
-    fontFamily: fonts.bodyBold,
-    color: colors.success,
-  },
-  acceptedGigTitle: {
-    fontSize: 16,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-    marginBottom: 4,
-  },
-  acceptedBusinessRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: spacing.md,
-  },
-  acceptedBusinessText: {
-    fontSize: 13,
-    fontFamily: fonts.bodyMedium,
-    color: colors.textSecondary,
-  },
-  acceptedDot: {
-    color: colors.textMuted,
-    fontSize: 12,
-  },
-  acceptedLocationText: {
-    fontSize: 12,
-    fontFamily: fonts.bodyMedium,
-    color: colors.textMuted,
-  },
-  acceptedActionsRow: {
+  inlineError: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    minHeight: 52,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.errorLight,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
   },
-  acceptedChatBtn: {
+  inlineErrorText: {
+    ...typography.bodySmall,
+    color: colors.error,
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: colors.primary,
-    paddingVertical: 10,
-    borderRadius: borderRadius.md,
   },
-  acceptedChatBtnText: {
-    color: colors.primaryOnColor,
-    fontSize: 13,
-    fontFamily: fonts.bodyBold,
+  inlineErrorAction: {
+    ...typography.label,
+    color: colors.error,
   },
-  acceptedDetailsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: borderRadius.md,
-  },
-  acceptedDetailsBtnText: {
-    color: colors.primary,
-    fontSize: 13,
-    fontFamily: fonts.bodySemiBold,
-  },
-  acceptedRateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    backgroundColor: colors.warningLight,
-    borderWidth: 1,
-    borderColor: colors.warningBorder,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: borderRadius.md,
-  },
-  acceptedRateBtnText: {
-    color: colors.warning,
-    fontSize: 13,
-    fontFamily: fonts.bodyBold,
-  },
-  acceptedRatedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    backgroundColor: colors.warningLight,
-    borderWidth: 1,
-    borderColor: colors.warningBorder,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: borderRadius.md,
-  },
-  acceptedRatedBadgeText: {
-    color: colors.warning,
-    fontSize: 12,
-    fontFamily: fonts.bodyBold,
-  },
-
-  // Active in-progress gigs (Business Owner)
 });

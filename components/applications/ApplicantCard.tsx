@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Chip from '../Chip';
 import { colors, spacing, borderRadius, typography } from '../../constants/theme';
 import type { Application } from '../../types/application';
-import { getStatusTheme } from './ApplicationCard';
+import { ApplicationStatusPill, getStatusTheme, toDate } from './ApplicationCard';
 
 interface ApplicantCardProps {
   application: Application;
@@ -18,11 +18,7 @@ interface ApplicantCardProps {
   busy?: boolean;
 }
 
-export function toDate(timestamp: any): Date | null {
-  if (!timestamp) return null;
-  const date = timestamp?.toDate ? timestamp.toDate() : timestamp?.toMillis ? new Date(timestamp.toMillis()) : new Date(timestamp);
-  return isNaN(date.getTime()) ? null : date;
-}
+export { ApplicationStatusPill, toDate };
 
 export function ApplicantAvatar({ application, size = 44 }: { application: Application; size?: number }) {
   const initial = (application.youthName?.[0] || 'Y').toUpperCase();
@@ -30,15 +26,6 @@ export function ApplicantAvatar({ application, size = 44 }: { application: Appli
   return application.youthPhotoURL
     ? <Image source={{ uri: application.youthPhotoURL }} style={[styles.avatar, shape]} contentFit="cover" transition={150} />
     : <View style={[styles.avatarFallback, shape]}><Text style={[styles.avatarText, { fontSize: size * 0.4 }]}>{initial}</Text></View>;
-}
-
-export function ApplicationStatusPill({ status }: { status: Application['status'] }) {
-  const { t } = useTranslation();
-  const theme = getStatusTheme(status);
-  return <View style={[styles.statusPill, { backgroundColor: theme.bg, borderColor: theme.border }]}>
-    <Ionicons name={theme.icon} size={12} color={theme.text} />
-    <Text style={[styles.statusText, { color: theme.text }]}>{t(theme.label)}</Text>
-  </View>;
 }
 
 export default function ApplicantCard({ application, onPress, onAccept, onReject, busy = false }: ApplicantCardProps) {
@@ -129,8 +116,6 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.sm },
   metaText: { ...typography.caption, fontFamily: typography.bodySmall.fontFamily, color: colors.textSecondary },
   rating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  statusPill: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: borderRadius.full, borderWidth: 1 },
-  statusText: { ...typography.caption, fontFamily: typography.label.fontFamily },
   message: { ...typography.bodySmall, color: colors.textSecondary },
   skillsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs + 2 },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingTop: spacing.sm + spacing.xs, borderTopWidth: 1, borderTopColor: colors.surfaceBorder },
