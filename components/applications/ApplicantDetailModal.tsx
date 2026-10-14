@@ -147,6 +147,8 @@ export default function ApplicantDetailModal({
   };
 
   const executeReject = async () => {
+    if (submitting.current || !isPending) return;
+    submitting.current = true;
     setActing(true);
     setErrorMsg('');
     try {
@@ -163,6 +165,7 @@ export default function ApplicantDetailModal({
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to reject application.');
     } finally {
+      submitting.current = false;
       setActing(false);
     }
   };
@@ -193,17 +196,6 @@ export default function ApplicantDetailModal({
     }
   };
 
-  const executeReject = async () => {
-    if (submitting.current || !isPending) return;
-    submitting.current = true; setActing(true); setErrorMsg('');
-    try {
-      await rejectApplication(application.id, businessId);
-      toast.success(tr('Application Rejected'), tr('The application has been rejected.'));
-      onStatusChanged?.('rejected'); onClose();
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : 'Failed to reject application.');
-    } finally { submitting.current = false; setActing(false); }
-  };
   const handleReject = () => {
     if (Platform.OS === 'web') {
       const confirmPrompt = tr("Are you sure you want to reject this application from {{value0}}?", { value0: application.youthName || 'this applicant' });

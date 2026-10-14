@@ -1,4 +1,5 @@
 import ProfileRatingActions from '../../../components/ProfileRatingActions';
+import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
 import { ReviewSummary, ReviewHistory } from '../../../components/ProfileReviews';
 import { useProfileReviews } from '../../../hooks/useProfileReviews';
 import { Text } from '../../../components/LocalizedText';

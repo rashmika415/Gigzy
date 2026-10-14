@@ -7,6 +7,7 @@ import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import StatusPill from './StatusPill';
+import VerifiedBusinessBadge from './VerifiedBusinessBadge';
 import BookmarkButton from './BookmarkButton';
 import Chip from './Chip';
 import { categoryId } from '../services/discoveryFilters';
