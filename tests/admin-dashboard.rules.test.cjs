@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
 const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
-const { doc, setDoc, updateDoc, deleteDoc, collection, getCountFromServer, serverTimestamp } = require('firebase/firestore');
+const { doc, setDoc, updateDoc, deleteDoc, collection, getCountFromServer, getDocs, serverTimestamp } = require('firebase/firestore');
 test('admin dashboard rules isolate counts, suspension and gig moderation', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async () => {
   const env = await initializeTestEnvironment({ projectId: 'demo-gigzy-admin', firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') } });
   try {
@@ -29,5 +29,16 @@ test('admin dashboard rules isolate counts, suspension and gig moderation', { sk
     await assertSucceeds(updateDoc(doc(db('admin'), 'gigs', 'g1'), remove));
     await assertFails(updateDoc(doc(db('owner'), 'gigs', 'g1'), { status: 'open' }));
     await assertFails(deleteDoc(doc(db('owner'), 'gigs', 'g1')));
+    const announcement = { title: 'Safety update', body: 'Please review the latest guidance.', audience: 'all', status: 'queued', deliveredCount: 0, createdBy: 'admin', createdAt: serverTimestamp() };
+    await assertFails(setDoc(doc(db('owner'), 'announcements', 'a1'), { ...announcement, createdBy: 'owner' }));
+    await assertFails(setDoc(doc(db('blocked'), 'announcements', 'a1'), { ...announcement, createdBy: 'blocked' }));
+    await assertFails(setDoc(doc(db('admin'), 'announcements', 'bad'), { ...announcement, status: 'sent' }));
+    await assertSucceeds(setDoc(doc(db('admin'), 'announcements', 'a1'), announcement));
+    await assertSucceeds(getDocs(collection(db('admin'), 'announcements')));
+    await assertFails(getDocs(collection(db('owner'), 'announcements')));
+    await assertFails(updateDoc(doc(db('owner'), 'announcements', 'a1'), { status: 'processing', startedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db('admin'), 'announcements', 'a1'), { title: 'Changed', status: 'processing', startedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(doc(db('admin'), 'announcements', 'a1'), { status: 'processing', startedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(doc(db('admin'), 'announcements', 'a1'), { status: 'sent', deliveredCount: 1, completedAt: serverTimestamp() }));
   } finally { await env.cleanup(); }
 });
