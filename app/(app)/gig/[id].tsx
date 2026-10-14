@@ -13,6 +13,8 @@ import { subscribeToGig } from '../../../services/gigService';
 import { getOrCreateChat } from '../../../services/chatService';
 import { StatusPill, Chip, LoadingState, ErrorState } from '../../../components';
 import CloseGigButton from '../../../components/CloseGigButton';
+import RateUserButton from '../../../components/RateUserButton';
+import ViewApplicantsButton from '../../../components/ViewApplicantsButton';
 import BookmarkButton from '../../../components/BookmarkButton';
 import GigMeetingPoint from '../../../components/GigMeetingPoint';
 import GigApplicationAction from '../../../components/applications/GigApplicationAction';
@@ -193,7 +195,9 @@ export default function GigDetailScreen() {
             <StatusPill status={gig.status} />
           </View>
 
-          <CloseGigButton gig={gig} />
+          <ViewApplicantsButton key={`applicants-${gig.id}`} gig={gig} />
+                    <CloseGigButton gig={gig} />
+                    <RateUserButton key={gig.id} gig={gig} />
 
           {/* Title */}
           <Text style={styles.gigTitle}>{gig.title}</Text>

@@ -1,4 +1,6 @@
-import { formatNumber } from '../../../localization/format';
+import ProfileRatingActions from '../../../components/ProfileRatingActions';
+import { ReviewSummary, ReviewHistory } from '../../../components/ProfileReviews';
+import { useProfileReviews } from '../../../hooks/useProfileReviews';
 import { Text } from '../../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
@@ -6,21 +8,19 @@ import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, Vie
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { UserData } from '../../../context/AuthContext';
-import { subscribeToProfile, subscribeToProfileReviews } from '../../../services/profileService';
-import { ProfileReview } from '../../../types/profile';
+import { subscribeToProfile } from '../../../services/profileService';
 import { borderRadius, colors, spacing, fonts } from '../../../constants/theme';
 
 export default function PublicProfileScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [profile, setProfile] = useState<UserData | null>(null);
-  const [reviews, setReviews] = useState<ProfileReview[]>([]);
+  const reviewState = useProfileReviews(id);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     if (!id) return;
     const stopProfile = subscribeToProfile(id, (value) => { setProfile(value); setLoading(false); }, () => setLoading(false));
-    const stopReviews = subscribeToProfileReviews(id, setReviews, () => {});
-    return () => { stopProfile(); stopReviews(); };
+    return () => { stopProfile(); };
   }, [id]);
   if (loading) return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
   if (!profile) return <View style={styles.center}><Text style={styles.title}>{t("Profile not found")}</Text></View>;
@@ -32,14 +32,15 @@ export default function PublicProfileScreen() {
     <View style={styles.hero}>{profile.photoURL ? <Image source={{uri:profile.photoURL}} style={styles.avatar}/> : <View style={styles.fallback}><Text style={styles.initial}>{name?.[0]?.toUpperCase()}</Text></View>}
       <View style={styles.nameRow}><Text style={styles.name}>{name}</Text>{!youth && profile.isVerified && <Ionicons name="checkmark-circle" size={21} color={colors.primary}/>}</View>
       <Text style={styles.role}>{youth ? t("Youth freelancer") : profile.businessCategory || t("Business")}</Text>
-      <View style={styles.rating}><Ionicons name="star" size={16} color={colors.star}/><Text style={styles.ratingText}>{t('{{rating}} · Reviews: {{count}}', { rating: formatNumber(profile.ratingAverage ?? 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), count: profile.ratingCount ?? reviews.length })}</Text></View>
+      <ReviewSummary {...reviewState} />
     </View>
+    {youth && <ProfileRatingActions key={id} userId={id} />}
     <Card title={youth ? t("About") : t("Business description")}><Text style={styles.body}>{youth ? profile.bio || t("No bio yet.") : profile.businessDetails || t("No description yet.")}</Text></Card>
     <Card title={t("Details")}><Text style={styles.body}>{profile.location || profile.address || t("Location not provided")}</Text>{youth && profile.age ? <Text style={styles.body}>{t('Age: {{age}}', { age: profile.age })}</Text> : null}<Text style={styles.body}>{profile.availability || profile.phone || ''}</Text></Card>
     {youth && skills.length > 0 && <Card title={t("Skills")}><View style={styles.tags}>{skills.map((skill) => <View key={skill} style={styles.tag}><Text style={styles.tagText}>{skill}</Text></View>)}</View></Card>}
     {youth && !!profile.skillBadges?.length && <Card title={t("Earned badges")}><View style={styles.tags}>{profile.skillBadges.map((badge) => <View key={badge.id} style={styles.badge}><Ionicons name="ribbon" size={15} color={colors.primary}/><Text style={styles.tagText}>{badge.label}</Text></View>)}</View></Card>}
     {youth && !!profile.endorsements?.length && <Card title={t("Community endorsements")}>{profile.endorsements.map((item) => <Text key={item.id} style={styles.body}>✓ {item.skill} · {item.endorserName}</Text>)}</Card>}
-    <Card title={t("Reviews")}>{reviews.length ? reviews.map((review) => <View key={review.id} style={styles.review}><View style={styles.reviewHead}><Text style={styles.reviewName}>{review.authorName}</Text><Text style={styles.reviewStars}>{'★'.repeat(Math.round(review.rating))}</Text></View><Text style={styles.body}>{review.comment}</Text></View>) : <Text style={styles.muted}>{t("No reviews yet.")}</Text>}</Card>
+    <ReviewHistory {...reviewState} />
   </ScrollView></View>;
 }
 

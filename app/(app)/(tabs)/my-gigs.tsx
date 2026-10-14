@@ -2,6 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
 import { formatCurrency } from '../../../localization/format';
 import CloseGigButton from '../../../components/CloseGigButton';
+import RateUserButton from '../../../components/RateUserButton';
+import ViewApplicantsButton from '../../../components/ViewApplicantsButton';
 import AppBanner from '../../../components/AppBanner';
 import { STATUS_STYLES } from '../../../components/StatusPill';
 import { Ionicons } from "@expo/vector-icons";
@@ -298,6 +300,15 @@ export default function MyGigs() {
           />
         }
       >
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={[styles.metricCard, { marginBottom: spacing.md }]}
+          onPress={() => router.push('/(app)/add-ratings' as any)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="star-outline" size={22} color={colors.primary} />
+          <Text style={styles.metricLabel}>{tr("Add Ratings")}</Text>
+        </TouchableOpacity>
         <AppBanner compact kind="business" title={tr("Good help, close to home.")} description={tr("Manage your opportunities and connect with local talent.")} />
         {/* Business Metrics Carousel / Grid */}
         <View style={styles.metricsSection}>
@@ -355,7 +366,13 @@ export default function MyGigs() {
             </TouchableOpacity>
 
             {/* Total Applicants */}
-            <View style={styles.metricCard}>
+            <TouchableOpacity
+              style={styles.metricCard}
+              onPress={() => router.push('/(app)/applications')}
+              accessibilityRole="button"
+              accessibilityLabel={tr("View Applications")}
+              activeOpacity={0.8}
+            >
               <View
                 style={[
                   styles.metricIconWrap,
@@ -366,7 +383,7 @@ export default function MyGigs() {
               </View>
               <Text style={styles.metricValue}>{stats.totalApplicants}</Text>
               <Text style={styles.metricLabel}>{tr("Applicants")}</Text>
-            </View>
+            </TouchableOpacity>
 
             {/* Completed */}
             <TouchableOpacity
@@ -814,7 +831,9 @@ export default function MyGigs() {
                       </View>
                     </View>
 
+                    <ViewApplicantsButton key={`applicants-${gig.id}`} gig={gig} />
                     <CloseGigButton gig={gig} />
+                    <RateUserButton key={gig.id} gig={gig} />
 
                     {/* Card Actions Footer */}
                     <View style={styles.cardActionsFooter}>
