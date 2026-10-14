@@ -400,6 +400,31 @@ export function subscribeToClientGigs(
   }
 }
 
+/** Subscribes to gigs assigned to a specific youth freelancer. */
+export function subscribeToAssignedGigs(
+  userId: string,
+  onUpdate: (gigs: Gig[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  try {
+    const q = query(collection(db, 'gigs'), where('assignedYouthId', '==', userId));
+    return onSnapshot(
+      q,
+      snapshot => {
+        const gigs = snapshot.docs.map(item => ({ id: item.id, ...item.data() })) as Gig[];
+        onUpdate(sortGigsDesc(gigs));
+      },
+      error => {
+        console.error('Firestore subscribeToAssignedGigs error:', error);
+        if (onError) onError(new Error(parseFirebaseError(error)));
+      },
+    );
+  } catch (error: any) {
+    if (onError) onError(new Error(parseFirebaseError(error)));
+    return () => {};
+  }
+}
+
 /**
  * Calculates summary metrics and performance stats for a business owner's gigs.
  */

@@ -11,7 +11,7 @@ export function ReviewSummary({ average, count, loading, error }: { average: num
   const { t } = useTranslation();
   if (loading) return <ActivityIndicator color={colors.primary} />;
   if (error) return <Text style={styles.muted}>{t('Ratings unavailable')}</Text>;
-  return <View style={styles.summary}><Ionicons name="star" size={16} color={colors.star} /><Text style={styles.text}>{count ? formatNumber(average, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : t('No ratings yet')}</Text><Text style={styles.muted}>{t('Reviews: {{count}}', { count })}</Text></View>;
+  return <View style={styles.summary}><Ionicons name={count ? 'star' : 'star-outline'} size={16} color={count ? colors.star : colors.textMuted} /><Text style={styles.text}>{count ? formatNumber(average, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : t('No ratings yet')}</Text><Text style={styles.muted}>· {t('Reviews: {{count}}', { count })}</Text></View>;
 }
 
 function reviewDate(value: unknown) {
