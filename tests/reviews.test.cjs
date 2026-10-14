@@ -88,6 +88,13 @@ function setupReviewService() {
         forEach: (fn) => items.forEach((item) => fn({ id: item.id, data: () => ({ ...item }) })),
       };
     },
+    runTransaction: async (_, callback) => callback({
+      get: async (docRef) => ({ exists: () => !!collections.subcollections.get(docRef.collectionPath)?.has(docRef.id) }),
+      set: (docRef, data) => {
+        if (!collections.subcollections.has(docRef.collectionPath)) collections.subcollections.set(docRef.collectionPath, new Map());
+        collections.subcollections.get(docRef.collectionPath).set(docRef.id, { id: docRef.id, ...data });
+      },
+    }),
     updateDoc: async (docRef, updates) => {
       const parts = docRef.path.split('/');
       if (parts[0] === 'users' && parts.length === 2) {
@@ -348,3 +355,24 @@ test('TEST 5: Reviews are blocked before acceptance (status pending or not accep
   assert.equal(canBizReviewAfter, true);
 });
 
+
+test('TEST 6: The same author can review a gig only once, and the count is not inflated', async () => {
+  const { service, collections } = setupReviewService();
+  const input = {
+    targetUserId: 'youth-1',
+    targetRole: 'freelancer',
+    authorId: 'biz-1',
+    authorName: 'ABC Studio',
+    authorRole: 'client',
+    rating: 5,
+    comment: 'Great job!',
+    gigId: 'gig-001',
+  };
+
+  const reviewId = await service.submitReview(input);
+  // Gig reviews share one id per gig and author with RateUserButton's submitGigReview.
+  assert.equal(reviewId, 'gig-001_biz-1');
+  await assert.rejects(service.submitReview({ ...input, rating: 1, comment: 'Changed my mind' }), /already reviewed/);
+  assert.equal(collections.subcollections.get('users/youth-1/reviews').size, 1);
+  assert.equal(collections.users.get('youth-1').ratingCount, 1);
+});

@@ -60,3 +60,18 @@ test('self-review and missing assignment never produce a target', () => {
   assert.equal(service.getReviewTarget({ ...gig, assignedYouthId: 'owner' }, 'owner', 'client'), null);
   assert.equal(service.getReviewTarget({ ...gig, assignedYouthId: undefined }, 'owner', 'client'), null);
 });
+test('gig reviews need a written comment and save the same fields as profile reviews', async () => {
+  const { service, writes } = setup();
+  await assert.rejects(service.submitGigReview('gig', 5, ' ok '), /at least 5 characters/);
+  assert.equal(writes.length, 0);
+
+  await service.submitGigReview('gig', 4, 'Reliable and quick');
+  const { path, data } = writes[0];
+  assert.equal(path, 'users/worker/reviews/gig_owner');
+  assert.equal(data.targetUserId, 'worker');
+  assert.equal(data.targetRole, 'freelancer');
+  assert.equal(data.authorId, 'owner');
+  assert.equal(data.authorRole, 'client');
+  assert.equal(data.tags.length, 0);
+  assert.equal(data.gigId, 'gig');
+});

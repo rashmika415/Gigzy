@@ -9,10 +9,12 @@ import {
   orderBy,
   limit,
   onSnapshot,
+  runTransaction,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../FirebaseConfig';
+import { auth, db } from '../FirebaseConfig';
 import { Review, SubmitReviewInput } from '../types/review';
+import type { Gig } from '../types/gig';
 import { sendNotification } from './notificationService';
 import { parseFirebaseError } from './gigService';
 
@@ -21,6 +23,129 @@ const REVIEWABLE_STATUSES = ['accepted', 'approved', 'in-progress', 'completed']
 
 export const REVIEW_LOCKED_MESSAGE =
   'Reviews unlock only after the business owner accepts the application.';
+
+export const ALREADY_REVIEWED_MESSAGE = 'You have already reviewed this gig.';
+const MIN_COMMENT = 5; // firestore.rules rejects shorter comments
+const SHORT_COMMENT_MESSAGE = 'Please provide a written review of at least 5 characters.';
+
+/**
+ * Gig-linked reviews use a fixed document id so the same person can rate the
+ * other participant of a gig only once, whichever rating button they used.
+ */
+const gigReviewId = (gigId: string, authorId: string) => `${gigId}_${authorId}`;
+
+/** The other participant of a completed gig, or null when the viewer cannot rate anyone. */
+export function getReviewTarget(gig: Gig, uid?: string, role?: string): string | null {
+  if (!uid || gig.status !== 'completed' || gig.moderationRemoved) return null;
+  const owner = gig.postedBy.uid;
+  const worker = gig.assignedYouthId;
+  if (!worker || worker === owner) return null;
+  if (role === 'client' && uid === owner) return worker;
+  if ((role === 'freelancer' || role === 'youth') && uid === worker) return owner;
+  return null;
+}
+
+/** Recalculates the recipient's rating and notifies them. Failures are logged, never thrown. */
+async function afterReviewSaved(
+  targetUserId: string,
+  reviewId: string,
+  review: { authorRole?: string; authorName?: string; rating: number; comment: string }
+) {
+  try {
+    const snap = await getDocs(collection(db, 'users', targetUserId, 'reviews'));
+    let totalRatingSum = 0;
+    let validReviewsCount = 0;
+
+    snap.forEach((d) => {
+      const item = d.data();
+      if (typeof item.rating === 'number' && item.rating >= 1 && item.rating <= 5) {
+        totalRatingSum += item.rating;
+        validReviewsCount += 1;
+      }
+    });
+
+    // Avoid edge cases where snap might be temporarily empty right after the write in mocks
+    if (validReviewsCount === 0) {
+      totalRatingSum = review.rating;
+      validReviewsCount = 1;
+    }
+
+    await updateDoc(doc(db, 'users', targetUserId), {
+      ratingAverage: Math.round((totalRatingSum / validReviewsCount) * 10) / 10,
+      ratingCount: validReviewsCount,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (calcError) {
+    console.warn('Warning: Could not recalculate user rating average:', calcError);
+  }
+
+  try {
+    const roleLabel = review.authorRole === 'client' ? 'Business client' : 'Youth freelancer';
+    const previewText = review.comment.length > 60 ? `${review.comment.slice(0, 60)}...` : review.comment;
+    await sendNotification(targetUserId, {
+      userId: targetUserId,
+      type: 'review',
+      title: 'New Review Received! ⭐',
+      body: `${roleLabel} ${review.authorName || 'A user'} gave you a ${review.rating}★ rating: "${previewText}"`,
+      read: false,
+      route: `/(app)/profile/${targetUserId}`,
+      entityId: reviewId,
+    });
+  } catch (notifErr) {
+    console.warn('Could not dispatch review notification:', notifErr);
+  }
+}
+
+/**
+ * Rates the other participant of a completed gig (used by RateUserButton).
+ * The target, role and duplicate checks all run inside one transaction.
+ */
+export async function submitGigReview(gigId: string, rating: number, comment: string): Promise<string> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Please sign in to rate a user.');
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new Error('Choose a rating from 1 to 5.');
+  const cleanComment = comment.trim();
+  if (cleanComment.length > 1000) throw new Error('Keep your review within 1000 characters.');
+
+  const saved = await runTransaction(db, async transaction => {
+    const gigSnapshot = await transaction.get(doc(db, 'gigs', gigId));
+    const authorSnapshot = await transaction.get(doc(db, 'users', uid));
+    if (!gigSnapshot.exists()) throw new Error('Gig not found.');
+    const gig = { ...gigSnapshot.data(), id: gigId } as Gig;
+    const author = authorSnapshot.data() ?? {};
+    const target = getReviewTarget(gig, uid, author.role);
+    if (!target) throw new Error('Only participants can rate a user after gig completion.');
+    if (cleanComment.length < MIN_COMMENT) throw new Error(SHORT_COMMENT_MESSAGE);
+    const reviewRef = doc(db, 'users', target, 'reviews', gigReviewId(gigId, uid));
+    if ((await transaction.get(reviewRef)).exists()) throw new Error(ALREADY_REVIEWED_MESSAGE);
+
+    const authorRole: 'client' | 'freelancer' = author.role === 'client' ? 'client' : 'freelancer';
+    const authorName = author.businessName || author.fullName || 'User';
+    transaction.set(reviewRef, {
+      targetUserId: target,
+      targetRole: target === gig.postedBy.uid ? 'client' : 'freelancer',
+      authorId: uid,
+      authorName,
+      authorPhotoURL: author.photoURL || '',
+      authorRole,
+      rating,
+      comment: cleanComment,
+      tags: [],
+      gigId,
+      gigTitle: gig.title || '',
+      // Kept for older readers of gig reviews.
+      reviewerId: uid,
+      reviewedUserId: target,
+      reviewerRole: author.role,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return { target, reviewId: reviewRef.id, authorRole, authorName };
+  });
+
+  await afterReviewSaved(saved.target, saved.reviewId, { authorRole: saved.authorRole, authorName: saved.authorName, rating, comment: cleanComment });
+  return saved.reviewId;
+}
 
 /**
  * Returns true when author and target share an application that the business
@@ -85,7 +210,7 @@ export async function submitReview(input: SubmitReviewInput): Promise<string> {
     throw new Error('Rating must be a whole number between 1 and 5 stars.');
   }
 
-  if (cleanComment.length < 5) {
+  if (cleanComment.length < MIN_COMMENT) {
     throw new Error('Please provide a written review of at least 5 characters.');
   }
 
@@ -98,9 +223,6 @@ export async function submitReview(input: SubmitReviewInput): Promise<string> {
   }
 
   try {
-    const reviewsColRef = collection(db, 'users', input.targetUserId, 'reviews');
-    const userDocRef = doc(db, 'users', input.targetUserId);
-
     const reviewData = {
       targetUserId: input.targetUserId,
       targetRole: input.targetRole,
@@ -117,59 +239,24 @@ export async function submitReview(input: SubmitReviewInput): Promise<string> {
       updatedAt: serverTimestamp(),
     };
 
-    // 1. Save review document to subcollection
-    const docRef = await addDoc(reviewsColRef, reviewData);
-
-    // 2. Recalculate rating average and total count across all reviews for this user
-    try {
-      const snap = await getDocs(reviewsColRef);
-      let totalRatingSum = 0;
-      let validReviewsCount = 0;
-
-      snap.forEach((d) => {
-        const item = d.data();
-        if (typeof item.rating === 'number' && item.rating >= 1 && item.rating <= 5) {
-          totalRatingSum += item.rating;
-          validReviewsCount += 1;
-        }
-      });
-
-      // Avoid edge cases where snap might be temporarily empty right after addDoc in mocks
-      if (validReviewsCount === 0) {
-        totalRatingSum = cleanRating;
-        validReviewsCount = 1;
+    let reviewId: string;
+    if (input.gigId) {
+      // Older gig reviews were saved with random ids, so also check by query.
+      if (await hasUserReviewedGig(input.authorId, input.targetUserId, input.gigId)) {
+        throw new Error(ALREADY_REVIEWED_MESSAGE);
       }
-
-      const ratingAverage = Math.round((totalRatingSum / validReviewsCount) * 10) / 10;
-      const ratingCount = validReviewsCount;
-
-      await updateDoc(userDocRef, {
-        ratingAverage,
-        ratingCount,
-        updatedAt: serverTimestamp(),
+      const reviewRef = doc(db, 'users', input.targetUserId, 'reviews', gigReviewId(input.gigId, input.authorId));
+      await runTransaction(db, async (transaction) => {
+        if ((await transaction.get(reviewRef)).exists()) throw new Error(ALREADY_REVIEWED_MESSAGE);
+        transaction.set(reviewRef, reviewData);
       });
-    } catch (calcError) {
-      console.warn('Warning: Could not recalculate user rating average:', calcError);
+      reviewId = reviewRef.id;
+    } else {
+      reviewId = (await addDoc(collection(db, 'users', input.targetUserId, 'reviews'), reviewData)).id;
     }
 
-    // 3. Dispatch an in-app notification to the reviewed user
-    try {
-      const roleLabel = input.authorRole === 'client' ? 'Business client' : 'Youth freelancer';
-      const previewText = cleanComment.length > 60 ? `${cleanComment.slice(0, 60)}...` : cleanComment;
-      await sendNotification(input.targetUserId, {
-        userId: input.targetUserId,
-        type: 'review',
-        title: 'New Review Received! ⭐',
-        body: `${roleLabel} ${input.authorName || 'A user'} gave you a ${cleanRating}★ rating: "${previewText}"`,
-        read: false,
-        route: `/(app)/profile/${input.targetUserId}`,
-        entityId: docRef.id,
-      });
-    } catch (notifErr) {
-      console.warn('Could not dispatch review notification:', notifErr);
-    }
-
-    return docRef.id;
+    await afterReviewSaved(input.targetUserId, reviewId, { authorRole: input.authorRole, authorName: input.authorName, rating: cleanRating, comment: cleanComment });
+    return reviewId;
   } catch (error: any) {
     console.error('Error submitting review:', error);
     throw new Error(parseFirebaseError(error));

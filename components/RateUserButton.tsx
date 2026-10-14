@@ -40,6 +40,7 @@ export default function RateUserButton({ gig }: { gig: Gig }) {
   const submit = async () => {
     if (!target || submitting.current) return;
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) { setError(t('Choose a rating from 1 to 5.')); return; }
+    if (comment.trim().length < 5) { setError(t('Please write a review with at least 5 characters.')); return; }
     submitting.current = true;
     setSaving(true); setError('');
     try {
@@ -70,7 +71,7 @@ export default function RateUserButton({ gig }: { gig: Gig }) {
         <View style={styles.actions}>{[1, 2, 3, 4, 5].map(value => <TouchableOpacity key={value} accessibilityRole="button" accessibilityLabel={t('{{count}} stars', { count: value })} accessibilityState={{ selected: rating === value }} disabled={saving} style={styles.star} onPress={() => setRating(value)}>
           <Ionicons name={value <= rating ? 'star' : 'star-outline'} size={30} color={colors.star} />
         </TouchableOpacity>)}</View>
-        <TextInput style={styles.input} accessibilityLabel={t('Review (optional)')} placeholder={t('Review (optional)')} placeholderTextColor={colors.textMuted} multiline maxLength={1000} editable={!saving} value={comment} onChangeText={setComment} />
+        <TextInput style={styles.input} accessibilityLabel={t('Written Review')} placeholder={t('Please write a review with at least 5 characters.')} placeholderTextColor={colors.textMuted} multiline maxLength={1000} editable={!saving} value={comment} onChangeText={setComment} />
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{t(error)}</Text>}
         <View style={styles.actions}>
           <TouchableOpacity style={styles.button} disabled={saving} onPress={() => setVisible(false)}><Text style={styles.text}>{t('Cancel')}</Text></TouchableOpacity>

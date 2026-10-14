@@ -522,7 +522,7 @@ export default function Home() {
             accessibilityRole="button"
             activeOpacity={0.8}
           >
-            <Ionicons name="checkmark-circle" size={16} color="#059669" />
+            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
             <Text style={styles.appliedActionText}>{tr("Applied")}</Text>
           </TouchableOpacity>
         ) : (
@@ -674,7 +674,7 @@ export default function Home() {
                 <Ionicons
                   name={acceptedApplications.length > 0 ? 'checkmark-circle' : 'document-text'}
                   size={20}
-                  color={acceptedApplications.length > 0 ? '#059669' : colors.primary}
+                  color={acceptedApplications.length > 0 ? colors.success : colors.primary}
                 />
                 <Text style={styles.acceptedSectionTitle}>
                   {acceptedApplications.length > 0
@@ -700,13 +700,13 @@ export default function Home() {
                   <View style={styles.acceptedCardTopRow}>
                     <View style={[
                       styles.acceptedStatusBadge,
-                      isCompleted ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' } :
+                      isCompleted ? { backgroundColor: colors.successLight, borderColor: colors.successBorder } :
                       !isAccepted ? { backgroundColor: colors.warningLight, borderColor: colors.warningBorder } : null,
                     ]}>
                       <Ionicons
                         name={isCompleted ? 'checkmark-circle' : isAccepted ? 'sparkles' : 'time-outline'}
                         size={13}
-                        color={isCompleted ? '#059669' : isAccepted ? '#059669' : colors.warning}
+                        color={isCompleted ? colors.success : isAccepted ? colors.success : colors.warning}
                       />
                       <Text style={[styles.acceptedStatusText, !isAccepted && !isCompleted && { color: colors.warning }]}>
                         {isCompleted ? tr("Completed 🎉") : isAccepted ? tr("Application Accepted! 🎉") : tr("Pending")}
@@ -769,7 +769,7 @@ export default function Home() {
                     {(isAccepted || isCompleted) && (
                       hasReviewed ? (
                         <View style={styles.acceptedRatedBadge}>
-                          <Ionicons name="star" size={13} color="#F59E0B" />
+                          <Ionicons name="star" size={13} color={colors.star} />
                           <Text style={styles.acceptedRatedBadgeText}>{tr("Rated ★")}</Text>
                         </View>
                       ) : (
@@ -778,7 +778,7 @@ export default function Home() {
                           onPress={() => handleRateClient(app)}
                           activeOpacity={0.8}
                         >
-                          <Ionicons name="star-outline" size={14} color="#D97706" />
+                          <Ionicons name="star-outline" size={14} color={colors.warning} />
                           <Text style={styles.acceptedRateBtnText}>{tr("Rate Client")}</Text>
                         </TouchableOpacity>
                       )
@@ -813,7 +813,7 @@ export default function Home() {
           <View style={styles.inProgressSectionContainer}>
             <View style={styles.inProgressSectionHeader}>
               <View style={styles.inProgressTitleRow}>
-                <Ionicons name="checkmark-circle" size={22} color="#059669" />
+                <Ionicons name="checkmark-circle" size={22} color={colors.success} />
                 <Text style={styles.inProgressSectionTitle}>
                   {tr("Accepted Gigs")} ({inProgressGigs.length})
                 </Text>
@@ -844,14 +844,14 @@ export default function Home() {
                     <View style={styles.projectTopRow}>
                       <View style={[
                         styles.youAcceptedStatusPill,
-                        isCompleted && { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
+                        isCompleted && { backgroundColor: colors.successLight, borderColor: colors.successBorder },
                       ]}>
                         <Ionicons
                           name={isCompleted ? "checkmark-done-circle" : "checkmark-circle"}
                           size={14}
-                          color="#059669"
+                          color={colors.success}
                         />
-                        <Text style={[styles.youAcceptedStatusText, isCompleted && { color: "#059669" }]}>
+                        <Text style={[styles.youAcceptedStatusText, isCompleted && { color: colors.success }]}>
                           {isCompleted ? tr("Completed 🎉") : tr("You Accepted ✓")}
                         </Text>
                       </View>
@@ -886,7 +886,7 @@ export default function Home() {
                             {gig.assignedYouthName || tr("Assigned Freelancer")}
                           </Text>
                           <View style={styles.talentBadge}>
-                            <Ionicons name="checkmark-circle" size={12} color="#059669" />
+                            <Ionicons name="checkmark-circle" size={12} color={colors.success} />
                             <Text style={styles.talentBadgeText}>{tr("Hired")}</Text>
                           </View>
                         </View>
@@ -940,9 +940,9 @@ export default function Home() {
                             <Ionicons
                               name={isAddedCal ? "checkmark-circle" : "calendar-outline"}
                               size={16}
-                              color={isAddedCal ? "#059669" : colors.primary}
+                              color={isAddedCal ? colors.success : colors.primary}
                             />
-                            <Text style={[styles.projectSecondaryActionText, isAddedCal && { color: "#059669" }]}>
+                            <Text style={[styles.projectSecondaryActionText, isAddedCal && { color: colors.success }]}>
                               {isAddedCal ? tr("Scheduled ✓") : tr("Calendar")}
                             </Text>
                           </>
@@ -952,7 +952,7 @@ export default function Home() {
                       {isCompleted ? (
                         hasReviewed ? (
                           <View style={styles.projectRatedAction}>
-                            <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
                             <Text style={styles.projectRatedActionText}>{tr("Reviewed ✓")}</Text>
                           </View>
                         ) : (
@@ -961,7 +961,7 @@ export default function Home() {
                             onPress={() => handleRateFreelancer(gig)}
                             activeOpacity={0.85}
                           >
-                            <Ionicons name="star" size={16} color="#D97706" />
+                            <Ionicons name="star" size={16} color={colors.star} />
                             <Text style={styles.projectRateNowActionText}>{tr("Rate Freelancer")}</Text>
                           </TouchableOpacity>
                         )
@@ -971,7 +971,7 @@ export default function Home() {
                           onPress={() => handleCompleteGig(gig)}
                           activeOpacity={0.85}
                         >
-                          <Ionicons name="checkmark-done-circle" size={17} color="#059669" />
+                          <Ionicons name="checkmark-done-circle" size={17} color={colors.success} />
                           <Text style={styles.projectCompleteActionText}>{tr("Complete & Rate")}</Text>
                         </TouchableOpacity>
                       )}
@@ -1007,7 +1007,7 @@ export default function Home() {
           ) : isClient && openGigs.length === 0 && inProgressGigs.length > 0 ? (
             <View style={styles.allAssignedCard}>
               <View style={styles.allAssignedIconWrap}>
-                <Ionicons name="sparkles" size={24} color="#059669" />
+                <Ionicons name="sparkles" size={24} color={colors.success} />
               </View>
               <Text style={styles.allAssignedTitle}>{tr("All Gigs In Progress! 🎉")}</Text>
               <Text style={styles.allAssignedSubtitle}>
@@ -1402,15 +1402,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successLight,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: colors.successBorder,
     borderRadius: borderRadius.md,
   },
   appliedActionText: {
     ...typography.label,
     fontSize: 14,
-    color: '#059669',
+    color: colors.success,
   },
   chatAction: {
     width: 44,
@@ -1448,7 +1448,7 @@ const styles = StyleSheet.create({
   acceptedSectionTitle: {
     fontSize: 16,
     fontFamily: fonts.bodyBold,
-    color: '#065F46',
+    color: colors.success,
   },
   acceptedViewAllText: {
     fontSize: 13,
@@ -1456,11 +1456,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   acceptedGigCard: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successLight,
     borderRadius: borderRadius.xl,
     padding: spacing.md,
     borderWidth: 1.5,
-    borderColor: '#A7F3D0',
+    borderColor: colors.successBorder,
     marginBottom: spacing.sm,
   },
   acceptedCardTopRow: {
@@ -1473,22 +1473,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#D1FAE5',
+    backgroundColor: colors.successLight,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: borderRadius.full,
     borderWidth: 1,
-    borderColor: '#6EE7B7',
+    borderColor: colors.successBorder,
   },
   acceptedStatusText: {
     fontSize: 11,
     fontFamily: fonts.bodyBold,
-    color: '#047857',
+    color: colors.success,
   },
   acceptedPayText: {
     fontSize: 15,
     fontFamily: fonts.bodyBold,
-    color: '#065F46',
+    color: colors.success,
   },
   acceptedGigTitle: {
     fontSize: 16,
@@ -1558,15 +1558,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.warningLight,
     borderWidth: 1,
-    borderColor: '#F59E0B',
+    borderColor: colors.warningBorder,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: borderRadius.md,
   },
   acceptedRateBtnText: {
-    color: '#B45309',
+    color: colors.warning,
     fontSize: 13,
     fontFamily: fonts.bodyBold,
   },
@@ -1575,15 +1575,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    backgroundColor: '#FEF9C3',
+    backgroundColor: colors.warningLight,
     borderWidth: 1,
-    borderColor: '#FDE047',
+    borderColor: colors.warningBorder,
     paddingVertical: 10,
     paddingHorizontal: 10,
     borderRadius: borderRadius.md,
   },
   acceptedRatedBadgeText: {
-    color: '#854D0E',
+    color: colors.warning,
     fontSize: 12,
     fontFamily: fonts.bodyBold,
   },
@@ -1608,7 +1608,7 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: colors.accentLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1616,7 +1616,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.accent,
   },
   inProgressSectionTitle: {
     fontSize: 18,
@@ -1638,11 +1638,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   projectCard: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: colors.successLight,
     borderRadius: borderRadius.xl,
     padding: spacing.md,
     borderWidth: 1.5,
-    borderColor: '#A7F3D0',
+    borderColor: colors.successBorder,
     marginBottom: spacing.sm,
   },
   projectTopRow: {
@@ -1655,38 +1655,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: colors.successLight,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: borderRadius.full,
     borderWidth: 1.5,
-    borderColor: '#86EFAC',
+    borderColor: colors.successBorder,
   },
   youAcceptedStatusText: {
     fontSize: 12,
     fontFamily: fonts.bodyBold,
-    color: '#15803D',
+    color: colors.success,
   },
   projectStatusPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.accentLight,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: borderRadius.full,
     borderWidth: 1,
-    borderColor: '#93C5FD',
+    borderColor: colors.accentBorder,
   },
   projectStatusText: {
     fontSize: 12,
     fontFamily: fonts.bodyBold,
-    color: '#1D4ED8',
+    color: colors.accent,
   },
   projectPayText: {
     fontSize: 16,
     fontFamily: fonts.bodyBold,
-    color: '#1E3A8A',
+    color: colors.accent,
   },
   projectTitle: {
     fontSize: 17,
@@ -1744,7 +1744,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successLight,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: borderRadius.full,
@@ -1752,7 +1752,7 @@ const styles = StyleSheet.create({
   talentBadgeText: {
     fontSize: 10,
     fontFamily: fonts.bodyBold,
-    color: '#059669',
+    color: colors.success,
   },
   talentSub: {
     fontSize: 12,
@@ -1820,8 +1820,8 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
   },
   projectCalendarAddedAction: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
+    backgroundColor: colors.successLight,
+    borderColor: colors.successBorder,
   },
   projectCompleteAction: {
     flex: 1.4,
@@ -1831,14 +1831,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successLight,
     borderWidth: 1.5,
-    borderColor: '#059669',
+    borderColor: colors.success,
     paddingHorizontal: spacing.sm,
     borderRadius: borderRadius.md,
   },
   projectCompleteActionText: {
-    color: '#059669',
+    color: colors.success,
     fontSize: 13,
     fontFamily: fonts.bodyBold,
   },
@@ -1850,14 +1850,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.warningLight,
     borderWidth: 1.5,
-    borderColor: '#F59E0B',
+    borderColor: colors.warningBorder,
     paddingHorizontal: spacing.sm,
     borderRadius: borderRadius.md,
   },
   projectRateNowActionText: {
-    color: '#B45309',
+    color: colors.warning,
     fontSize: 13,
     fontFamily: fonts.bodyBold,
   },
@@ -1869,21 +1869,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successLight,
     borderWidth: 1.5,
-    borderColor: '#10B981',
+    borderColor: colors.success,
     paddingHorizontal: spacing.sm,
     borderRadius: borderRadius.md,
   },
   projectRatedActionText: {
-    color: '#059669',
+    color: colors.success,
     fontSize: 13,
     fontFamily: fonts.bodyBold,
   },
   allAssignedCard: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: colors.successLight,
     borderWidth: 1.5,
-    borderColor: '#BBF7D0',
+    borderColor: colors.successBorder,
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     alignItems: 'center',
@@ -1893,7 +1893,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: colors.successLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
@@ -1901,7 +1901,7 @@ const styles = StyleSheet.create({
   allAssignedTitle: {
     fontSize: 17,
     fontFamily: fonts.bodyBold,
-    color: '#166534',
+    color: colors.success,
     marginBottom: 4,
     textAlign: 'center',
   },

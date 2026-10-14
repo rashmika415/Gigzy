@@ -3,6 +3,7 @@ import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
 import { ReviewSummary, ReviewHistory } from '../../../components/ProfileReviews';
 import { useProfileReviews } from '../../../hooks/useProfileReviews';
 import { Text } from '../../../components/LocalizedText';
+import { formatNumber } from '../../../localization/format';
 import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -20,6 +21,7 @@ export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [profile, setProfile] = useState<UserData | null>(null);
   const reviewState = useProfileReviews(id);
+  const { reviews } = reviewState;
   const [loading, setLoading] = useState(true);
   const [showRatingModal, setShowRatingModal] = useState(false);
   useEffect(() => {
@@ -92,7 +94,7 @@ function Card({title,children}:{title:string;children:React.ReactNode}) {
   const { t } = useTranslation(); return <View style={styles.card}><Text style={styles.cardTitle}>{t(title)}</Text>{children}</View>; }
 const styles=StyleSheet.create({container:{flex:1,backgroundColor:colors.background},center:{flex:1,alignItems:'center',justifyContent:'center',backgroundColor:colors.background},content:{padding:spacing.lg,paddingTop:48,paddingBottom:spacing.xxl},header:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:spacing.lg},headerTitle:{fontSize:19,fontFamily: fonts.bodyBold,color:colors.text},hero:{alignItems:'center',marginBottom:spacing.lg},avatar:{width:96,height:96,borderRadius:48,borderWidth:2,borderColor:colors.primary},fallback:{width:96,height:96,borderRadius:48,alignItems:'center',justifyContent:'center',backgroundColor:colors.primaryLight,borderWidth:2,borderColor:colors.primary},initial:{fontSize:38,fontFamily: fonts.display,color:colors.primary},nameRow:{flexDirection:'row',alignItems:'center',gap:6,marginTop:spacing.md},name:{fontSize:23,fontFamily: fonts.heading,color:colors.text},title:{fontSize:20,color:colors.text},role:{fontSize:13,color:colors.textSecondary,marginTop:3},rating:{flexDirection:'row',gap:5,marginTop:spacing.sm},ratingText:{color:colors.textSecondary,fontSize:13},card:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.surfaceBorder,borderRadius:borderRadius.xl,padding:spacing.lg,marginBottom:spacing.md},cardTitle:{fontSize:13,fontFamily: fonts.bodyBold,color:colors.textSecondary,textTransform:'uppercase',marginBottom:spacing.sm},body:{fontSize:14,color:colors.text,lineHeight:21,marginBottom:3},muted:{fontSize:14,color:colors.textMuted},tags:{flexDirection:'row',flexWrap:'wrap',gap:spacing.sm},tag:{paddingHorizontal:10,paddingVertical:6,borderRadius:borderRadius.full,backgroundColor:colors.primaryLight},badge:{flexDirection:'row',alignItems:'center',gap:5,paddingHorizontal:10,paddingVertical:6,borderRadius:borderRadius.full,backgroundColor:colors.primaryLight},tagText:{fontSize:12,fontFamily: fonts.bodyBold,color:colors.primary},review:{paddingVertical:spacing.sm,borderBottomWidth:1,borderBottomColor:colors.surfaceBorder},reviewHead:{flexDirection:'row',justifyContent:'space-between',marginBottom:4},reviewName:{fontFamily: fonts.bodyBold,color:colors.text},reviewStars:{color:colors.warning},
 reviewTagsRow:{flexDirection:'row',flexWrap:'wrap',gap:6,marginVertical:4},
-reviewTagChip:{backgroundColor:'rgba(245, 158, 11, 0.12)',borderWidth:1,borderColor:'rgba(245, 158, 11, 0.3)',borderRadius:borderRadius.full,paddingHorizontal:8,paddingVertical:2},
-reviewTagText:{fontSize:11,fontFamily:fonts.bodySemiBold,color:'#D97706'},
+reviewTagChip:{backgroundColor:colors.warningLight,borderWidth:1,borderColor:colors.warningBorder,borderRadius:borderRadius.full,paddingHorizontal:8,paddingVertical:2},
+reviewTagText:{fontSize:11,fontFamily:fonts.bodySemiBold,color:colors.warning},
 leaveReviewBtn:{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:colors.primary,paddingHorizontal:16,paddingVertical:8,borderRadius:borderRadius.full,marginTop:spacing.md,shadowColor:colors.primary,shadowOffset:{width:0,height:2},shadowOpacity:0.25,shadowRadius:4,elevation:2},
 leaveReviewBtnText:{color:colors.primaryOnColor,fontFamily:fonts.bodyBold,fontSize:13}});

@@ -441,7 +441,7 @@ export default function ApplicantDetailModal({
                         <Ionicons
                           name={calendarAdded ? 'checkmark-circle' : 'calendar-outline'}
                           size={18}
-                          color={calendarAdded ? '#059669' : colors.primary}
+                          color={calendarAdded ? colors.success : colors.primary}
                         />
                         <Text
                           style={[
@@ -460,7 +460,7 @@ export default function ApplicantDetailModal({
                     onPress={() => setShowRatingModal(true)}
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="star" size={18} color="#D97706" />
+                    <Ionicons name="star" size={18} color={colors.star} />
                     <Text style={styles.actionRateBtnText}>{tr("Rate Freelancer")}</Text>
                   </TouchableOpacity>
                 </View>
@@ -793,8 +793,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
   },
   actionCalendarBtnAdded: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#059669',
+    backgroundColor: colors.successLight,
+    borderColor: colors.success,
   },
   actionCalendarBtnText: {
     fontSize: 14,
@@ -802,23 +802,23 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   actionCalendarBtnTextAdded: {
-    color: '#059669',
+    color: colors.success,
   },
   actionRateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: colors.primaryLight,
     borderWidth: 1.5,
-    borderColor: 'rgba(245, 158, 11, 0.35)',
+    borderColor: colors.primaryBorder,
     paddingVertical: spacing.md,
     borderRadius: borderRadius.lg,
   },
   actionRateBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#D97706',
+    color: colors.warning,
   },
   finalizedNotice: {
     flexDirection: 'row',

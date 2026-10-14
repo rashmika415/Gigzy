@@ -149,7 +149,7 @@ export default function BrowseScreen() {
                     onPress={() => router.push('/(app)/applications' as any)}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="checkmark-circle" size={15} color="#059669" />
+                    <Ionicons name="checkmark-circle" size={15} color={colors.success} />
                     <Text style={styles.appliedBtnText}>{t("Applied")}</Text>
                   </TouchableOpacity>
                 ) : (
@@ -739,14 +739,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successLight,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: colors.successBorder,
     borderRadius: borderRadius.md,
   },
   appliedBtnText: {
     fontSize: 13,
     fontFamily: fonts.bodyBold,
-    color: '#059669',
+    color: colors.success,
   },
 });

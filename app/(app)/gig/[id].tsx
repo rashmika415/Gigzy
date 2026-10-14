@@ -13,7 +13,6 @@ import { subscribeToGig } from '../../../services/gigService';
 import { getOrCreateChat } from '../../../services/chatService';
 import { StatusPill, Chip, LoadingState, ErrorState } from '../../../components';
 import CloseGigButton from '../../../components/CloseGigButton';
-import RateUserButton from '../../../components/RateUserButton';
 import ViewApplicantsButton from '../../../components/ViewApplicantsButton';
 import BookmarkButton from '../../../components/BookmarkButton';
 import GigMeetingPoint from '../../../components/GigMeetingPoint';
@@ -217,7 +216,6 @@ export default function GigDetailScreen() {
 
           <ViewApplicantsButton key={`applicants-${gig.id}`} gig={gig} />
                     <CloseGigButton gig={gig} />
-                    <RateUserButton key={gig.id} gig={gig} />
 
           {/* Title */}
           <Text style={styles.gigTitle}>{gig.title}</Text>
@@ -364,7 +362,7 @@ export default function GigDetailScreen() {
           <View style={styles.bottomPayPreview}>
             <Text style={styles.bottomPayLabel}>{tr("Pay")}</Text>
             <Text style={styles.bottomPayValue}>
-              ${gig.pay}{gig.payType === 'hourly' ? tr("/hr") : ''}
+              {formatCurrency(gig.pay)}{gig.payType === 'hourly' ? tr("/hr") : ''}
             </Text>
           </View>
 
@@ -376,7 +374,7 @@ export default function GigDetailScreen() {
               onPress={() => setShowRatingModal(true)}
               activeOpacity={0.85}
             >
-              <Ionicons name="star" size={16} color="#D97706" />
+              <Ionicons name="star" size={16} color={colors.star} />
               <Text style={styles.rateFreelancerBtnText}>{tr("Rate Client")}</Text>
             </TouchableOpacity>
           )}
@@ -402,7 +400,7 @@ export default function GigDetailScreen() {
               onPress={() => setShowRatingModal(true)}
               activeOpacity={0.85}
             >
-              <Ionicons name="star" size={16} color="#D97706" />
+              <Ionicons name="star" size={16} color={colors.star} />
               <Text style={styles.rateFreelancerBtnText}>{tr("Rate")}</Text>
             </TouchableOpacity>
           )}
@@ -907,9 +905,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: colors.primaryLight,
     borderWidth: 1.5,
-    borderColor: 'rgba(245, 158, 11, 0.35)',
+    borderColor: colors.primaryBorder,
     borderRadius: borderRadius.lg,
     paddingVertical: 14,
     paddingHorizontal: 12,
@@ -918,6 +916,6 @@ const styles = StyleSheet.create({
   rateFreelancerBtnText: {
     fontSize: 13,
     fontFamily: fonts.bodyBold,
-    color: '#D97706',
+    color: colors.warning,
   },
 });

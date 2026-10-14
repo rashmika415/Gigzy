@@ -256,7 +256,7 @@ export default function ChatRoomScreen() {
           )}
           <View style={styles.systemMessageContainer}>
             <View style={styles.systemMessagePill}>
-              <Ionicons name="sparkles" size={14} color="#047857" style={{ marginRight: 6 }} />
+              <Ionicons name="sparkles" size={14} color={colors.success} style={{ marginRight: 6 }} />
               <Text style={styles.systemMessageText}>{item.text}</Text>
             </View>
             <Text style={styles.systemMessageTime}>{formatMessageTime(item.createdAt)}</Text>
@@ -831,13 +831,13 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: borderRadius.sm,
     borderWidth: 1,
-    borderColor: "#F59E0B",
+    borderColor: colors.warningBorder,
     gap: 4,
   },
   gigBannerRateText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#D97706",
+    color: colors.warning,
   },
   systemMessageContainer: {
     alignItems: "center",
@@ -847,9 +847,9 @@ const styles = StyleSheet.create({
   systemMessagePill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ECFDF5",
+    backgroundColor: colors.successLight,
     borderWidth: 1,
-    borderColor: "#A7F3D0",
+    borderColor: colors.successBorder,
     borderRadius: borderRadius.full,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
@@ -858,7 +858,7 @@ const styles = StyleSheet.create({
   systemMessageText: {
     fontSize: 12.5,
     fontWeight: "600",
-    color: "#047857",
+    color: colors.success,
     textAlign: "center",
     flexShrink: 1,
   },

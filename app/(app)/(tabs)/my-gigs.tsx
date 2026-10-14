@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
 import { formatCurrency } from '../../../localization/format';
 import CloseGigButton from '../../../components/CloseGigButton';
-import RateUserButton from '../../../components/RateUserButton';
 import ViewApplicantsButton from '../../../components/ViewApplicantsButton';
 import AppBanner from '../../../components/AppBanner';
 import { STATUS_STYLES } from '../../../components/StatusPill';
@@ -784,7 +783,7 @@ export default function MyGigs() {
 
                     {Boolean(gig.assignedYouthId || gig.status === "in-progress") && (
                       <View style={styles.assignedHireBanner}>
-                        <Ionicons name="checkmark-circle" size={13} color="#059669" />
+                        <Ionicons name="checkmark-circle" size={13} color={colors.success} />
                         <Text style={styles.assignedHireBannerText}>
                           {tr("Accepted Freelancer Assigned")}
                         </Text>
@@ -886,7 +885,6 @@ export default function MyGigs() {
 
                     <ViewApplicantsButton key={`applicants-${gig.id}`} gig={gig} />
                     <CloseGigButton gig={gig} />
-                    <RateUserButton key={gig.id} gig={gig} />
 
                     {/* Card Actions Footer */}
                     <View style={styles.cardActionsFooter}>
@@ -950,7 +948,7 @@ export default function MyGigs() {
                           }}
                           activeOpacity={0.75}
                         >
-                          <Ionicons name="star" size={13} color="#D97706" />
+                          <Ionicons name="star" size={13} color={colors.star} />
                           <Text style={styles.actionRateBtnText}>{tr("Rate Freelancer")}</Text>
                         </TouchableOpacity>
                       ) : null}
@@ -2082,27 +2080,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successLight,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: borderRadius.md,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: colors.successBorder,
     marginBottom: spacing.xs,
   },
   assignedHireBannerText: {
     fontSize: 12,
     fontFamily: fonts.bodySemiBold,
-    color: '#059669',
+    color: colors.success,
   },
   actionRateBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    backgroundColor: colors.primaryLight,
     borderWidth: 1,
-    borderColor: "rgba(245, 158, 11, 0.3)",
+    borderColor: colors.primaryBorder,
     borderRadius: borderRadius.md,
     paddingVertical: 7,
     gap: 4,
@@ -2110,7 +2108,7 @@ const styles = StyleSheet.create({
   actionRateBtnText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#D97706",
+    color: colors.warning,
   },
   actionDeleteBtn: {
     width: 34,

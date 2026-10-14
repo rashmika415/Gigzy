@@ -58,7 +58,6 @@ export interface ProfileReview {
   rating: number;
   comment: string;
   tags?: string[];
-  gigId?: string;
   gigTitle?: string;
   createdAt?: unknown;
 }

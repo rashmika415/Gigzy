@@ -223,7 +223,7 @@ export default function CelebrationModal({
                   <Ionicons
                     name={calendarAdded ? 'checkmark-circle' : 'calendar-outline'}
                     size={19}
-                    color={calendarAdded ? '#059669' : colors.primary}
+                    color={calendarAdded ? colors.success : colors.primary}
                     style={{ marginRight: 8 }}
                   />
                   <Text
@@ -455,15 +455,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceElevated || '#F8FAFC',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1.5,
     borderColor: colors.primary,
     paddingVertical: 12,
     borderRadius: borderRadius.md || 12,
   },
   calendarButtonAdded: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#059669',
+    backgroundColor: colors.successLight,
+    borderColor: colors.success,
   },
   calendarButtonText: {
     fontSize: 14.5,
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   calendarButtonTextAdded: {
-    color: '#059669',
+    color: colors.success,
   },
   doneButton: {
     width: '100%',

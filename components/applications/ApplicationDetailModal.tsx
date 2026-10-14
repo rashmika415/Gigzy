@@ -195,7 +195,7 @@ export default function ApplicationDetailModal({
                       <Ionicons
                         name={calendarAdded ? 'checkmark-circle' : 'calendar-outline'}
                         size={17}
-                        color={calendarAdded ? '#059669' : colors.primary}
+                        color={calendarAdded ? colors.success : colors.primary}
                       />
                       <Text
                         style={[
@@ -214,7 +214,7 @@ export default function ApplicationDetailModal({
                   onPress={() => setShowRatingModal(true)}
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="star" size={17} color="#D97706" />
+                  <Ionicons name="star" size={17} color={colors.star} />
                   <Text style={styles.rateBizBtnText}>{tr("Rate Business Owner")}</Text>
                 </TouchableOpacity>
               </View>
@@ -495,9 +495,9 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   acceptedActionCard: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successLight,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: colors.successBorder,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     gap: spacing.sm,
@@ -510,11 +510,11 @@ const styles = StyleSheet.create({
   acceptedActionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#065F46',
+    color: colors.success,
   },
   acceptedActionSubtitle: {
     fontSize: 12.5,
-    color: '#047857',
+    color: colors.success,
     lineHeight: 18,
   },
   acceptedButtonGroup: {
@@ -547,8 +547,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   calendarSyncBtnAdded: {
-    backgroundColor: '#D1FAE5',
-    borderColor: '#059669',
+    backgroundColor: colors.successLight,
+    borderColor: colors.success,
   },
   calendarSyncBtnText: {
     color: colors.primary,
@@ -556,12 +556,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   calendarSyncBtnTextAdded: {
-    color: '#059669',
+    color: colors.success,
   },
   rateBizBtn: {
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: colors.primaryLight,
     borderWidth: 1.5,
-    borderColor: 'rgba(245, 158, 11, 0.35)',
+    borderColor: colors.primaryBorder,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   rateBizBtnText: {
-    color: '#D97706',
+    color: colors.warning,
     fontSize: 14,
     fontWeight: '700',
   },

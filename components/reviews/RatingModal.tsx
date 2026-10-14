@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Image,
@@ -17,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import {
   submitReview,
   canReviewUser,
@@ -60,6 +60,7 @@ export default function RatingModal({
 }: RatingModalProps) {
   const { t } = useTranslation();
   const { user, userData } = useAuth();
+  const toast = useToast();
 
   const [rating, setRating] = useState<number>(5);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -67,17 +68,19 @@ export default function RatingModal({
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   // null = checking, true = accepted application exists, false = locked
-  const [eligible, setEligible] = useState<boolean | null>(null);
+  // The result is keyed to who is rating whom, so switching target shows "checking" again.
+  const eligibilityKey = `${user?.uid}|${targetUserId}|${gigId ?? ''}`;
+  const [eligibility, setEligibility] = useState<{ key: string; ok: boolean } | null>(null);
+  const eligible = eligibility?.key === eligibilityKey ? eligibility.ok : null;
 
   useEffect(() => {
     if (!visible || !user?.uid || !targetUserId) return;
     let cancelled = false;
-    setEligible(null);
     canReviewUser(user.uid, targetUserId, gigId)
-      .then((ok) => { if (!cancelled) setEligible(ok); })
-      .catch(() => { if (!cancelled) setEligible(false); });
+      .then((ok) => { if (!cancelled) setEligibility({ key: eligibilityKey, ok }); })
+      .catch(() => { if (!cancelled) setEligibility({ key: eligibilityKey, ok: false }); });
     return () => { cancelled = true; };
-  }, [visible, user?.uid, targetUserId, gigId]);
+  }, [visible, user?.uid, targetUserId, gigId, eligibilityKey]);
 
   if (!visible) return null;
   const locked = eligible === false;
@@ -158,7 +161,7 @@ export default function RatingModal({
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
 
-      Alert.alert(
+      toast.success(
         t('Review Submitted! ⭐'),
         t('Thank you for rating {{name}}. Your feedback helps keep the Gigzy community trusted and safe.', {
           name: targetUserName,
@@ -260,7 +263,7 @@ export default function RatingModal({
               <View style={styles.ratingHeaderRow}>
                 <Text style={styles.sectionHeading}>{t('Overall Rating')}</Text>
                 <View style={styles.ratingScorePill}>
-                  <Ionicons name="star" size={13} color="#F59E0B" />
+                  <Ionicons name="star" size={13} color={colors.star} />
                   <Text style={styles.ratingScoreNumber}>{rating}.0</Text>
                   <Text style={styles.ratingScoreDivider}>•</Text>
                   <Text style={styles.ratingScoreDescriptor}>
@@ -287,7 +290,7 @@ export default function RatingModal({
                         <Ionicons
                           name={isSelected ? 'star' : 'star-outline'}
                           size={38}
-                          color={isSelected ? '#F59E0B' : '#CBD5E1'}
+                          color={isSelected ? colors.star : colors.surfaceBorder}
                         />
                         <Text style={[styles.starNumLabel, isSelected && styles.starNumLabelActive]}>
                           {starNum}
@@ -406,7 +409,7 @@ export default function RatingModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
@@ -473,7 +476,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: borderRadius.md || 12,
     borderWidth: 1,
-    borderColor: 'rgba(8, 127, 115, 0.15)',
+    borderColor: colors.primaryBorder,
     marginBottom: spacing.md,
     gap: spacing.sm,
   },
@@ -520,7 +523,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   roleDotBusiness: {
-    backgroundColor: '#2C4968',
+    backgroundColor: colors.accent,
   },
   targetRoleText: {
     fontSize: 11.5,
@@ -564,7 +567,7 @@ const styles = StyleSheet.create({
   ratingScorePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.warningLight,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: borderRadius.full,
@@ -573,19 +576,19 @@ const styles = StyleSheet.create({
   ratingScoreNumber: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#B45309',
+    color: colors.warning,
   },
   ratingScoreDivider: {
     fontSize: 10,
-    color: '#D97706',
+    color: colors.warning,
   },
   ratingScoreDescriptor: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#92400E',
+    color: colors.warning,
   },
   starsCard: {
-    backgroundColor: colors.surfaceElevated || '#F8FAFC',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.lg || 16,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
@@ -605,7 +608,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   starTouchCurrent: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: colors.warningLight,
   },
   starNumLabel: {
     fontSize: 11,
@@ -614,7 +617,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   starNumLabelActive: {
-    color: '#D97706',
+    color: colors.warning,
     fontWeight: '700',
   },
   tapToRateHint: {
@@ -630,7 +633,7 @@ const styles = StyleSheet.create({
   tagChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceElevated || '#F8FAFC',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     paddingHorizontal: 10,
@@ -660,7 +663,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   textArea: {
-    backgroundColor: colors.surfaceElevated || '#F8FAFC',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.md || 12,
@@ -673,9 +676,9 @@ const styles = StyleSheet.create({
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: colors.errorLight,
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: colors.errorBorder,
     padding: spacing.sm,
     borderRadius: borderRadius.md,
     marginBottom: spacing.md,
