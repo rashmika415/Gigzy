@@ -5,7 +5,7 @@ import React, { useRef, useEffect } from 'react';
 import { FlatList, View, StyleSheet } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '../../constants/theme';
+import { colors, spacing, fonts } from '../../constants/theme';
 import { Message } from '../../types/messaging';
 import MessageBubble from './MessageBubble';
 
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   emptySubtitle: {

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Text } from './LocalizedText';
 import { useAuth } from '../context/AuthContext';
 import { ensureReferralCode, subscribeToReferralCount } from '../services/referralService';
-import { colors } from '../constants/theme';
+import { colors, fonts } from '../constants/theme';
 
 export default function ReferralCard() {
   const { user, userData } = useAuth();
@@ -42,5 +42,5 @@ function AccountReferrals({ userId }: { userId: string }) {
   </View>;
 }
 const styles = StyleSheet.create({ card: { marginVertical: 16, padding: 20, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder, gap: 12 },
-  title: { fontSize: 18, fontWeight: '700', color: colors.text }, body: { color: colors.textSecondary, lineHeight: 21 }, code: { fontSize: 24, fontWeight: '700', letterSpacing: 3, color: colors.primary },
-  link: { paddingVertical: 10, color: colors.primary, fontWeight: '600' }, error: { color: colors.error } });
+  title: { fontSize: 18, fontFamily: fonts.bodyBold, color: colors.text }, body: { color: colors.textSecondary, lineHeight: 21 }, code: { fontSize: 24, fontFamily: fonts.heading, letterSpacing: 3, color: colors.primary },
+  link: { paddingVertical: 10, color: colors.primary, fontFamily: fonts.bodySemiBold }, error: { color: colors.error } });

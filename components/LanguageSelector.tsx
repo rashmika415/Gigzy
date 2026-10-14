@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { LANGUAGES } from '../localization/language';
 import { useLanguage } from '../localization/LanguageProvider';
 import { Text } from './LocalizedText';
-import { colors, borderRadius, spacing } from '../constants/theme';
+import { colors, borderRadius, spacing, fonts } from '../constants/theme';
 
 export default function LanguageSelector() {
   const { t, i18n } = useTranslation();
@@ -21,7 +21,7 @@ export default function LanguageSelector() {
   </View>;
 }
 const styles = StyleSheet.create({
-  container: { width: '100%', paddingVertical: spacing.md, gap: spacing.sm }, heading: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  container: { width: '100%', paddingVertical: spacing.md, gap: spacing.sm }, heading: { color: colors.textSecondary, fontSize: 13, fontFamily: fonts.bodySemiBold },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   option: { minHeight: 44, minWidth: 80, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: borderRadius.full, borderWidth: 1, borderColor: colors.surfaceBorder, backgroundColor: colors.surface },
   selected: { backgroundColor: colors.primaryLight, borderColor: colors.primary }, label: { fontSize: 14, color: colors.text }, selectedLabel: { color: colors.primary }, error: { color: colors.error, fontSize: 12 },

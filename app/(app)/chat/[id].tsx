@@ -1,4 +1,4 @@
-import { formatDate, formatTime } from '../../../localization/format';
+import { formatCurrency, formatDate, formatTime } from '../../../localization/format';
 import { translate } from "../../../localization/i18n";
 import { Text, TextInput } from '../../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
@@ -8,8 +8,9 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { borderRadius, colors, spacing } from "../../../constants/theme";
+import { borderRadius, colors, spacing, fonts } from "../../../constants/theme";
 import { useAuth } from "../../../context/AuthContext";
+import { useToast } from '../../../context/ToastContext';
 import {
     getChatById,
     markChatAsRead,
@@ -53,6 +54,7 @@ export default function ChatRoomScreen() {
   const chatId = Array.isArray(rawId) ? rawId[0] : (rawId || '');
 
   const { user, userData } = useAuth();
+  const toast = useToast();
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -188,7 +190,7 @@ export default function ChatRoomScreen() {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (err: any) {
-      Alert.alert(t("Send Error"), err.message || t("Failed to send message."));
+      toast.error(t("Failed to send message."), err.message);
     } finally {
       setSending(false);
       setUploadingImage(false);
@@ -200,10 +202,7 @@ export default function ChatRoomScreen() {
       const permissionResult =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permissionResult.granted) {
-        Alert.alert(
-          t("Permission Required"),
-          t("Please enable photos permission to send images."),
-        );
+        toast.info(t("Permission Required"), t("Please enable photos permission to send images."));
         return;
       }
 
@@ -220,7 +219,7 @@ export default function ChatRoomScreen() {
         } catch {}
       }
     } catch {
-      Alert.alert(t("Error"), t("Unable to pick image."));
+      toast.error(t("Unable to pick image."));
     }
   };
 
@@ -435,7 +434,7 @@ export default function ChatRoomScreen() {
               {chat.gigTitle}
             </Text>
             <Text style={styles.gigBannerSubtitle}>
-              {chat.gigPay ? t("${{value0}} {{value1}}", { value0: chat.gigPay, value1: chat.gigPayType === "hourly" ? t("/ hr") : t("Fixed Budget") }) : t("Gig Details")}
+              {chat.gigPay ? t("{{value0}} {{value1}}", { value0: formatCurrency(chat.gigPay), value1: chat.gigPayType === "hourly" ? t("/ hr") : t("Fixed Budget") }) : t("Gig Details")}
               {chat.gigCategory ? t(" • {{value0}}", { value0: chat.gigCategory }) : ""}
             </Text>
           </View>
@@ -444,7 +443,7 @@ export default function ChatRoomScreen() {
             onPress={() => {
               Alert.alert(
                 t("Related Gig"),
-                t("{{value0}}\nBudget: ${{value1}}\nCategory: {{value2}}", { value0: chat.gigTitle, value1: chat.gigPay || t("N/A"), value2: chat.gigCategory || t("General") }),
+                t("{{value0}}\nBudget: {{value1}}\nCategory: {{value2}}", { value0: chat.gigTitle, value1: chat.gigPay ? formatCurrency(chat.gigPay) : t("N/A"), value2: chat.gigCategory || t("General") }),
                 [{ text: t("Close") }],
               );
             }}
@@ -656,7 +655,7 @@ const styles = StyleSheet.create({
   },
   headerAvatarBusiness: {
     backgroundColor: colors.accentLight,
-    borderColor: "#2C4968",
+    borderColor: colors.accent,
   },
   headerAvatarImg: {
     width: 40,
@@ -667,7 +666,7 @@ const styles = StyleSheet.create({
   },
   headerAvatarText: {
     fontSize: 16,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   headerOnlineDot: {
@@ -686,7 +685,7 @@ const styles = StyleSheet.create({
   },
   headerName: {
     fontSize: 15,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   headerRoleRow: {
@@ -704,12 +703,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   roleDotBusiness: {
-    backgroundColor: "#2C4968",
+    backgroundColor: colors.accent,
   },
   headerRoleText: {
     fontSize: 11,
     color: colors.textSecondary,
-    fontWeight: "500",
+    fontFamily: fonts.bodyMedium,
   },
   gigToggleBtn: {
     padding: spacing.xs,
@@ -737,13 +736,13 @@ const styles = StyleSheet.create({
   },
   gigBannerTitle: {
     fontSize: 13,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   gigBannerSubtitle: {
     fontSize: 11,
     color: colors.primary,
-    fontWeight: "600",
+    fontFamily: fonts.bodySemiBold,
     marginTop: 1,
   },
   gigBannerAction: {
@@ -753,10 +752,12 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   gigBannerActionText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   centerContainer: {
@@ -783,7 +784,7 @@ const styles = StyleSheet.create({
   },
   emptyChatTitle: {
     fontSize: 16,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   emptyChatSub: {
@@ -808,7 +809,7 @@ const styles = StyleSheet.create({
   },
   dateDividerText: {
     fontSize: 11,
-    fontWeight: "600",
+    fontFamily: fonts.bodySemiBold,
     color: colors.textMuted,
   },
   messageBubbleRow: {
@@ -845,7 +846,7 @@ const styles = StyleSheet.create({
   },
   bubbleAvatarText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   bubble: {
@@ -883,7 +884,7 @@ const styles = StyleSheet.create({
   },
   bubbleTextMe: {
     color: colors.primaryOnColor,
-    fontWeight: "500",
+    fontFamily: fonts.bodyMedium,
   },
   bubbleTextOther: {
     color: colors.text,
@@ -929,7 +930,7 @@ const styles = StyleSheet.create({
   },
   previewTitle: {
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   previewSub: {
@@ -958,10 +959,12 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     paddingHorizontal: 12,
     paddingVertical: 6,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   quickReplyText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
     maxWidth: 240,
   },
@@ -1026,6 +1029,10 @@ const styles = StyleSheet.create({
     right: 20,
     zIndex: 10,
     padding: spacing.sm,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fullscreenImage: {
     width: "100%",

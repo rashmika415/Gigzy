@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../localization/i18n';
 import React, { useMemo } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { Text, TextInput } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import { Conversation } from '../../types/messaging';
 import ConversationItem from './ConversationItem';
+import SkeletonList from '../Skeleton';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -127,10 +128,7 @@ export default function ConversationList({
         }
       >
         {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>{tr("Syncing conversations...")}</Text>
-          </View>
+          <SkeletonList variant="row" count={5} />
         ) : filteredConversations.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconCircle}>
@@ -206,7 +204,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(135, 147, 144, 0.1)',
+    borderBottomColor: colors.surfaceElevated,
   },
   tabButton: {
     paddingVertical: 6,
@@ -215,6 +213,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.surfaceBorderSubtle,
+    minHeight: 40,
+    justifyContent: 'center',
   },
   tabButtonActive: {
     backgroundColor: colors.primaryLight,
@@ -222,12 +222,12 @@ const styles = StyleSheet.create({
   },
   tabButtonText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   tabButtonTextActive: {
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
   },
   scroll: {
     flex: 1,
@@ -260,14 +260,14 @@ const styles = StyleSheet.create({
     borderRadius: 36,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: 'rgba(111, 216, 199, 0.2)',
+    borderColor: colors.primaryBorder,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
   emptyTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   emptySubtitle: {
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   },
   exploreButtonText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
   },
 });

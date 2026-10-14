@@ -47,6 +47,10 @@ export interface CommunityEndorsement {
 }
 
 export interface ProfileReview {
+  gigId?: string;
+  reviewerId?: string;
+  reviewedUserId?: string;
+  reviewerRole?: string;
   id: string;
   authorId: string;
   authorName: string;

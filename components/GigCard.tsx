@@ -1,11 +1,11 @@
-import VerifiedBusinessBadge from './VerifiedBusinessBadge';
-import { formatNumber, formatCalendarDate } from '../localization/format';
+import { formatCurrency, formatCalendarDate } from '../localization/format';
 import { Text } from './LocalizedText';
 import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { View, StyleSheet, ViewStyle } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../constants/theme';
+import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import StatusPill from './StatusPill';
 import BookmarkButton from './BookmarkButton';
 import Chip from './Chip';
@@ -45,11 +45,13 @@ export default function GigCard({
     gig.locationType === 'remote' ? 'globe-outline' : 'location-outline';
 
   return (
-    <TouchableOpacity
-      style={[styles.card, style]}
+    <PressableScale
+      appear
+      style={styles.card}
+      containerStyle={style}
       onPress={() => onPress?.(gig)}
-      activeOpacity={onPress ? 0.9 : 1}
       disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
     >
       {/* ── Top Row: category & status ── */}
       <View style={styles.topRow}>
@@ -74,7 +76,7 @@ export default function GigCard({
           {gig.title}
         </Text>
         <View style={styles.payPill}>
-          <Text style={styles.payAmount}>${formatNumber(gig.pay)}</Text>
+          <Text style={styles.payAmount}>{formatCurrency(gig.pay)}</Text>
           <Text style={styles.payType}>
             {gig.payType === 'hourly' ? t("/hr") : t(" fixed")}
           </Text>
@@ -125,7 +127,7 @@ export default function GigCard({
           <Ionicons
             name="people"
             size={12}
-            color={gig.applicantsCount > 0 ? '#147D54' : colors.textMuted}
+            color={gig.applicantsCount > 0 ? colors.success : colors.textMuted}
           />
           <Text
             style={[
@@ -142,7 +144,7 @@ export default function GigCard({
       {renderActions && (
         <View style={styles.actionsFooter}>{renderActions(gig)}</View>
       )}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -170,11 +172,8 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   categoryText: {
+    ...typography.overline,
     color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
   },
 
   // Title & pay
@@ -185,17 +184,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   title: {
+    ...typography.h3,
     flex: 1,
-    fontSize: 17,
-    fontWeight: '800',
     color: colors.text,
-    letterSpacing: -0.2,
-    lineHeight: 22,
   },
   payPill: {
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: colors.primaryLight,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: colors.primaryBorder,
     borderRadius: borderRadius.md,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -203,21 +199,18 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   payAmount: {
-    fontSize: 15,
-    fontWeight: '800',
+    ...typography.title,
     color: colors.primary,
   },
   payType: {
-    fontSize: 11,
-    fontWeight: '600',
+    ...typography.caption,
     color: colors.primary,
   },
 
   // Description
   description: {
-    fontSize: 13,
+    ...typography.bodySmall,
     color: colors.textSecondary,
-    lineHeight: 18,
   },
 
   // Skills
@@ -227,15 +220,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   moreChip: {
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    backgroundColor: colors.primaryLight,
     borderRadius: borderRadius.sm,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   moreChipText: {
-    fontSize: 11,
+    ...typography.caption,
     color: colors.primary,
-    fontWeight: '700',
   },
 
   // Meta
@@ -256,8 +248,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
+    ...typography.caption,
     flexShrink: 1,
-    fontSize: 12,
     color: colors.textSecondary,
   },
   applicantsChip: {
@@ -270,18 +262,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   applicantsChipActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: colors.successLight,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: colors.successBorder,
   },
   applicantsText: {
-    fontSize: 11,
+    ...typography.caption,
     color: colors.textMuted,
-    fontWeight: '600',
   },
   applicantsTextActive: {
-    color: '#147D54',
-    fontWeight: '700',
+    color: colors.success,
   },
 
   // Actions footer

@@ -14,6 +14,7 @@ export { default as SearchBar } from './SearchBar';
 export { default as TabBar } from './TabBar';
 export { default as EmptyState } from './EmptyState';
 export { default as LoadingState } from './LoadingState';
+export { default as SkeletonList } from './Skeleton';
 export { default as ErrorState } from './ErrorState';
 export { default as DiscoveryFilters } from './DiscoveryFilters';
 export { default as GigLocationField } from './GigLocationField';

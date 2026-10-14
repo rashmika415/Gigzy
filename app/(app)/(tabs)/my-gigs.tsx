@@ -1,7 +1,10 @@
 import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
+import { formatCurrency } from '../../../localization/format';
 import CloseGigButton from '../../../components/CloseGigButton';
+import RateUserButton from '../../../components/RateUserButton';
+import ViewApplicantsButton from '../../../components/ViewApplicantsButton';
 import AppBanner from '../../../components/AppBanner';
 import { STATUS_STYLES } from '../../../components/StatusPill';
 import { Ionicons } from "@expo/vector-icons";
@@ -10,8 +13,10 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Platform, RefreshControl, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text, TextInput } from '../../../components/LocalizedText';
-import { borderRadius, colors, shadows, spacing } from "../../../constants/theme";
+import { borderRadius, colors, shadows, spacing, fonts } from "../../../constants/theme";
 import { useAuth } from "../../../context/AuthContext";
+import { useToast } from '../../../context/ToastContext';
+import SkeletonList from '../../../components/Skeleton';
 import {
     calculateBusinessGigStats,
     deleteGig,
@@ -33,6 +38,7 @@ const STATUS_CONFIG = STATUS_STYLES;
 export default function MyGigs() {
   useTranslation();
   const { user, userData } = useAuth();
+  const toast = useToast();
   const role = userData?.role;
 
   // Role guard: only business owners (clients) can manage gigs
@@ -133,10 +139,7 @@ export default function MyGigs() {
       setStatusModalVisible(false);
       setSelectedGigForStatus(null);
     } catch (error: any) {
-      Alert.alert(
-        tr("Status Update Failed"),
-        error.message || tr("Could not update gig status."),
-      );
+      toast.error(tr("Status Update Failed"), error.message || tr("Could not update gig status."));
     } finally {
       setStatusUpdating(false);
     }
@@ -161,7 +164,7 @@ export default function MyGigs() {
                 );
               } catch {}
             } catch (err: any) {
-              Alert.alert(tr("Error"), err.message || tr("Failed to delete gig."));
+              toast.error(tr("Failed to delete gig."), err.message);
             }
           },
         },
@@ -298,6 +301,15 @@ export default function MyGigs() {
           />
         }
       >
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={[styles.metricCard, { marginBottom: spacing.md }]}
+          onPress={() => router.push('/(app)/add-ratings' as any)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="star-outline" size={22} color={colors.primary} />
+          <Text style={styles.metricLabel}>{tr("Add Ratings")}</Text>
+        </TouchableOpacity>
         <AppBanner compact kind="business" title={tr("Good help, close to home.")} description={tr("Manage your opportunities and connect with local talent.")} />
         {/* Business Metrics Carousel / Grid */}
         <View style={styles.metricsSection}>
@@ -320,10 +332,10 @@ export default function MyGigs() {
               <View
                 style={[
                   styles.metricIconWrap,
-                  { backgroundColor: "rgba(16, 185, 129, 0.15)" },
+                  { backgroundColor: colors.successLight },
                 ]}
               >
-                <Ionicons name="radio-button-on" size={18} color="#147D54" />
+                <Ionicons name="radio-button-on" size={18} color={colors.success} />
               </View>
               <Text style={styles.metricValue}>{stats.open}</Text>
               <Text style={styles.metricLabel}>{tr("Open & Active")}</Text>
@@ -345,28 +357,34 @@ export default function MyGigs() {
               <View
                 style={[
                   styles.metricIconWrap,
-                  { backgroundColor: "rgba(245, 158, 11, 0.15)" },
+                  { backgroundColor: colors.warningLight },
                 ]}
               >
-                <Ionicons name="time-outline" size={18} color="#986000" />
+                <Ionicons name="time-outline" size={18} color={colors.warning} />
               </View>
               <Text style={styles.metricValue}>{stats.inProgress}</Text>
               <Text style={styles.metricLabel}>{tr("In Progress")}</Text>
             </TouchableOpacity>
 
             {/* Total Applicants */}
-            <View style={styles.metricCard}>
+            <TouchableOpacity
+              style={styles.metricCard}
+              onPress={() => router.push('/(app)/applications')}
+              accessibilityRole="button"
+              accessibilityLabel={tr("View Applications")}
+              activeOpacity={0.8}
+            >
               <View
                 style={[
                   styles.metricIconWrap,
-                  { backgroundColor: "rgba(59, 130, 246, 0.15)" },
+                  { backgroundColor: colors.accentLight },
                 ]}
               >
-                <Ionicons name="people-outline" size={18} color="#245EAD" />
+                <Ionicons name="people-outline" size={18} color={colors.accent} />
               </View>
               <Text style={styles.metricValue}>{stats.totalApplicants}</Text>
               <Text style={styles.metricLabel}>{tr("Applicants")}</Text>
-            </View>
+            </TouchableOpacity>
 
             {/* Completed */}
             <TouchableOpacity
@@ -384,13 +402,13 @@ export default function MyGigs() {
               <View
                 style={[
                   styles.metricIconWrap,
-                  { backgroundColor: "rgba(124, 58, 237, 0.15)" },
+                  { backgroundColor: colors.infoLight },
                 ]}
               >
                 <Ionicons
                   name="checkmark-circle-outline"
                   size={18}
-                  color="#6D28D9"
+                  color={colors.info}
                 />
               </View>
               <Text style={styles.metricValue}>{stats.completed}</Text>
@@ -402,13 +420,13 @@ export default function MyGigs() {
               <View
                 style={[
                   styles.metricIconWrap,
-                  { backgroundColor: "rgba(236, 72, 153, 0.15)" },
+                  { backgroundColor: colors.successLight },
                 ]}
               >
-                <Ionicons name="wallet-outline" size={18} color="#A52662" />
+                <Ionicons name="wallet-outline" size={18} color={colors.success} />
               </View>
               <Text style={styles.metricValue}>
-                ${stats.totalBudget.toLocaleString()}
+                {formatCurrency(stats.totalBudget)}
               </Text>
               <Text style={styles.metricLabel}>{tr("Total Budget")}</Text>
             </View>
@@ -600,10 +618,7 @@ export default function MyGigs() {
           </View>
 
           {loading && user ? (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator color={colors.primary} size="large" />
-              <Text style={styles.loadingText}>{tr("Syncing your posted gigs from Firestore...")}</Text>
-            </View>
+            <SkeletonList variant="gig" count={3} />
           ) : loadError ? (
             <View style={styles.errorBox}>
               <Ionicons name="alert-circle" size={32} color={colors.error} />
@@ -686,6 +701,7 @@ export default function MyGigs() {
                       </View>
 
                       <TouchableOpacity
+                        hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
                         style={[
                           styles.cardStatusBadge,
                           {
@@ -724,7 +740,7 @@ export default function MyGigs() {
                         {gig.title}
                       </Text>
                       <View style={styles.payPill}>
-                        <Text style={styles.payAmount}>${gig.pay}</Text>
+                        <Text style={styles.payAmount}>{formatCurrency(gig.pay)}</Text>
                         <Text style={styles.payType}>
                           {gig.payType === "hourly" ? tr("/hr") : tr(" fixed")}
                         </Text>
@@ -797,7 +813,7 @@ export default function MyGigs() {
                           size={12}
                           color={
                             gig.applicantsCount > 0
-                              ? "#147D54"
+                              ? colors.success
                               : colors.textMuted
                           }
                         />
@@ -816,8 +832,9 @@ export default function MyGigs() {
                       </View>
                     </View>
 
-                    <VerifiedBusinessBadge userId={gig.postedBy.uid} />
+                    <ViewApplicantsButton key={`applicants-${gig.id}`} gig={gig} />
                     <CloseGigButton gig={gig} />
+                    <RateUserButton key={gig.id} gig={gig} />
 
                     {/* Card Actions Footer */}
                     <View style={styles.cardActionsFooter}>
@@ -1309,7 +1326,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "800",
+    fontFamily: fonts.heading,
     color: colors.text,
     letterSpacing: -0.3,
   },
@@ -1336,9 +1353,9 @@ const styles = StyleSheet.create({
   liveBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    backgroundColor: colors.successLight,
     borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.3)",
+    borderColor: colors.successBorder,
     borderRadius: borderRadius.full,
     paddingHorizontal: 7,
     paddingVertical: 2,
@@ -1348,12 +1365,12 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#147D54",
+    backgroundColor: colors.success,
   },
   liveBadgeText: {
     fontSize: 10,
-    fontWeight: "700",
-    color: "#147D54",
+    fontFamily: fonts.bodyBold,
+    color: colors.success,
   },
   postNewBtn: {
     backgroundColor: colors.primary,
@@ -1368,11 +1385,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 3,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   postNewBtnText: {
     color: colors.primaryOnColor,
     fontSize: 13,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
   },
 
   // Metrics
@@ -1408,13 +1427,13 @@ const styles = StyleSheet.create({
   },
   metricValue: {
     fontSize: 18,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   metricLabel: {
     fontSize: 11,
     color: colors.textSecondary,
-    fontWeight: "600",
+    fontFamily: fonts.bodySemiBold,
   },
 
   // Toolbar
@@ -1451,11 +1470,13 @@ const styles = StyleSheet.create({
     borderColor: colors.surfaceBorder,
     paddingHorizontal: 12,
     gap: 6,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   sortButtonText: {
     color: colors.primary,
     fontSize: 13,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
   },
 
   // Status Tabs
@@ -1477,6 +1498,8 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 14,
     gap: 6,
+    minHeight: 40,
+    justifyContent: 'center',
   },
   statusTabSelected: {
     backgroundColor: colors.primary,
@@ -1484,12 +1507,12 @@ const styles = StyleSheet.create({
   },
   statusTabText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   statusTabTextSelected: {
     color: colors.primaryOnColor,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
   },
   tabBadge: {
     backgroundColor: colors.surfaceElevated,
@@ -1502,7 +1525,7 @@ const styles = StyleSheet.create({
   },
   tabBadgeText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.textSecondary,
   },
   tabBadgeTextSelected: {
@@ -1527,6 +1550,8 @@ const styles = StyleSheet.create({
     borderColor: colors.surfaceBorder,
     paddingVertical: 5,
     paddingHorizontal: 12,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   categoryChipSelected: {
     backgroundColor: colors.text,
@@ -1535,11 +1560,11 @@ const styles = StyleSheet.create({
   categoryChipText: {
     fontSize: 12,
     color: colors.textSecondary,
-    fontWeight: "500",
+    fontFamily: fonts.bodyMedium,
   },
   categoryChipTextSelected: {
     color: colors.primaryOnColor,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
   },
 
   // List Section
@@ -1556,16 +1581,16 @@ const styles = StyleSheet.create({
   listCountText: {
     fontSize: 13,
     color: colors.textSecondary,
-    fontWeight: "500",
+    fontFamily: fonts.bodyMedium,
   },
   listCountHighlight: {
     color: colors.text,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
   },
   resetFiltersText: {
     fontSize: 12,
     color: colors.primary,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
   },
 
   // Loading & Error
@@ -1582,7 +1607,7 @@ const styles = StyleSheet.create({
   loadingText: {
     color: colors.textSecondary,
     fontSize: 14,
-    fontWeight: "500",
+    fontFamily: fonts.bodyMedium,
   },
   errorBox: {
     backgroundColor: colors.errorLight,
@@ -1596,7 +1621,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 16,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   errorSubtitle: {
@@ -1611,11 +1636,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: spacing.md,
     marginTop: 4,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   retryBtnText: {
     color: colors.primaryOnColor,
     fontSize: 13,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
   },
 
   // Empty State
@@ -1642,7 +1669,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   emptyDesc: {
@@ -1670,7 +1697,7 @@ const styles = StyleSheet.create({
   emptyActionBtnText: {
     color: colors.primaryOnColor,
     fontSize: 14,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
   },
   clearFilterBtn: {
     borderWidth: 1,
@@ -1683,7 +1710,7 @@ const styles = StyleSheet.create({
   clearFilterBtnText: {
     color: colors.primary,
     fontSize: 13,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
   },
 
   // Gig Cards
@@ -1712,7 +1739,7 @@ const styles = StyleSheet.create({
   cardCategoryText: {
     color: colors.textSecondary,
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
@@ -1727,7 +1754,7 @@ const styles = StyleSheet.create({
   },
   cardStatusText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
   },
 
   // Title and Pay
@@ -1740,15 +1767,15 @@ const styles = StyleSheet.create({
   gigCardTitle: {
     flex: 1,
     fontSize: 17,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     letterSpacing: -0.2,
     lineHeight: 22,
   },
   payPill: {
-    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    backgroundColor: colors.primaryLight,
     borderWidth: 1,
-    borderColor: "rgba(245, 158, 11, 0.3)",
+    borderColor: colors.primaryBorder,
     borderRadius: borderRadius.md,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1757,12 +1784,12 @@ const styles = StyleSheet.create({
   },
   payAmount: {
     fontSize: 15,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   payType: {
     fontSize: 11,
-    fontWeight: "600",
+    fontFamily: fonts.bodySemiBold,
     color: colors.primary,
   },
   gigCardDesc: {
@@ -1790,7 +1817,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   skillMoreTag: {
-    backgroundColor: "rgba(245, 158, 11, 0.08)",
+    backgroundColor: colors.primaryLight,
     borderRadius: borderRadius.sm,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -1798,7 +1825,7 @@ const styles = StyleSheet.create({
   skillMoreText: {
     fontSize: 11,
     color: colors.primary,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
   },
 
   // Meta
@@ -1829,18 +1856,18 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   applicantsChipActive: {
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    backgroundColor: colors.successLight,
     borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.3)",
+    borderColor: colors.successBorder,
   },
   applicantsChipText: {
     fontSize: 11,
     color: colors.textMuted,
-    fontWeight: "600",
+    fontFamily: fonts.bodySemiBold,
   },
   applicantsChipTextActive: {
-    color: "#147D54",
-    fontWeight: "700",
+    color: colors.success,
+    fontFamily: fonts.bodyBold,
   },
 
   // Actions Footer
@@ -1865,10 +1892,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 2,
+    minHeight: 44,
   },
   actionUpdateBtnText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
   },
   actionStatusBtn: {
@@ -1876,16 +1904,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(245, 158, 11, 0.1)",
+    backgroundColor: colors.primaryLight,
     borderWidth: 1,
-    borderColor: "rgba(245, 158, 11, 0.25)",
+    borderColor: colors.primaryBorder,
     borderRadius: borderRadius.md,
     paddingVertical: 7,
     gap: 4,
+    minHeight: 44,
   },
   actionStatusBtnText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   actionDetailsBtn: {
@@ -1897,19 +1926,20 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     paddingVertical: 7,
     gap: 4,
+    minHeight: 44,
   },
   actionDetailsBtnText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontFamily: fonts.bodySemiBold,
     color: colors.text,
   },
   actionDeleteBtn: {
     width: 34,
     height: 34,
     borderRadius: borderRadius.md,
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    backgroundColor: colors.errorLight,
     borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.2)",
+    borderColor: colors.errorBorder,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1930,7 +1960,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   modalSubtitle: {
@@ -1941,6 +1971,10 @@ const styles = StyleSheet.create({
   },
   modalCloseBtn: {
     padding: 4,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalLoadingBox: {
     padding: spacing.xl,
@@ -1991,7 +2025,7 @@ const styles = StyleSheet.create({
   },
   statusOptionLabel: {
     fontSize: 15,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     marginBottom: 2,
   },
   statusOptionDesc: {
@@ -2036,11 +2070,11 @@ const styles = StyleSheet.create({
   sortOptionItemLabel: {
     fontSize: 14,
     color: colors.text,
-    fontWeight: "500",
+    fontFamily: fonts.bodyMedium,
   },
   sortOptionItemLabelSelected: {
     color: colors.primary,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
   },
 
   // Details Modal
@@ -2069,7 +2103,7 @@ const styles = StyleSheet.create({
   },
   detailTitle: {
     fontSize: 20,
-    fontWeight: "800",
+    fontFamily: fonts.heading,
     color: colors.text,
     letterSpacing: -0.3,
   },
@@ -2089,20 +2123,20 @@ const styles = StyleSheet.create({
   },
   detailBoxLabel: {
     fontSize: 10,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.textMuted,
     letterSpacing: 0.5,
     marginBottom: 2,
   },
   detailPayAmount: {
     fontSize: 22,
-    fontWeight: "800",
+    fontFamily: fonts.heading,
     color: colors.primary,
   },
   detailPayType: {
     fontSize: 13,
     color: colors.textSecondary,
-    fontWeight: "500",
+    fontFamily: fonts.bodyMedium,
   },
   detailSpecsGrid: {
     gap: spacing.sm,
@@ -2122,12 +2156,12 @@ const styles = StyleSheet.create({
   },
   specVal: {
     fontSize: 13,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   detailSectionHeading: {
     fontSize: 14,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -2149,14 +2183,14 @@ const styles = StyleSheet.create({
   detailSkillChip: {
     backgroundColor: colors.primaryLight,
     borderWidth: 1,
-    borderColor: "rgba(245, 158, 11, 0.3)",
+    borderColor: colors.primaryBorder,
     borderRadius: borderRadius.full,
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
   detailSkillChipText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   detailModalFooter: {
@@ -2185,7 +2219,7 @@ const styles = StyleSheet.create({
   detailEditBtnText: {
     color: colors.primaryOnColor,
     fontSize: 14,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
   },
   detailChangeStatusBtn: {
     flex: 1,
@@ -2202,6 +2236,6 @@ const styles = StyleSheet.create({
   detailChangeStatusBtnText: {
     color: colors.text,
     fontSize: 14,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
   },
 });

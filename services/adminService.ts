@@ -1,4 +1,4 @@
-import { collection, doc, documentId, getCountFromServer, getDocsFromServer, limit, orderBy, query, runTransaction, serverTimestamp, startAfter, where } from 'firebase/firestore';
+import { collection, doc, documentId, getCountFromServer, getDocsFromServer, increment, limit, orderBy, query, runTransaction, serverTimestamp, startAfter, Timestamp, updateDoc, where } from 'firebase/firestore';
 import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { auth, db } from '../FirebaseConfig';
 import type { UserData } from '../context/AuthContext';
@@ -8,6 +8,9 @@ import type { Gig } from '../types/gig';
 export type AdminUser = UserData & { id: string };
 export type AdminStats = { users: number; youth: number; businesses: number; suspended: number; gigs: number; openGigs: number; applications: number };
 export type AdminCursor = QueryDocumentSnapshot<DocumentData>;
+export type SuspensionType = 'temporary' | 'permanent';
+export type ModerationEventType = 'warning' | 'temporary_suspension' | 'permanent_suspension' | 'reinstated';
+export interface ModerationEvent { id: string; type: ModerationEventType; reason: string; actorId: string; createdAt?: unknown; suspendedUntil?: unknown }
 export const ADMIN_PAGE_SIZE = 25;
 
 export async function fetchAdminStats(): Promise<AdminStats> {
@@ -40,17 +43,83 @@ function cleanReason(reason: string) {
 }
 
 // Server rules also enforce these restrictions. Transactions avoid acting on stale rows.
-export async function setUserSuspension(userId: string, suspended: boolean, reason: string) {
+export async function setUserSuspension(userId: string, suspended: boolean, reason: string, options?: { type?: SuspensionType; durationDays?: number }) {
   const actor = auth.currentUser;
   if (!actor) throw new Error('Please sign in again.');
   const clean = suspended ? cleanReason(reason) : '';
+  const type = options?.type ?? 'permanent';
+  const durationDays = options?.durationDays ?? 7;
+  if (suspended && type === 'temporary' && (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 365)) {
+    throw new Error('Choose a suspension duration between 1 and 365 days.');
+  }
+  const suspendedUntil = suspended && type === 'temporary'
+    ? Timestamp.fromMillis(Date.now() + durationDays * 24 * 60 * 60 * 1000)
+    : null;
+  const historyRef = doc(collection(db, 'users', userId, 'moderationHistory'));
+  const notificationRef = doc(collection(db, 'users', userId, 'notifications'));
   await runTransaction(db, async transaction => {
     const admin = await transaction.get(doc(db, 'users', actor.uid));
     const target = await transaction.get(doc(db, 'users', userId));
     if (!admin.exists() || admin.data().role !== 'admin' || admin.data().suspended) throw new Error('Administrator access required.');
     if (!target.exists()) throw new Error('This user no longer exists.');
     if (userId === actor.uid || target.data().role === 'admin') throw new Error('Administrator accounts cannot be suspended here.');
-    transaction.update(target.ref, { suspended, suspensionReason: clean, updatedAt: serverTimestamp() });
+    const now = serverTimestamp();
+    transaction.update(target.ref, {
+      suspended,
+      suspensionReason: clean,
+      suspensionType: suspended ? type : 'none',
+      suspendedUntil,
+      updatedAt: now,
+    });
+    transaction.set(historyRef, {
+      type: suspended ? (type === 'temporary' ? 'temporary_suspension' : 'permanent_suspension') : 'reinstated',
+      reason: suspended ? clean : 'Manually reinstated by an administrator.',
+      actorId: actor.uid,
+      ...(suspendedUntil ? { suspendedUntil } : {}),
+      createdAt: now,
+    });
+    transaction.set(notificationRef, {
+      userId,
+      type: 'system',
+      title: suspended ? (type === 'temporary' ? 'Account temporarily suspended' : 'Account suspended') : 'Account reinstated',
+      body: suspended ? clean : 'Your access to Gigzy has been restored.',
+      read: false,
+      createdAt: now,
+    });
+  });
+}
+
+export async function issueUserWarning(userId: string, reason: string) {
+  const actor = auth.currentUser;
+  if (!actor) throw new Error('Please sign in again.');
+  const clean = cleanReason(reason);
+  const historyRef = doc(collection(db, 'users', userId, 'moderationHistory'));
+  const notificationRef = doc(collection(db, 'users', userId, 'notifications'));
+  await runTransaction(db, async transaction => {
+    const admin = await transaction.get(doc(db, 'users', actor.uid));
+    const target = await transaction.get(doc(db, 'users', userId));
+    if (!admin.exists() || admin.data().role !== 'admin' || admin.data().suspended) throw new Error('Administrator access required.');
+    if (!target.exists()) throw new Error('This user no longer exists.');
+    if (userId === actor.uid || target.data().role === 'admin') throw new Error('Administrator accounts cannot be warned here.');
+    const now = serverTimestamp();
+    transaction.update(target.ref, { warningCount: increment(1), lastWarningReason: clean, lastWarnedAt: now, updatedAt: now });
+    transaction.set(historyRef, { type: 'warning', reason: clean, actorId: actor.uid, createdAt: now });
+    transaction.set(notificationRef, { userId, type: 'system', title: 'Account warning', body: clean, read: false, createdAt: now });
+  });
+}
+
+export async function fetchUserModerationHistory(userId: string): Promise<ModerationEvent[]> {
+  const snapshot = await getDocsFromServer(query(collection(db, 'users', userId, 'moderationHistory'), orderBy('createdAt', 'desc'), limit(20)));
+  return snapshot.docs.map(item => ({ id: item.id, ...item.data() }) as ModerationEvent);
+}
+
+export async function releaseExpiredSuspension(userId: string) {
+  await updateDoc(doc(db, 'users', userId), {
+    suspended: false,
+    suspensionReason: '',
+    suspensionType: 'none',
+    suspendedUntil: null,
+    updatedAt: serverTimestamp(),
   });
 }
 

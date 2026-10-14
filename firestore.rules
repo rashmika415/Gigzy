@@ -19,9 +19,46 @@ service cloud.firestore {
     }
     function protectedUserFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-        'role', 'isVerified', 'verificationStatus', 'suspended', 'suspensionReason',
+        'role', 'isVerified', 'suspended', 'suspensionReason',
+        'suspensionType', 'suspendedUntil', 'warningCount',
+        'lastWarningReason', 'lastWarnedAt',
         'ratingAverage', 'ratingCount', 'skillBadges'
       ]);
+    }
+    match /announcements/{announcementId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly([
+          'title', 'body', 'audience', 'targetUserId', 'status',
+          'deliveredCount', 'createdBy', 'createdAt'
+        ])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 80
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 5 && request.resource.data.body.size() <= 500
+        && request.resource.data.audience in ['all', 'freelancer', 'client', 'user']
+        && ((request.resource.data.audience == 'user'
+            && request.resource.data.targetUserId is string
+            && request.resource.data.targetUserId.size() > 0)
+          || (request.resource.data.audience != 'user'
+            && !request.resource.data.keys().hasAny(['targetUserId'])))
+        && request.resource.data.status == 'queued'
+        && request.resource.data.deliveredCount == 0
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      // On the Spark plan the authenticated admin client performs bounded
+      // delivery batches. Content and audience stay immutable after creation.
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'deliveredCount', 'lastUserId', 'startedAt',
+          'completedAt', 'failedAt', 'errorMessage'
+        ])
+        && request.resource.data.status in ['processing', 'sent', 'failed']
+        && request.resource.data.deliveredCount is int
+        && request.resource.data.deliveredCount >= resource.data.deliveredCount
+        && request.resource.data.get('errorMessage', '') is string
+        && request.resource.data.get('errorMessage', '').size() <= 500;
+      allow delete: if false;
     }
     function validReferralCodeUpdate(userId) {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['referralCode'])
@@ -57,16 +94,67 @@ service cloud.firestore {
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.get('suspended', false) != true
         && request.resource.data.get('isVerified', false) != true
-        && !request.resource.data.keys().hasAny(['referralCode', 'verificationStatus']);
-      allow update: if verificationSubmission() || verificationDecision() || (isAdmin() && userId != request.auth.uid && resource.data.role != 'admin'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suspended', 'suspensionReason', 'updatedAt'])
-        && request.resource.data.suspended is bool
-        && request.resource.data.suspensionReason is string && request.resource.data.suspensionReason.size() <= 500
-        && (!request.resource.data.suspended || request.resource.data.suspensionReason.size() >= 5)
-        && request.resource.data.updatedAt == request.time)
+        && !request.resource.data.keys().hasAny(['referralCode']);
+      allow update: if (isAdmin() && userId != request.auth.uid && resource.data.role != 'admin'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'suspended', 'suspensionReason', 'suspensionType', 'suspendedUntil',
+          'warningCount', 'lastWarningReason', 'lastWarnedAt', 'updatedAt'
+        ])
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.get('warningCount', 0) is int
+        && request.resource.data.get('warningCount', 0) >= resource.data.get('warningCount', 0)
+        && request.resource.data.get('lastWarningReason', '') is string
+        && request.resource.data.get('lastWarningReason', '').size() <= 500
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'suspended', 'suspensionReason', 'suspensionType', 'suspendedUntil'
+          ]) || (
+            request.resource.data.suspended is bool
+            && request.resource.data.suspensionReason is string
+            && request.resource.data.suspensionReason.size() <= 500
+            && ((request.resource.data.suspended == false
+                && request.resource.data.suspensionReason == ''
+                && request.resource.data.suspensionType == 'none'
+                && request.resource.data.suspendedUntil == null)
+              || (request.resource.data.suspended == true
+                && request.resource.data.suspensionReason.size() >= 5
+                && request.resource.data.suspensionType in ['temporary', 'permanent']
+                && ((request.resource.data.suspensionType == 'permanent'
+                    && request.resource.data.suspendedUntil == null)
+                  || (request.resource.data.suspensionType == 'temporary'
+                    && request.resource.data.suspendedUntil is timestamp
+                    && request.resource.data.suspendedUntil > request.time
+                    && request.resource.data.suspendedUntil <= request.time + duration.value(365, 'd'))))))))
+        || (owns(userId)
+          && resource.data.get('suspended', false) == true
+          && resource.data.get('suspensionType', '') == 'temporary'
+          && resource.data.suspendedUntil is timestamp
+          && resource.data.suspendedUntil <= request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'suspended', 'suspensionReason', 'suspensionType', 'suspendedUntil', 'updatedAt'
+          ])
+          && request.resource.data.suspended == false
+          && request.resource.data.suspensionReason == ''
+          && request.resource.data.suspensionType == 'none'
+          && request.resource.data.suspendedUntil == null
+          && request.resource.data.updatedAt == request.time)
         || (owns(userId) && active() && protectedUserFieldsUnchanged() && validReferralCodeUpdate(userId)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || validProfilePhoto()));
       allow delete: if false;
+      match /moderationHistory/{eventId} {
+        allow read: if owns(userId) || isAdmin();
+        allow create: if isAdmin()
+          && request.resource.data.keys().hasOnly(['type', 'reason', 'actorId', 'suspendedUntil', 'createdAt'])
+          && request.resource.data.type in ['warning', 'temporary_suspension', 'permanent_suspension', 'reinstated']
+          && request.resource.data.reason is string
+          && request.resource.data.reason.size() >= 5 && request.resource.data.reason.size() <= 500
+          && request.resource.data.actorId == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && ((request.resource.data.type == 'temporary_suspension'
+              && request.resource.data.suspendedUntil is timestamp)
+            || (request.resource.data.type != 'temporary_suspension'
+              && !request.resource.data.keys().hasAny(['suspendedUntil'])));
+        allow update, delete: if false;
+      }
       match /savedGigs/{gigId} {
         allow read: if owns(userId) && active();
         allow create: if owns(userId) && active() && currentUser().data.role == 'freelancer'
@@ -113,12 +201,26 @@ service cloud.firestore {
       }
       match /reviews/{reviewId} {
         allow read: if signedIn();
-        allow create: if active() && request.auth.uid != userId
-          && request.resource.data.authorId == request.auth.uid
-          && request.resource.data.rating is number
-          && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
-          && request.resource.data.comment is string && request.resource.data.comment.size() <= 1000;
-        allow update, delete: if active() && resource.data.authorId == request.auth.uid;
+        function validGigReview() {
+          let data = request.resource.data;
+          let gig = get(/databases/$(database)/documents/gigs/$(data.gigId)).data;
+          let owner = gig.postedBy.uid;
+          let worker = gig.assignedYouthId;
+          return gig.status == 'completed' && gig.get('moderationRemoved', false) != true
+            && owner != worker && request.auth.uid != userId
+            && ((request.auth.uid == owner && userId == worker && currentUser().data.role == 'client')
+              || (request.auth.uid == worker && userId == owner && currentUser().data.role in ['freelancer', 'youth']))
+            && reviewId == data.gigId + '_' + request.auth.uid
+            && data.keys().hasOnly(['gigId', 'reviewerId', 'reviewedUserId', 'reviewerRole', 'authorId', 'authorName', 'rating', 'comment', 'createdAt'])
+            && data.authorId == request.auth.uid && data.authorName is string
+            && data.reviewerId == request.auth.uid && data.reviewedUserId == userId
+            && data.reviewerRole == currentUser().data.role
+            && data.rating is int && data.rating >= 1 && data.rating <= 5
+            && data.comment is string && data.comment.size() <= 1000
+            && data.createdAt == request.time;
+        }
+        allow create: if active() && validGigReview();
+        allow update, delete: if false;
       }
       match /endorsements/{endorsementId} {
         allow read: if signedIn();

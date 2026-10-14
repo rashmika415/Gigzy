@@ -7,34 +7,25 @@ import { signOut } from 'firebase/auth';
 import { useTranslation } from 'react-i18next';
 import { Text, TextInput } from '../LocalizedText';
 import LanguageSelector from '../LanguageSelector';
+import AdminNotificationPanel from './AdminNotificationPanel';
+import UserModerationModal from './UserModerationModal';
 import { useAuth } from '../../context/AuthContext';
 import { auth } from '../../FirebaseConfig';
-import { colors as sharedColors, fonts } from '../../constants/theme';
-import { fetchAdminPage, fetchAdminStats, removeGigFromDiscovery, setUserSuspension } from '../../services/adminService';
+import { colors, fonts } from '../../constants/theme';
+import { fetchAdminPage, fetchAdminStats, removeGigFromDiscovery } from '../../services/adminService';
 import type { AdminCursor, AdminStats, AdminUser } from '../../services/adminService';
 import type { Application } from '../../types/application';
 import { formatDate } from '../../localization/format';
 import type { Gig } from '../../types/gig';
 
-// A dedicated palette keeps administration visually distinct from the member app.
-const colors = {
-  ...sharedColors,
-  background: '#F3F4FB', surface: '#FFFFFF', surfaceElevated: '#F0F1FA',
-  surfaceBorder: '#E2E5F1', surfaceBorderSubtle: '#EDF0F7',
-  primary: '#6250C5', primaryLight: '#EEEAFE', accent: '#2879B7',
-  text: '#22243C', textSecondary: '#60657E', textMuted: '#747A92',
-  inputBorder: '#DDE1EF', success: '#147B68', warning: '#996116',
-};
-const STAT_TONES = ['#EEEAFE', '#E6F2FC', '#E4F6EF', '#FFF1DB'];
-
-type Panel = 'overview' | 'users' | 'gigs' | 'applications' | 'verification';
-type Action = { kind: 'suspend' | 'reinstate' | 'remove'; id: string; name: string };
+type Panel = 'overview' | 'users' | 'gigs' | 'notifications';
+type Action = { kind: 'remove'; id: string; name: string };
 const PANELS: { key: Panel; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'verification', label: 'Business verification', icon: 'shield-checkmark-outline' },
   { key: 'overview', label: 'Overview', icon: 'grid-outline' },
   { key: 'users', label: 'Users', icon: 'people-outline' },
   { key: 'gigs', label: 'Gigs', icon: 'briefcase-outline' },
-  { key: 'applications', label: 'Applications', icon: 'document-text-outline' },
+  { key: 'notifications', label: 'Notifications', icon: 'notifications-outline' },
 ];
 const message = (error: unknown) => error instanceof Error ? error.message : 'Could not load dashboard. Please retry.';
 
@@ -56,6 +47,7 @@ export default function AdminDashboardScreen() {
   const [expandedGig, setExpandedGig] = useState('');
   const [revision, setRevision] = useState(0);
   const [action, setAction] = useState<Action>();
+  const [moderatingUser, setModeratingUser] = useState<AdminUser>();
   const [reason, setReason] = useState('');
   const [actionError, setActionError] = useState('');
   const [acting, setActing] = useState(false);
@@ -75,7 +67,7 @@ export default function AdminDashboardScreen() {
   }, [revision]);
   useEffect(() => {
     const request = ++pageRequest.current;
-    if (panel === 'overview' || panel === 'verification') return;
+    if (panel !== 'users' && panel !== 'gigs') return;
     void Promise.resolve().then(async () => {
       if (!mounted.current || request !== pageRequest.current) return;
       setListLoading(true); setListError(''); setCursor(undefined); setHasMore(false); setRows([]);
@@ -90,7 +82,7 @@ export default function AdminDashboardScreen() {
   const refresh = () => { setStatsLoading(true); setStatsError(''); setRevision(value => value + 1); };
   const selectPanel = (next: Panel) => { if (next === panel) return; pageRequest.current++; setListLoading(false); setPanel(next); setSearch(''); setFilter('all'); setNotice(''); setExpandedGig(''); };
   const loadMore = async () => {
-    if (listLoading || !hasMore || (panel === 'overview' || panel === 'verification')) return;
+    if (listLoading || !hasMore || (panel !== 'users' && panel !== 'gigs')) return;
     const request = ++pageRequest.current;
     setListLoading(true); setListError('');
     try {
@@ -105,8 +97,7 @@ export default function AdminDashboardScreen() {
     if (!action || actionLock.current) return;
     actionLock.current = true; setActing(true); setActionError('');
     try {
-      if (action.kind === 'remove') await removeGigFromDiscovery(action.id, reason);
-      else await setUserSuspension(action.id, action.kind === 'suspend', reason);
+      await removeGigFromDiscovery(action.id, reason);
       if (!mounted.current) return;
       setNotice('Changes saved.'); setAction(undefined); refresh();
     } catch (error) { if (mounted.current) setActionError(message(error)); }
@@ -137,16 +128,16 @@ export default function AdminDashboardScreen() {
     { label: 'Open gigs', key: 'openGigs', icon: 'flash-outline', color: colors.warning },
   ];
   const navigation = <View style={[styles.navigation, !wide && styles.mobileNavigation]}>{PANELS.map(item =>
-    <TouchableOpacity key={item.key} accessibilityRole="tab" accessibilityState={{ selected: panel === item.key }} onPress={() => selectPanel(item.key)} style={[styles.navItem, !wide && { flexGrow: 1, flexBasis: '44%', minWidth: 0 }, panel === item.key && (wide ? styles.sidebarSelected : styles.selected)]}>
-      <Ionicons name={item.icon} size={20} color={wide ? panel === item.key ? '#FFFFFF' : '#B9BDD8' : panel === item.key ? colors.primary : colors.textSecondary} /><Text style={wide ? panel === item.key ? styles.sidebarSelectedText : styles.sidebarText : panel === item.key ? styles.selectedText : styles.secondary}>{t(item.label)}</Text>
+    <TouchableOpacity key={item.key} accessibilityRole="tab" accessibilityState={{ selected: panel === item.key }} onPress={() => selectPanel(item.key)} style={[styles.navItem, !wide && styles.mobileNavItem, panel === item.key && styles.selected]}>
+      <Ionicons name={item.icon} size={wide ? 20 : 22} color={panel === item.key ? colors.primary : colors.textSecondary} /><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78} style={[panel === item.key ? styles.selectedText : styles.secondary, !wide && styles.mobileNavText]}>{t(item.label)}</Text>
     </TouchableOpacity>)}</View>;
   return <SafeAreaView style={styles.page}>
     <View style={[styles.shell, wide && styles.shellWide]}>
       {wide && <View style={styles.sidebar}><View style={styles.brand}><Ionicons name="shield-checkmark" size={25} color="#B9ACFF" /><Text style={styles.brandText}>Gigzy</Text></View>
         <Text style={styles.sidebarText}>{t('Administration')}</Text>{navigation}<Text style={styles.sidebarNote}>{t('Manage your community and opportunities.')}</Text></View>}
       <View style={styles.main}>
-        <View style={styles.header}><View style={styles.headerCopy}><Text accessibilityRole="header" style={styles.heading}>{t('Admin dashboard')}</Text>
-          <Text style={styles.secondary}>{t('Signed in as {{email}}', { email: user?.email || '' })}</Text></View><Button title={t('Sign out')} icon="log-out-outline" busy={loggingOut} disabled={acting} onPress={logout} /></View>
+        <View style={[styles.header, !wide && styles.mobileHeader]}><View style={styles.headerCopy}><Text accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={[styles.heading, !wide && styles.mobileHeading]}>{t('Admin dashboard')}</Text>
+          <Text numberOfLines={1} ellipsizeMode="middle" style={styles.secondary}>{t('Signed in as {{email}}', { email: user?.email || '' })}</Text></View><Button title={t('Sign out')} icon="log-out-outline" busy={loggingOut} disabled={acting} onPress={logout} /></View>
         {!wide && navigation}
         <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={statsLoading && !!stats} onRefresh={refresh} tintColor={colors.primary} />}>
           <View style={styles.hero}>
@@ -173,10 +164,11 @@ export default function AdminDashboardScreen() {
               </>}
             </View>
             <View style={styles.section}><Text style={styles.sectionTitle}>{t('Quick actions')}</Text><View style={styles.actions}>
-              <Button title={t('Manage users')} icon="people-outline" onPress={() => selectPanel('users')} primary /><Button title={t('Manage gigs')} icon="briefcase-outline" onPress={() => selectPanel('gigs')} /><Button title={t('Review applications')} icon="document-text-outline" onPress={() => selectPanel('applications')} />
+              <Button title={t('Manage users')} icon="people-outline" onPress={() => selectPanel('users')} primary /><Button title={t('Manage gigs')} icon="briefcase-outline" onPress={() => selectPanel('gigs')} />
+              <Button title={t('Send announcement')} icon="notifications-outline" onPress={() => selectPanel('notifications')} />
             </View><Text style={styles.secondary}>{t('Suspend accounts or remove gigs from discovery with a recorded reason.')}</Text></View>
-          </> : <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{panel === 'users' ? t('User management') : panel === 'applications' ? t('Application activity') : t('Gig management')}</Text>
+          </> : panel === 'notifications' ? <AdminNotificationPanel /> : <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{panel === 'users' ? t('User management') : t('Gig management')}</Text>
             <TextInput accessibilityLabel={t('Search loaded records')} placeholder={t('Search loaded records')} value={search} onChangeText={setSearch} style={styles.input} autoCapitalize="none" />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{filters.map(value =>
               <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: filter === value }} onPress={() => setFilter(value)} style={[styles.filter, filter === value && styles.selected]}><Text style={filter === value ? styles.selectedText : styles.secondary}>{label(value)}</Text></TouchableOpacity>)}</ScrollView>
@@ -188,8 +180,8 @@ export default function AdminDashboardScreen() {
                   <View style={styles.rowCopy}><Text style={styles.rowTitle}>{item.fullName || item.businessName || t('Unnamed user')}</Text><Text selectable style={styles.secondary}>{item.email || item.id}</Text>
                     <View style={styles.badges}><Badge label={label(item.role)} /><Badge label={item.suspended ? t('Suspended') : t('Active')} danger={!!item.suspended} /></View>
                     {!!item.suspended && !!item.suspensionReason && <Text style={styles.secondary}>{item.suspensionReason}</Text>}</View>
-                  {item.role !== 'admin' && item.id !== user?.uid && <Button title={item.suspended ? t('Reinstate') : t('Suspend')} danger={!item.suspended}
-                    onPress={() => openAction({ kind: item.suspended ? 'reinstate' : 'suspend', id: item.id, name: item.fullName || item.email || item.id })} />}</View>;
+                  {item.role !== 'admin' && item.id !== user?.uid && <Button title={t('Moderate')} danger={!!item.suspended}
+                    onPress={() => { setNotice(''); setModeratingUser(item); }} />}</View>;
               }
               if (panel === 'applications') {
                 const item = row as Application;
@@ -229,14 +221,14 @@ export default function AdminDashboardScreen() {
     </View>
     <Modal visible={!!action} transparent animationType="fade" onRequestClose={() => { if (!acting) setAction(undefined); }}>
       <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView style={styles.dialog} contentContainerStyle={styles.dialogContent} keyboardShouldPersistTaps="handled">
-        <Text accessibilityRole="header" style={styles.sectionTitle}>{action?.kind === 'remove' ? t('Remove from discovery') : action?.kind === 'suspend' ? t('Suspend account') : t('Reinstate account')}</Text><Text style={styles.rowTitle}>{action?.name}</Text>
-        <Text style={styles.secondary}>{action?.kind === 'remove' ? t('This closes the gig, stops new applications and prevents the business from reopening it. Existing applications are preserved.')
-          : action?.kind === 'suspend' ? t('This blocks the member from posting, applying and messaging until reinstated.') : t('This restores the member’s access to the platform.')}</Text>
-        {action?.kind !== 'reinstate' && <TextInput accessibilityLabel={t('Reason')} placeholder={t('Reason (5–500 characters)')} value={reason} onChangeText={setReason} multiline maxLength={500} editable={!acting} style={[styles.input, styles.reason]} />}
+        <Text accessibilityRole="header" style={styles.sectionTitle}>{t('Remove from discovery')}</Text><Text style={styles.rowTitle}>{action?.name}</Text>
+        <Text style={styles.secondary}>{t('This closes the gig, stops new applications and prevents the business from reopening it. Existing applications are preserved.')}</Text>
+        <TextInput accessibilityLabel={t('Reason')} placeholder={t('Reason (5–500 characters)')} value={reason} onChangeText={setReason} multiline maxLength={500} editable={!acting} style={[styles.input, styles.reason]} />
         {!!actionError && <Text accessibilityRole="alert" style={styles.error}>{t(actionError)}</Text>}
-        <View style={styles.actions}><Button title={t('Cancel')} disabled={acting} onPress={() => setAction(undefined)} /><Button title={t('Confirm')} danger={action?.kind !== 'reinstate'} primary={action?.kind === 'reinstate'} busy={acting} onPress={confirmAction} /></View>
+        <View style={styles.actions}><Button title={t('Cancel')} disabled={acting} onPress={() => setAction(undefined)} /><Button title={t('Confirm')} danger busy={acting} onPress={confirmAction} /></View>
       </ScrollView></KeyboardAvoidingView>
     </Modal>
+    <UserModerationModal key={moderatingUser?.id ?? 'closed'} user={moderatingUser} onClose={() => setModeratingUser(undefined)} onChanged={() => { setNotice('Changes saved.'); refresh(); }} />
   </SafeAreaView>;
 }
 
@@ -254,27 +246,17 @@ function SummaryRow({ label, value, total, warning }: { label: string; value: nu
     <View style={styles.track}><View style={[styles.progress, { width: `${Math.min(100, total ? value / total * 100 : 0)}%`, backgroundColor: warning ? colors.warning : colors.primary }]} /></View></View>;
 }
 const styles = StyleSheet.create({
-  sidebarText: { color: '#B9BDD8', fontSize: 13, flexShrink: 1 },
-  sidebarSelected: { backgroundColor: '#6250C5', borderWidth: 1, borderColor: '#8170DF' },
-  sidebarSelectedText: { color: '#FFFFFF', fontWeight: '700', flexShrink: 1 },
-  hero: { backgroundColor: '#34305E', borderRadius: 24, padding: 28, overflow: 'hidden', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 20 },
-  heroCopy: { flex: 1, minWidth: 180, gap: 12 },
-  heroEyebrow: { color: '#C1B5FF', letterSpacing: 2, textTransform: 'uppercase', fontSize: 11, fontWeight: '700' },
-  heroTitle: { color: '#FFFFFF', fontFamily: fonts.heading, fontSize: 26, lineHeight: 35, maxWidth: 570 },
-  heroCaption: { color: '#D3CFEA', fontSize: 13, lineHeight: 22, maxWidth: 560 },
-  heroEmblem: { width: 88, height: 88, borderRadius: 28, backgroundColor: '#4B447A', borderWidth: 1, borderColor: '#69608F', alignItems: 'center', justifyContent: 'center' },
-  heroOrb: { position: 'absolute', right: -60, top: -90, width: 300, height: 300, borderRadius: 150, backgroundColor: '#403966' },
-  page: { flex: 1, backgroundColor: colors.background }, shell: { flex: 1 }, shellWide: { flexDirection: 'row' }, sidebar: { width: 248, padding: 24, gap: 24, backgroundColor: '#22213C', borderRightWidth: 1, borderColor: colors.surfaceBorder },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 10 }, brandText: { fontFamily: fonts.heading, fontSize: 28, color: '#FFFFFF' }, sidebarNote: { marginTop: 'auto', color: '#B9BDD8', lineHeight: 22 },
-  navigation: { gap: 8 }, mobileNavigation: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingBottom: 12 }, navItem: { minHeight: 48, padding: 12, flexDirection: 'row', gap: 10, alignItems: 'center', borderRadius: 12 }, selected: { backgroundColor: colors.primaryLight }, selectedText: { color: colors.primary, fontWeight: '700', flexShrink: 1 },
-  main: { flex: 1, minWidth: 0 }, header: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 16, justifyContent: 'space-between', padding: 24, backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.surfaceBorder }, headerCopy: { flex: 1, minWidth: 190, gap: 6 }, heading: { fontFamily: fonts.heading, fontSize: 28, color: colors.text },
+  page: { flex: 1, backgroundColor: colors.background }, shell: { flex: 1 }, shellWide: { flexDirection: 'row' }, sidebar: { width: 240, padding: 24, gap: 20, backgroundColor: colors.surface, borderRightWidth: 1, borderColor: colors.surfaceBorder },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10 }, brandText: { fontFamily: fonts.heading, fontSize: 28, color: colors.text }, sidebarNote: { marginTop: 'auto', color: colors.textSecondary, lineHeight: 22 },
+  navigation: { gap: 8 }, mobileNavigation: { flexDirection: 'row', gap: 4, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.surfaceBorder }, navItem: { minHeight: 48, padding: 12, flexDirection: 'row', gap: 10, alignItems: 'center', borderRadius: 12 }, mobileNavItem: { flex: 1, minWidth: 0, minHeight: 66, paddingVertical: 9, paddingHorizontal: 3, flexDirection: 'column', justifyContent: 'center', gap: 5 }, mobileNavText: { width: '100%', fontSize: 12, lineHeight: 16, textAlign: 'center', flexShrink: 1 }, selected: { backgroundColor: colors.primaryLight }, selectedText: { color: colors.primary, fontFamily: fonts.bodyBold, flexShrink: 1 },
+  main: { flex: 1, minWidth: 0 }, header: { flexDirection: 'row', alignItems: 'center', gap: 16, justifyContent: 'space-between', padding: 24, backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.surfaceBorder }, mobileHeader: { paddingHorizontal: 16, paddingVertical: 14, gap: 10 }, headerCopy: { flex: 1, minWidth: 0, gap: 6 }, heading: { fontFamily: fonts.heading, fontSize: 28, color: colors.text }, mobileHeading: { fontSize: 22, lineHeight: 28 },
   content: { padding: 20, gap: 20, maxWidth: 1250, width: '100%', alignSelf: 'center', paddingBottom: 40 }, toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, secondary: { color: colors.textSecondary, fontSize: 13, lineHeight: 21 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 }, statCard: { flex: 1, minWidth: 130, padding: 22, gap: 12, backgroundColor: colors.surface, borderRadius: 22, borderWidth: 1, borderColor: colors.surfaceBorder }, statIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, statValue: { fontFamily: fonts.heading, color: colors.text, fontSize: 32 },
-  section: { padding: 24, gap: 18, backgroundColor: colors.surface, borderRadius: 22, borderWidth: 1, borderColor: colors.surfaceBorder }, sectionTitle: { fontSize: 20, fontWeight: '700', color: colors.text }, actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  button: { minHeight: 44, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: colors.surfaceBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, buttonText: { fontWeight: '600', fontSize: 13, flexShrink: 1 }, primaryButton: { backgroundColor: colors.primary, borderColor: colors.primary }, dangerButton: { backgroundColor: colors.errorLight, borderColor: colors.errorBorder }, disabled: { opacity: 0.5 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 }, statCard: { flex: 1, minWidth: 130, padding: 20, gap: 12, backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.surfaceBorder }, statIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, statValue: { fontFamily: fonts.heading, color: colors.text, fontSize: 32 },
+  section: { padding: 20, gap: 16, backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.surfaceBorder }, sectionTitle: { fontSize: 20, fontFamily: fonts.heading, color: colors.text }, actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  button: { minHeight: 44, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: colors.surfaceBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, buttonText: { fontFamily: fonts.bodySemiBold, fontSize: 13, flexShrink: 1 }, primaryButton: { backgroundColor: colors.primary, borderColor: colors.primary }, dangerButton: { backgroundColor: colors.errorLight, borderColor: colors.errorBorder }, disabled: { opacity: 0.5 },
   input: { borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 12, padding: 14, minHeight: 48, color: colors.text, fontSize: 15 }, filters: { gap: 8 }, filter: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.surfaceElevated },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center', padding: 16, borderWidth: 1, borderRadius: 16, backgroundColor: '#FAFBFF', borderColor: colors.surfaceBorderSubtle }, rowCopy: { flex: 1, minWidth: 160, gap: 6 }, rowTitle: { fontSize: 15, fontWeight: '600', color: colors.text }, avatar: { width: 42, height: 42, borderRadius: 13, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }, badge: { borderRadius: 7, paddingVertical: 3, paddingHorizontal: 8, backgroundColor: colors.primaryLight }, badgeText: { fontSize: 12, color: colors.primary, fontWeight: '600' }, recordId: { fontSize: 11, color: colors.textMuted },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center', paddingVertical: 16, borderTopWidth: 1, borderColor: colors.surfaceBorderSubtle }, rowCopy: { flex: 1, minWidth: 160, gap: 6 }, rowTitle: { fontSize: 15, fontFamily: fonts.bodySemiBold, color: colors.text }, avatar: { width: 42, height: 42, borderRadius: 13, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }, badge: { borderRadius: 7, paddingVertical: 3, paddingHorizontal: 8, backgroundColor: colors.primaryLight }, badgeText: { fontSize: 12, color: colors.primary, fontFamily: fonts.bodySemiBold }, recordId: { fontSize: 11, color: colors.textMuted },
   summaryRow: { gap: 8 }, summaryLabels: { flexDirection: 'row', justifyContent: 'space-between' }, track: { height: 7, borderRadius: 4, overflow: 'hidden', backgroundColor: colors.surfaceElevated }, progress: { height: 7, borderRadius: 4 }, error: { color: colors.error, lineHeight: 22 }, success: { color: colors.success, backgroundColor: colors.successLight, padding: 12, borderRadius: 10 },
   errorBox: { gap: 10, padding: 12, backgroundColor: colors.errorLight, borderRadius: 10 }, loader: { padding: 20 }, empty: { alignItems: 'center', gap: 12, padding: 28 }, overlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', padding: 24 }, dialog: { flexGrow: 0, width: '100%', maxWidth: 520, maxHeight: '90%', alignSelf: 'center', backgroundColor: colors.surface, borderRadius: 20 }, dialogContent: { padding: 24, gap: 20 }, reason: { minHeight: 110, textAlignVertical: 'top' },
 });

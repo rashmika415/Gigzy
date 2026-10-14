@@ -1,19 +1,20 @@
-import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
-import { formatRelativeDate } from '../../../localization/format';
+import { formatCurrency, formatRelativeDate } from '../../../localization/format';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Share, Alert } from 'react-native';
+import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Share } from 'react-native';
 import { Text } from '../../../components/LocalizedText';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../../context/AuthContext';
-import { colors, spacing, borderRadius } from '../../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../../constants/theme';
 import { subscribeToGig } from '../../../services/gigService';
 import { getOrCreateChat } from '../../../services/chatService';
 import { StatusPill, Chip, LoadingState, ErrorState } from '../../../components';
 import CloseGigButton from '../../../components/CloseGigButton';
+import RateUserButton from '../../../components/RateUserButton';
+import ViewApplicantsButton from '../../../components/ViewApplicantsButton';
 import BookmarkButton from '../../../components/BookmarkButton';
 import GigMeetingPoint from '../../../components/GigMeetingPoint';
 import GigApplicationAction from '../../../components/applications/GigApplicationAction';
@@ -21,6 +22,7 @@ import { distanceKm, validCoordinates } from '../../../services/discoveryFilters
 import { getCurrentCoordinates } from '../../../services/locationService';
 import type { Gig } from '../../../types/gig';
 import { GIG_CATEGORIES } from '../../../types/gig';
+import { useToast } from '../../../context/ToastContext';
 
 /** Resolve category id or name to the category object */
 function resolveCategory(raw: string) {
@@ -41,6 +43,7 @@ export default function GigDetailScreen() {
   useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user, userData } = useAuth();
+  const toast = useToast();
   const role = userData?.role ?? 'freelancer';
   const [retry, setRetry] = useState(0);
   const [distance, setDistance] = useState<number>();
@@ -69,7 +72,7 @@ export default function GigDetailScreen() {
     if (!validCoordinates(gig?.coordinates)) return;
     setLocating(true);
     try { setDistance(distanceKm(await getCurrentCoordinates(), gig.coordinates)); }
-    catch (failure) { Alert.alert(tr("Location unavailable"), failure instanceof Error ? failure.message : tr("Try again.")); }
+    catch (failure) { toast.error(tr("Location unavailable"), failure instanceof Error ? failure.message : tr("Try again.")); }
     finally { setLocating(false); }
   };
 
@@ -82,7 +85,7 @@ export default function GigDetailScreen() {
     if (!gig) return;
     try {
       await Share.share({
-        message: tr("Check out {{title}} on Gigzy: {{pay}} {{rate}}", { title: gig.title, pay: `$${gig.pay}`, rate: gig.payType === "hourly" ? tr("/hr") : tr(" Fixed Price").trim() }),
+        message: tr("Check out {{title}} on Gigzy: {{pay}} {{rate}}", { title: gig.title, pay: formatCurrency(gig.pay), rate: gig.payType === "hourly" ? tr("/hr") : tr(" Fixed Price").trim() }),
       });
     } catch {}
   };
@@ -105,7 +108,7 @@ export default function GigDetailScreen() {
     }
 
     if (gig.status !== 'open') {
-      Alert.alert(tr("Gig Closed"), tr("This gig is no longer accepting applications."));
+      toast.info(tr("Gig Closed"), tr("This gig is no longer accepting applications."));
       return;
     }
 
@@ -135,7 +138,7 @@ export default function GigDetailScreen() {
         params: { id: chat.id },
       } as any);
     } catch (err: any) {
-      Alert.alert(tr("Chat Error"), err.message || tr("Failed to start conversation."));
+      toast.error(tr("Failed to start conversation."), err.message);
     } finally {
       setStartingChat(false);
     }
@@ -192,8 +195,9 @@ export default function GigDetailScreen() {
             <StatusPill status={gig.status} />
           </View>
 
-          <VerifiedBusinessBadge userId={gig.postedBy.uid} />
+          <ViewApplicantsButton key={`applicants-${gig.id}`} gig={gig} />
                     <CloseGigButton gig={gig} />
+                    <RateUserButton key={gig.id} gig={gig} />
 
           {/* Title */}
           <Text style={styles.gigTitle}>{gig.title}</Text>
@@ -221,7 +225,7 @@ export default function GigDetailScreen() {
             <View>
               <Text style={styles.payLabel}>{tr("COMPENSATION")}</Text>
               <View style={styles.payRow}>
-                <Text style={styles.payAmount}>${gig.pay.toLocaleString()}</Text>
+                <Text style={styles.payAmount}>{formatCurrency(gig.pay)}</Text>
                 <Text style={styles.payType}>
                   {gig.payType === 'hourly' ? tr(" / hour") : tr(" Fixed Price")}
                 </Text>
@@ -461,7 +465,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     letterSpacing: -0.2,
   },
@@ -488,12 +492,12 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   gigTitle: {
     fontSize: 24,
-    fontWeight: '800',
+    fontFamily: fonts.heading,
     color: colors.text,
     letterSpacing: -0.5,
     lineHeight: 30,
@@ -515,7 +519,7 @@ const styles = StyleSheet.create({
   },
   posterAvatarText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   posterInfo: {
@@ -523,7 +527,7 @@ const styles = StyleSheet.create({
   },
   posterName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.text,
   },
   postedTime: {
@@ -547,7 +551,7 @@ const styles = StyleSheet.create({
   },
   payLabel: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.textMuted,
     letterSpacing: 0.8,
     marginBottom: 4,
@@ -558,13 +562,13 @@ const styles = StyleSheet.create({
   },
   payAmount: {
     fontSize: 28,
-    fontWeight: '800',
+    fontFamily: fonts.display,
     color: colors.primary,
     letterSpacing: -0.5,
   },
   payType: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   payIconCircle: {
@@ -606,14 +610,14 @@ const styles = StyleSheet.create({
   },
   specLabel: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   specValue: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.text,
   },
 
@@ -623,7 +627,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     marginBottom: spacing.sm,
   },
@@ -661,7 +665,7 @@ const styles = StyleSheet.create({
   },
   posterCardAvatarText: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
   },
   posterCardInfo: {
@@ -670,7 +674,7 @@ const styles = StyleSheet.create({
   },
   posterCardName: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   posterCardEmail: {
@@ -722,14 +726,14 @@ const styles = StyleSheet.create({
   },
   bottomPayLabel: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   bottomPayValue: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: fonts.heading,
     color: colors.primary,
   },
   contactBtn: {
@@ -749,7 +753,7 @@ const styles = StyleSheet.create({
   },
   contactBtnText: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
   },
   updateBtn: {
@@ -769,7 +773,7 @@ const styles = StyleSheet.create({
   },
   updateBtnText: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
   },
   manageBtn: {
@@ -786,7 +790,7 @@ const styles = StyleSheet.create({
   },
   manageBtnText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
 });

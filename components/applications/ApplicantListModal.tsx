@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, View, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, ActivityIndicator } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application, ApplicationFilterStatus } from '../../types/application';
 import { subscribeToGigApplicants } from '../../services/applicationService';
 import ApplicantCard from './ApplicantCard';
@@ -29,6 +29,7 @@ export default function ApplicantListModal({
   const [applicants, setApplicants] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [retry, setRetry] = useState(0);
   const [filter, setFilter] = useState<ApplicationFilterStatus>('all');
   const [selectedApplicant, setSelectedApplicant] = useState<Application | null>(null);
 
@@ -61,25 +62,9 @@ export default function ApplicantListModal({
       active = false;
       unsubscribe();
     };
-  }, [visible, gigId, businessId]);
+  }, [visible, gigId, businessId, retry]);
 
-  const handleRetry = () => {
-    setLoading(true);
-    setLoadError('');
-    subscribeToGigApplicants(
-      gigId,
-      businessId,
-      (apps: Application[]) => {
-        setApplicants(apps);
-        setLoading(false);
-        setLoadError('');
-      },
-      (error: Error) => {
-        setLoadError(error.message || 'Failed to load applicants.');
-        setLoading(false);
-      }
-    );
-  };
+  const handleRetry = () => setRetry(value => value + 1);
 
   const filteredApplicants = applicants.filter((app) => {
     if (filter === 'all') return true;
@@ -164,7 +149,7 @@ export default function ApplicantListModal({
           </View>
         ) : loadError ? (
           <View style={styles.emptyContainer}>
-            <View style={[styles.emptyIconBg, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+            <View style={[styles.emptyIconBg, { backgroundColor: colors.errorLight }]}>
               <Ionicons name="alert-circle-outline" size={36} color={colors.error} />
             </View>
             <Text style={styles.emptyTitle}>{tr("Unable to Load Applicants")}</Text>
@@ -207,7 +192,7 @@ export default function ApplicantListModal({
         {/* Applicant Detail Modal */}
         <ApplicantDetailModal
           visible={!!selectedApplicant}
-          application={selectedApplicant}
+          application={applicants.find(item => item.id === selectedApplicant?.id) || selectedApplicant}
           businessId={businessId}
           onClose={() => setSelectedApplicant(null)}
           onStatusChanged={(newStatus) => {
@@ -255,7 +240,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   headerSubtitle: {
@@ -280,6 +265,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   tabActive: {
     backgroundColor: colors.primary,
@@ -287,7 +274,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
     color: colors.textSecondary,
   },
   tabTextActive: {
@@ -318,14 +305,14 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     color: colors.text,
   },
   emptySubtitle: {
@@ -341,10 +328,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   retryBtnText: {
     color: colors.primaryOnColor,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
   },
 });

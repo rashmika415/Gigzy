@@ -27,6 +27,11 @@ export interface UserData {
   verificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED';
   suspended?: boolean;
   suspensionReason?: string;
+  suspensionType?: 'none' | 'temporary' | 'permanent';
+  suspendedUntil?: any;
+  warningCount?: number;
+  lastWarningReason?: string;
+  lastWarnedAt?: any;
   notifyOnMatch?: boolean;
   createdAt?: any;
   updatedAt?: any;
