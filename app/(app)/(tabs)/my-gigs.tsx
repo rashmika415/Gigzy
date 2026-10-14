@@ -1,7 +1,9 @@
+import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
 import { formatCurrency } from '../../../localization/format';
 import CloseGigButton from '../../../components/CloseGigButton';
+import ViewApplicantsButton from '../../../components/ViewApplicantsButton';
 import AppBanner from '../../../components/AppBanner';
 import { STATUS_STYLES } from '../../../components/StatusPill';
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +16,8 @@ import { borderRadius, colors, shadows, spacing, fonts } from "../../../constant
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from '../../../context/ToastContext';
 import SkeletonList from '../../../components/Skeleton';
+import { ApplicantListModal } from '../../../components/applications';
+import { RatingModal } from '../../../components/reviews';
 import {
     calculateBusinessGigStats,
     deleteGig,
@@ -33,10 +37,14 @@ import {
 const STATUS_CONFIG = STATUS_STYLES;
 
 export default function MyGigs() {
-  useTranslation();
+  const { t } = useTranslation();
   const { user, userData } = useAuth();
   const toast = useToast();
   const role = userData?.role;
+
+  const [selectedGigForApplicants, setSelectedGigForApplicants] = useState<Gig | null>(null);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [ratingTarget, setRatingTarget] = useState<{ userId: string; userName: string; gigId?: string; gigTitle?: string } | null>(null);
 
   // Role guard: only business owners (clients) can manage gigs
   // Data states
@@ -127,14 +135,24 @@ export default function MyGigs() {
 
   const handleUpdateStatus = async (newStatus: GigStatus) => {
     if (!selectedGigForStatus) return;
+    const currentGig = selectedGigForStatus;
     setStatusUpdating(true);
     try {
-      await updateGigStatus(selectedGigForStatus.id, newStatus);
+      await updateGigStatus(currentGig.id, newStatus);
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
       setStatusModalVisible(false);
       setSelectedGigForStatus(null);
+      if (newStatus === "completed" && currentGig.assignedYouthId) {
+        setRatingTarget({
+          userId: currentGig.assignedYouthId,
+          userName: t("Youth Freelancer"),
+          gigId: currentGig.id,
+          gigTitle: currentGig.title,
+        });
+        setRatingModalVisible(true);
+      }
     } catch (error: any) {
       toast.error(tr("Status Update Failed"), error.message || tr("Could not update gig status."));
     } finally {
@@ -257,6 +275,25 @@ export default function MyGigs() {
               try {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               } catch {}
+              router.push("/(app)/applications" as any);
+            }}
+            activeOpacity={0.8}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityLabel={tr("All Applications")}
+          >
+            <Ionicons
+              name="people-outline"
+              size={20}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerMessagesBtn}
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
               router.push("/(app)/(tabs)/messages" as any);
             }}
             activeOpacity={0.8}
@@ -298,6 +335,15 @@ export default function MyGigs() {
           />
         }
       >
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={[styles.metricCard, { marginBottom: spacing.md }]}
+          onPress={() => router.push('/(app)/add-ratings' as any)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="star-outline" size={22} color={colors.primary} />
+          <Text style={styles.metricLabel}>{tr("Add Ratings")}</Text>
+        </TouchableOpacity>
         <AppBanner compact kind="business" title={tr("Good help, close to home.")} description={tr("Manage your opportunities and connect with local talent.")} />
         {/* Business Metrics Carousel / Grid */}
         <View style={styles.metricsSection}>
@@ -355,7 +401,13 @@ export default function MyGigs() {
             </TouchableOpacity>
 
             {/* Total Applicants */}
-            <View style={styles.metricCard}>
+            <TouchableOpacity
+              style={styles.metricCard}
+              onPress={() => router.push('/(app)/applications')}
+              accessibilityRole="button"
+              accessibilityLabel={tr("View Applications")}
+              activeOpacity={0.8}
+            >
               <View
                 style={[
                   styles.metricIconWrap,
@@ -366,7 +418,7 @@ export default function MyGigs() {
               </View>
               <Text style={styles.metricValue}>{stats.totalApplicants}</Text>
               <Text style={styles.metricLabel}>{tr("Applicants")}</Text>
-            </View>
+            </TouchableOpacity>
 
             {/* Completed */}
             <TouchableOpacity
@@ -729,6 +781,15 @@ export default function MyGigs() {
                       </View>
                     </View>
 
+                    {Boolean(gig.assignedYouthId || gig.status === "in-progress") && (
+                      <View style={styles.assignedHireBanner}>
+                        <Ionicons name="checkmark-circle" size={13} color={colors.success} />
+                        <Text style={styles.assignedHireBannerText}>
+                          {tr("Accepted Freelancer Assigned")}
+                        </Text>
+                      </View>
+                    )}
+
                     {/* Gig Description preview */}
                     <Text style={styles.gigCardDesc} numberOfLines={2}>
                       {gig.description}
@@ -783,12 +844,20 @@ export default function MyGigs() {
                         </Text>
                       </View>
 
-                      <View
+                      <TouchableOpacity
                         style={[
                           styles.applicantsChip,
                           gig.applicantsCount > 0 &&
                             styles.applicantsChipActive,
                         ]}
+                        onPress={() => {
+                          try {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          } catch {}
+                          setSelectedGigForApplicants(gig);
+                        }}
+                        activeOpacity={0.7}
+                        accessibilityLabel={`${gig.applicantsCount || 0} ${gig.applicantsCount === 1 ? tr("Applicant") : tr("Applicants")}`}
                       >
                         <Ionicons
                           name="people"
@@ -811,9 +880,10 @@ export default function MyGigs() {
                             ? tr("Applicant")
                             : tr("Applicants")}
                         </Text>
-                      </View>
+                      </TouchableOpacity>
                     </View>
 
+                    <ViewApplicantsButton key={`applicants-${gig.id}`} gig={gig} />
                     <CloseGigButton gig={gig} />
 
                     {/* Card Actions Footer */}
@@ -832,6 +902,26 @@ export default function MyGigs() {
                       </TouchableOpacity>
 
                       <TouchableOpacity
+                        style={styles.actionApplicantsBtn}
+                        onPress={() => {
+                          try {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          } catch {}
+                          setSelectedGigForApplicants(gig);
+                        }}
+                        activeOpacity={0.75}
+                      >
+                        <Ionicons
+                          name="people-outline"
+                          size={14}
+                          color={colors.primary}
+                        />
+                        <Text style={styles.actionApplicantsBtnText}>
+                          {tr("Applicants")} ({gig.applicantsCount || 0})
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
                         style={styles.actionStatusBtn}
                         onPress={() => handleOpenStatusModal(gig)}
                         activeOpacity={0.75}
@@ -843,6 +933,25 @@ export default function MyGigs() {
                         />
                         <Text style={styles.actionStatusBtnText}>{tr("Status")}</Text>
                       </TouchableOpacity>
+
+                      {(gig.status === "completed" || gig.status === "in-progress" || Boolean(gig.assignedYouthId)) && gig.assignedYouthId ? (
+                        <TouchableOpacity
+                          style={styles.actionRateBtn}
+                          onPress={() => {
+                            setRatingTarget({
+                              userId: gig.assignedYouthId!,
+                              userName: tr("Youth Freelancer"),
+                              gigId: gig.id,
+                              gigTitle: gig.title,
+                            });
+                            setRatingModalVisible(true);
+                          }}
+                          activeOpacity={0.75}
+                        >
+                          <Ionicons name="star" size={13} color={colors.star} />
+                          <Text style={styles.actionRateBtnText}>{tr("Rate Freelancer")}</Text>
+                        </TouchableOpacity>
+                      ) : null}
 
                       <TouchableOpacity
                         style={styles.actionDetailsBtn}
@@ -1256,6 +1365,42 @@ export default function MyGigs() {
           </View>
         </View>
       </Modal>
+      {/* Applicant List Modal */}
+      {selectedGigForApplicants && (
+        <ApplicantListModal
+          visible={Boolean(selectedGigForApplicants)}
+          gigId={selectedGigForApplicants.id}
+          gigTitle={selectedGigForApplicants.title}
+          businessId={user?.uid || ''}
+          gigDate={selectedGigForApplicants.date}
+          gigTime={selectedGigForApplicants.time}
+          gigLocation={selectedGigForApplicants.location}
+          gigPay={selectedGigForApplicants.pay}
+          gigPayType={selectedGigForApplicants.payType}
+          onClose={() => setSelectedGigForApplicants(null)}
+        />
+      )}
+
+      {/* Rating Modal */}
+      {ratingTarget && (
+        <RatingModal
+          visible={ratingModalVisible}
+          targetUserId={ratingTarget.userId}
+          targetUserName={ratingTarget.userName}
+          targetRole="freelancer"
+          gigId={ratingTarget.gigId}
+          gigTitle={ratingTarget.gigTitle}
+          onClose={() => {
+            setRatingModalVisible(false);
+            setRatingTarget(null);
+          }}
+          onSuccess={() => {
+            setRatingModalVisible(false);
+            setRatingTarget(null);
+            toast.success(tr("Review submitted successfully!"));
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -1912,6 +2057,58 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fonts.bodySemiBold,
     color: colors.text,
+  },
+  actionApplicantsBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: 7,
+    gap: 4,
+    minHeight: 44,
+  },
+  actionApplicantsBtnText: {
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.primary,
+  },
+  assignedHireBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.successLight,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.successBorder,
+    marginBottom: spacing.xs,
+  },
+  assignedHireBannerText: {
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.success,
+  },
+  actionRateBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+    borderRadius: borderRadius.md,
+    paddingVertical: 7,
+    gap: 4,
+  },
+  actionRateBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.warning,
   },
   actionDeleteBtn: {
     width: 34,

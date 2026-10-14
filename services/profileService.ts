@@ -1,7 +1,6 @@
 import {
   collection,
   doc,
-  limit,
   onSnapshot,
   orderBy,
   query,
@@ -30,7 +29,6 @@ export function subscribeToProfileReviews(
   const reviewsQuery = query(
     collection(db, 'users', userId, 'reviews'),
     orderBy('createdAt', 'desc'),
-    limit(25),
   );
 
   return onSnapshot(

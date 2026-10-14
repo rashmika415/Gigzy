@@ -1,12 +1,16 @@
 import { formatDate as localizedDate } from '../../localization/format';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../localization/i18n';
-import React from 'react';
-import { Modal, View, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState } from 'react';
+import { Modal, View, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application } from '../../types/application';
+import { addGigToCalendar } from '../../services/calendarService';
+import { RatingModal } from '../reviews';
 import { getStatusTheme } from './ApplicationCard';
 
 interface ApplicationDetailModalProps {
@@ -37,10 +41,65 @@ export default function ApplicationDetailModal({
   onClose,
 }: ApplicationDetailModalProps) {
   useTranslation();
+  const [calendarAdding, setCalendarAdding] = useState(false);
+  const [calendarAdded, setCalendarAdded] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+
   if (!application) return null;
 
   const statusTheme = getStatusTheme(application.status);
   const appliedDateStr = formatDate(application.createdAt);
+  const isAccepted = application.status === 'accepted';
+  const isCompleted = application.status === 'completed';
+  const canTakeAction = isAccepted || isCompleted;
+
+  const handleMessageBusiness = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    onClose();
+    const convId = application.conversationId || `conv_${application.id}`;
+    router.push({
+      pathname: '/(app)/chat/[id]',
+      params: { id: convId },
+    } as any);
+  };
+
+  const handleAddToCalendar = async () => {
+    setCalendarAdding(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    const result = await addGigToCalendar({
+      title: application.gigTitle || 'Gig',
+      date: application.gigDate || new Date().toISOString().slice(0, 10),
+      location: application.gigLocation,
+      pay: application.gigPay,
+      payType: application.gigPayType,
+      counterpartName: application.businessName,
+      counterpartRole: 'business',
+      gigId: application.gigId,
+      applicationId: application.id,
+      description: `Accepted Gigzy gig with ${application.businessName || 'Business Owner'}`,
+    });
+
+    setCalendarAdding(false);
+    if (result.success) {
+      setCalendarAdded(true);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      Alert.alert(
+        'Gig Added to Calendar! 📅',
+        result.method === 'native'
+          ? `Added "${application.gigTitle || 'Gig'}" to your device calendar.`
+          : `Opened calendar for "${application.gigTitle || 'Gig'}".`
+      );
+    } else {
+      Alert.alert('Calendar', result.error || 'Could not add gig to calendar.');
+    }
+  };
 
   return (
     <Modal
@@ -93,6 +152,74 @@ export default function ApplicationDetailModal({
               </Text>
             </View>
           </View>
+
+          {/* Action Card (Messaging, Calendar, Rating) */}
+          {canTakeAction && (
+            <View style={styles.acceptedActionCard}>
+              <View style={styles.acceptedActionHeader}>
+                <Ionicons name="sparkles" size={16} color={colors.primary} />
+                <Text style={styles.acceptedActionTitle}>
+                  {isCompleted ? tr("Gig Completed") : tr("Gig Confirmed & Assigned")}
+                </Text>
+              </View>
+
+              <Text style={styles.acceptedActionSubtitle}>
+                {isCompleted
+                  ? tr("This gig is completed. You can leave a review and message the business owner.")
+                  : tr("You have been selected for this gig. Coordinate timing with the business owner and add the gig to your calendar.")}
+              </Text>
+
+              <View style={styles.acceptedButtonGroup}>
+                <TouchableOpacity
+                  style={styles.messageBizBtn}
+                  onPress={handleMessageBusiness}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="chatbubbles" size={17} color={colors.primaryOnColor} />
+                  <Text style={styles.messageBizBtnText}>{tr("Message Business Owner")}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.calendarSyncBtn,
+                    calendarAdded && styles.calendarSyncBtnAdded,
+                  ]}
+                  onPress={handleAddToCalendar}
+                  disabled={calendarAdding || calendarAdded}
+                  activeOpacity={0.85}
+                >
+                  {calendarAdding ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name={calendarAdded ? 'checkmark-circle' : 'calendar-outline'}
+                        size={17}
+                        color={calendarAdded ? colors.success : colors.primary}
+                      />
+                      <Text
+                        style={[
+                          styles.calendarSyncBtnText,
+                          calendarAdded && styles.calendarSyncBtnTextAdded,
+                        ]}
+                      >
+                        {calendarAdded ? tr("Scheduled in Calendar ✓") : tr("Add Gig to Calendar")}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.rateBizBtn}
+                  onPress={() => setShowRatingModal(true)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="star" size={17} color={colors.star} />
+                  <Text style={styles.rateBizBtnText}>{tr("Rate Business Owner")}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Gig Overview Card */}
           <View style={styles.card}>
@@ -190,6 +317,19 @@ export default function ApplicationDetailModal({
             <Text style={styles.dismissBtnText}>{tr("Back to Applications")}</Text>
           </TouchableOpacity>
         </ScrollView>
+
+        {application?.businessId ? (
+          <RatingModal
+            visible={showRatingModal}
+            targetUserId={application.businessId}
+            targetUserName={application.businessName || 'Business Owner'}
+            targetRole="client"
+            gigId={application.gigId}
+            gigTitle={application.gigTitle}
+            onClose={() => setShowRatingModal(false)}
+            onSuccess={() => setShowRatingModal(false)}
+          />
+        ) : null}
       </SafeAreaView>
     </Modal>
   );
@@ -353,5 +493,85 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: fonts.bodySemiBold,
     color: colors.text,
+  },
+  acceptedActionCard: {
+    backgroundColor: colors.successLight,
+    borderWidth: 1,
+    borderColor: colors.successBorder,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  acceptedActionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  acceptedActionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.success,
+  },
+  acceptedActionSubtitle: {
+    fontSize: 12.5,
+    color: colors.success,
+    lineHeight: 18,
+  },
+  acceptedButtonGroup: {
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  messageBizBtn: {
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: borderRadius.md,
+    gap: 6,
+  },
+  messageBizBtnText: {
+    color: colors.primaryOnColor,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  calendarSyncBtn: {
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: borderRadius.md,
+    gap: 6,
+  },
+  calendarSyncBtnAdded: {
+    backgroundColor: colors.successLight,
+    borderColor: colors.success,
+  },
+  calendarSyncBtnText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  calendarSyncBtnTextAdded: {
+    color: colors.success,
+  },
+  rateBizBtn: {
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1.5,
+    borderColor: colors.primaryBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: borderRadius.md,
+    gap: 6,
+  },
+  rateBizBtnText: {
+    color: colors.warning,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

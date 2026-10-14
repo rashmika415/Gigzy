@@ -2,7 +2,7 @@ import { formatCurrency, formatRelativeDate } from '../../../localization/format
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Share } from 'react-native';
+import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Share, Alert } from 'react-native';
 import { Text } from '../../../components/LocalizedText';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,9 +13,12 @@ import { subscribeToGig } from '../../../services/gigService';
 import { getOrCreateChat } from '../../../services/chatService';
 import { StatusPill, Chip, LoadingState, ErrorState } from '../../../components';
 import CloseGigButton from '../../../components/CloseGigButton';
+import ViewApplicantsButton from '../../../components/ViewApplicantsButton';
 import BookmarkButton from '../../../components/BookmarkButton';
 import GigMeetingPoint from '../../../components/GigMeetingPoint';
 import GigApplicationAction from '../../../components/applications/GigApplicationAction';
+import { ApplicantListModal } from '../../../components/applications';
+import { RatingModal } from '../../../components/reviews';
 import { distanceKm, validCoordinates } from '../../../services/discoveryFilters';
 import { getCurrentCoordinates } from '../../../services/locationService';
 import type { Gig } from '../../../types/gig';
@@ -51,6 +54,8 @@ export default function GigDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [startingChat, setStartingChat] = useState(false);
+  const [showApplicantsModal, setShowApplicantsModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,12 +127,28 @@ export default function GigDetailScreen() {
         email: user.email || '',
       };
 
+      const businessUid =
+        (typeof gig.postedBy === 'object' && gig.postedBy?.uid) ||
+        (typeof gig.postedBy === 'string' && gig.postedBy) ||
+        (gig as any).businessId ||
+        (gig as any).clientId ||
+        '';
+
+      if (!businessUid) {
+        Alert.alert(tr("Chat Error"), tr("Unable to identify the gig creator."));
+        return;
+      }
+
       const businessParticipant = {
-        uid: gig.postedBy.uid,
-        fullName: gig.postedBy.fullName || 'Business Owner',
+        uid: businessUid,
+        fullName:
+          (typeof gig.postedBy === 'object' && gig.postedBy?.fullName) ||
+          (gig as any).businessName ||
+          'Business Owner',
         photoURL: '',
         role: 'client' as const,
-        email: gig.postedBy.email || '',
+        email:
+          (typeof gig.postedBy === 'object' && gig.postedBy?.email) || '',
       };
 
       const chat = await getOrCreateChat(currentParticipant, businessParticipant, gig);
@@ -193,7 +214,8 @@ export default function GigDetailScreen() {
             <StatusPill status={gig.status} />
           </View>
 
-          <CloseGigButton gig={gig} />
+          <ViewApplicantsButton key={`applicants-${gig.id}`} gig={gig} />
+                    <CloseGigButton gig={gig} />
 
           {/* Title */}
           <Text style={styles.gigTitle}>{gig.title}</Text>
@@ -302,6 +324,15 @@ export default function GigDetailScreen() {
             <View style={styles.posterCardInfo}>
               <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/profile/[id]', params: { id: gig.postedBy.uid } })}>
                 <Text style={styles.posterCardName}>{gig.postedBy.fullName}</Text>
+                {typeof (gig.postedBy as any)?.ratingAverage === 'number' && (gig.postedBy as any).ratingAverage > 0 ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginVertical: 2 }}>
+                    <Ionicons name="star" size={13} color={colors.star} />
+                    <Text style={{ fontSize: 12, fontFamily: fonts.bodySemiBold, color: colors.textSecondary }}>
+                      {(gig.postedBy as any).ratingAverage.toFixed(1)}
+                      {(gig.postedBy as any).ratingCount ? ` (${(gig.postedBy as any).ratingCount} ${tr("reviews")})` : ''}
+                    </Text>
+                  </View>
+                ) : null}
                 <Text style={styles.categoryText}>{tr("View business profile")}</Text>
               </TouchableOpacity>
               <Text style={styles.posterCardEmail}>{gig.postedBy.email}</Text>
@@ -326,28 +357,61 @@ export default function GigDetailScreen() {
       </ScrollView>
 
       {/* ── Bottom Action Bar ── */}
-      {!gigOwner && role === 'freelancer' && (
+      {!gigOwner && role !== 'client' && (
         <View style={styles.bottomBar}>
           <View style={styles.bottomPayPreview}>
             <Text style={styles.bottomPayLabel}>{tr("Pay")}</Text>
             <Text style={styles.bottomPayValue}>
-              ${gig.pay}{gig.payType === 'hourly' ? tr("/hr") : ''}
+              {formatCurrency(gig.pay)}{gig.payType === 'hourly' ? tr("/hr") : ''}
             </Text>
           </View>
 
           <GigApplicationAction gig={gig} />
+
+          {Boolean(gig.assignedYouthId === user?.uid && (gig.status === 'in-progress' || gig.status === 'completed')) && (
+            <TouchableOpacity
+              style={styles.rateFreelancerBtn}
+              onPress={() => setShowRatingModal(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="star" size={16} color={colors.star} />
+              <Text style={styles.rateFreelancerBtnText}>{tr("Rate Client")}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
       {gigOwner && (
         <View style={styles.bottomBar}>
           <TouchableOpacity
+            style={styles.applicantsBtn}
+            onPress={() => setShowApplicantsModal(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="people-outline" size={17} color={colors.primaryOnColor} />
+            <Text style={styles.applicantsBtnText}>
+              {tr("Applicants")} ({gig.applicantsCount || 0})
+            </Text>
+          </TouchableOpacity>
+
+          {Boolean(gig.assignedYouthId && (gig.status === 'in-progress' || gig.status === 'completed')) && (
+            <TouchableOpacity
+              style={styles.rateFreelancerBtn}
+              onPress={() => setShowRatingModal(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="star" size={16} color={colors.star} />
+              <Text style={styles.rateFreelancerBtnText}>{tr("Rate")}</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
             style={styles.updateBtn}
             onPress={handleEditGig}
             activeOpacity={0.85}
           >
-            <Ionicons name="create-outline" size={18} color={colors.primaryOnColor} />
-            <Text style={styles.updateBtnText}>{tr("Update Gig")}</Text>
+            <Ionicons name="create-outline" size={17} color={colors.primary} />
+            <Text style={styles.updateBtnText}>{tr("Update")}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -355,10 +419,41 @@ export default function GigDetailScreen() {
             onPress={() => router.push('/(app)/(tabs)/my-gigs' as any)}
             activeOpacity={0.85}
           >
-            <Ionicons name="list-outline" size={18} color={colors.text} />
+            <Ionicons name="list-outline" size={17} color={colors.text} />
             <Text style={styles.manageBtnText}>{tr("My Gigs")}</Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {gig && showApplicantsModal && (
+        <ApplicantListModal
+          visible={showApplicantsModal}
+          gigId={gig.id}
+          gigTitle={gig.title}
+          businessId={user?.uid || ''}
+          gigDate={gig.date}
+          gigTime={gig.time}
+          gigLocation={gig.location}
+          gigPay={gig.pay}
+          gigPayType={gig.payType}
+          onClose={() => setShowApplicantsModal(false)}
+        />
+      )}
+
+      {gig && showRatingModal && (
+        <RatingModal
+          visible={showRatingModal}
+          targetUserId={gigOwner ? (gig.assignedYouthId || '') : (gig.postedBy?.uid || '')}
+          targetUserName={gigOwner ? tr("Youth Freelancer") : (gig.postedBy?.fullName || tr("Business Owner"))}
+          targetRole={gigOwner ? 'freelancer' : 'client'}
+          gigId={gig.id}
+          gigTitle={gig.title}
+          onClose={() => setShowRatingModal(false)}
+          onSuccess={() => {
+            setShowRatingModal(false);
+            toast.success(tr("Review submitted successfully!"));
+          }}
+        />
       )}
     </SafeAreaView>
   );
@@ -752,25 +847,42 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
   },
-  updateBtn: {
-    flex: 1.2,
+  applicantsBtn: {
+    flex: 1.4,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,
     borderRadius: borderRadius.lg,
     paddingVertical: 14,
-    gap: 8,
+    gap: 6,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 5,
   },
-  updateBtnText: {
-    fontSize: 15,
+  applicantsBtnText: {
+    fontSize: 14,
     fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
+  },
+  updateBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: 14,
+    gap: 6,
+  },
+  updateBtnText: {
+    fontSize: 14,
+    fontFamily: fonts.bodyBold,
+    color: colors.primary,
   },
   manageBtn: {
     flex: 0.8,
@@ -788,5 +900,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fonts.bodyBold,
     color: colors.text,
+  },
+  rateFreelancerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1.5,
+    borderColor: colors.primaryBorder,
+    borderRadius: borderRadius.lg,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    gap: 6,
+  },
+  rateFreelancerBtnText: {
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+    color: colors.warning,
   },
 });

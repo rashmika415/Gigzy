@@ -33,8 +33,8 @@ export default function ApplyModal({
   onSuccess,
 }: ApplyModalProps) {
   useTranslation();
-  const [message, setMessage] = useState('');
-  const [availabilityConfirmed, setAvailabilityConfirmed] = useState(false);
+  const [message, setMessage] = useState('I am available and interested in helping with this gig!');
+  const [availabilityConfirmed, setAvailabilityConfirmed] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -46,9 +46,9 @@ export default function ApplyModal({
   const handleSubmit = async () => {
     if (!canSubmit) {
       if (!isMessageValid) {
-        setErrorMsg('Please write a message explaining why you are suitable (at least 5 characters).');
+        setErrorMsg(tr("Please write a message explaining why you are suitable (at least 5 characters)."));
       } else if (!availabilityConfirmed) {
-        setErrorMsg('Please confirm your availability on the required date and time.');
+        setErrorMsg(tr("Please confirm your availability on the required date and time."));
       }
       return;
     }
@@ -139,6 +139,19 @@ export default function ApplyModal({
               </Text>
             </View>
 
+            {/* Business Trust Pill */}
+            {Boolean(gig.postedBy?.fullName) && (
+              <View style={styles.businessTrustPill}>
+                <Ionicons name="shield-checkmark-outline" size={14} color={colors.primary} />
+                <Text style={styles.businessTrustText} numberOfLines={1}>
+                  {tr("Client:")}{' '}{gig.postedBy.fullName}
+                  {typeof (gig.postedBy as any)?.ratingAverage === 'number' && (gig.postedBy as any).ratingAverage > 0
+                    ? ` • ★ ${(gig.postedBy as any).ratingAverage.toFixed(1)}`
+                    : ''}
+                </Text>
+              </View>
+            )}
+
             {/* Error Message if any */}
             {Boolean(errorMsg) && (
               <View style={styles.errorBanner}>
@@ -202,7 +215,7 @@ export default function ApplyModal({
               <TouchableOpacity
                 style={[styles.applyBtn, !canSubmit && styles.applyBtnDisabled]}
                 onPress={handleSubmit}
-                disabled={!canSubmit}
+                disabled={submitting}
                 activeOpacity={0.85}
               >
                 {submitting ? (
@@ -300,6 +313,21 @@ const styles = StyleSheet.create({
   gigSummaryText: {
     fontSize: 12,
     color: colors.textSecondary,
+    fontFamily: fonts.bodySemiBold,
+    flex: 1,
+  },
+  businessTrustPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    gap: spacing.xs,
+  },
+  businessTrustText: {
+    fontSize: 12,
+    color: colors.primary,
     fontFamily: fonts.bodySemiBold,
     flex: 1,
   },

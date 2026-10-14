@@ -7,6 +7,7 @@ import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import StatusPill from './StatusPill';
+import VerifiedBusinessBadge from './VerifiedBusinessBadge';
 import BookmarkButton from './BookmarkButton';
 import Chip from './Chip';
 import { categoryId } from '../services/discoveryFilters';
@@ -44,22 +45,16 @@ export default function GigCard({
   const locationIcon =
     gig.locationType === 'remote' ? 'globe-outline' : 'location-outline';
 
-  return (
-    <PressableScale
-      appear
-      style={styles.card}
-      containerStyle={style}
-      onPress={() => onPress?.(gig)}
-      disabled={!onPress}
-      accessibilityRole={onPress ? 'button' : undefined}
-    >
+  const cardContent = (
+    <>
       {/* ── Top Row: category & status ── */}
       <View style={styles.topRow}>
         <View style={styles.badges}>
-        <View style={styles.categoryBadge}>
-          <Text style={styles.categoryText}>{t(GIG_CATEGORIES.find(category => category.id === categoryId(gig.category))?.name ?? gig.category)}</Text>
-        </View>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{t(GIG_CATEGORIES.find(category => category.id === categoryId(gig.category))?.name ?? gig.category)}</Text>
+          </View>
 
+        <VerifiedBusinessBadge userId={gig.postedBy.uid} />
         <StatusPill
           status={gig.status}
           showChevron={!!onStatusPress}
@@ -138,12 +133,37 @@ export default function GigCard({
           </Text>
         </View>
       </View>
+    </>
+  );
 
-      {/* ── Optional Action Footer ── */}
-      {renderActions && (
-        <View style={styles.actionsFooter}>{renderActions(gig)}</View>
-      )}
-    </PressableScale>
+  if (!renderActions) {
+    return (
+      <PressableScale
+        appear
+        style={styles.card}
+        containerStyle={style}
+        onPress={() => onPress?.(gig)}
+        disabled={!onPress}
+        accessibilityRole={onPress ? 'button' : undefined}
+      >
+        {cardContent}
+      </PressableScale>
+    );
+  }
+
+  return (
+    <View style={[styles.card, style]}>
+      <PressableScale
+        appear
+        style={styles.cardBody}
+        onPress={() => onPress?.(gig)}
+        disabled={!onPress}
+        accessibilityRole={onPress ? 'button' : undefined}
+      >
+        {cardContent}
+      </PressableScale>
+      <View style={styles.actionsFooter}>{renderActions(gig)}</View>
+    </View>
   );
 }
 
@@ -155,6 +175,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  cardBody: {
     gap: spacing.sm,
   },
 

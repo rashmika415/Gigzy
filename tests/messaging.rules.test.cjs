@@ -38,6 +38,7 @@ test('messaging firestore rules enforce participant-only access and validation',
 
     await t.test('participants can create and read their conversation', async () => {
       const youth = db('youth-001');
+      await assertSucceeds(getDoc(doc(youth, 'conversations', 'conv_app-001')));
       await assertSucceeds(setDoc(doc(youth, 'conversations', 'conv_app-001'), convData));
       await assertSucceeds(getDoc(doc(youth, 'conversations', 'conv_app-001')));
 

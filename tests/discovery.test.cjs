@@ -38,6 +38,12 @@ function setup(rows) {
       const count = clauses.find(c => c.type === 'limit').count;
       return { docs: result.slice(0, count).map(row => ({ id: row.id, data: () => row })) };
     },
+    onSnapshot: (clauses, onData) => {
+      queries.push(clauses);
+      const result = rows.filter(row => clauses.filter(clause => clause.type === 'where').every(clause => row[clause.field] === clause.value));
+      onData({ docs: result.map(row => ({ id: row.id, data: () => row })) });
+      return () => {};
+    },
   };
   return { service: load('../services/gigService.ts', { 'firebase/firestore': firestore, '../FirebaseConfig': { db: {} } }), queries, fail: () => { fail = true; } };
 }
@@ -116,6 +122,18 @@ test('network failures and cancelled searches are surfaced', async () => {
   const app = setup([]); app.fail();
   await assert.rejects(app.service.getBrowsePage({}), /internet connection/);
   await assert.rejects(app.service.getBrowsePage({}, null, { aborted: true }), /cancelled/);
+});
+test('assigned gig subscription lets a youth find completed work for rating a business', () => {
+  const rows = [
+    gig({ id: 'older', assignedYouthId: 'worker', status: 'completed', createdAt: 1 }),
+    gig({ id: 'newer', assignedYouthId: 'worker', status: 'completed', createdAt: 2 }),
+    gig({ id: 'other', assignedYouthId: 'someone-else', status: 'completed', createdAt: 3 }),
+  ];
+  const app = setup(rows); let received = [];
+  const unsubscribe = app.service.subscribeToAssignedGigs('worker', gigs => { received = gigs; });
+  assert.deepEqual(Array.from(received, item => item.id), ['newer', 'older']);
+  assert.deepEqual(app.queries.at(-1)[0], { type: 'where', field: 'assignedYouthId', value: 'worker' });
+  unsubscribe();
 });
 test('posting persists location and time, rejects impossible dates and invalid locations', async () => {
   const writes = [];

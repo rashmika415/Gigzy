@@ -28,6 +28,9 @@ export interface Chat {
   gigPay?: number;
   gigPayType?: PayType;
   gigCategory?: string;
+  gigDate?: string;
+  gigTime?: string;
+  gigLocation?: string;
   participants: string[];
   participantDetails: Record<string, ParticipantDetail>;
   lastMessage?: LastMessage | string;
