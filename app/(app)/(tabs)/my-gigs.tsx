@@ -18,6 +18,7 @@ import { useToast } from '../../../context/ToastContext';
 import SkeletonList from '../../../components/Skeleton';
 import { ApplicantListModal } from '../../../components/applications';
 import { RatingModal } from '../../../components/reviews';
+import { ReportModal } from '../../../components/reports';
 import {
     calculateBusinessGigStats,
     deleteGig,
@@ -44,7 +45,15 @@ export default function MyGigs() {
 
   const [selectedGigForApplicants, setSelectedGigForApplicants] = useState<Gig | null>(null);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
-  const [ratingTarget, setRatingTarget] = useState<{ userId: string; userName: string; gigId?: string; gigTitle?: string } | null>(null);
+  const [ratingTarget, setRatingTarget] = useState<{ userId: string; userName: string; userPhotoURL?: string; gigId?: string; gigTitle?: string } | null>(null);
+  const [reportTarget, setReportTarget] = useState<{
+    targetType: 'user' | 'gig' | 'no-show';
+    targetId: string;
+    targetUserId?: string;
+    targetUserName?: string;
+    targetGigId?: string;
+    targetGigTitle?: string;
+  } | null>(null);
 
   // Role guard: only business owners (clients) can manage gigs
   // Data states
@@ -147,7 +156,8 @@ export default function MyGigs() {
       if (newStatus === "completed" && currentGig.assignedYouthId) {
         setRatingTarget({
           userId: currentGig.assignedYouthId,
-          userName: t("Youth Freelancer"),
+          userName: currentGig.assignedYouthName || t("Youth Freelancer"),
+          userPhotoURL: currentGig.assignedYouthPhotoURL,
           gigId: currentGig.id,
           gigTitle: currentGig.title,
         });
@@ -157,6 +167,29 @@ export default function MyGigs() {
       toast.error(tr("Status Update Failed"), error.message || tr("Could not update gig status."));
     } finally {
       setStatusUpdating(false);
+    }
+  };
+
+  const handleReportGig = (gig: Gig) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    if (gig.assignedYouthId) {
+      setReportTarget({
+        targetType: 'user',
+        targetId: gig.assignedYouthId,
+        targetUserId: gig.assignedYouthId,
+        targetUserName: gig.assignedYouthName || tr("Assigned Freelancer"),
+        targetGigId: gig.id,
+        targetGigTitle: gig.title,
+      });
+    } else {
+      setReportTarget({
+        targetType: 'gig',
+        targetId: gig.id,
+        targetGigId: gig.id,
+        targetGigTitle: gig.title,
+      });
     }
   };
 
@@ -783,10 +816,24 @@ export default function MyGigs() {
 
                     {Boolean(gig.assignedYouthId || gig.status === "in-progress") && (
                       <View style={styles.assignedHireBanner}>
-                        <Ionicons name="checkmark-circle" size={13} color={colors.success} />
-                        <Text style={styles.assignedHireBannerText}>
-                          {tr("Accepted Freelancer Assigned")}
-                        </Text>
+                        <View style={styles.assignedHireBannerLeft}>
+                          <Ionicons name="checkmark-circle" size={13} color={colors.success} />
+                          <Text style={styles.assignedHireBannerText}>
+                            {gig.assignedYouthName
+                              ? `${tr("Assigned Freelancer")}: ${gig.assignedYouthName}`
+                              : tr("Accepted Freelancer Assigned")}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.assignedReportLink}
+                          onPress={() => handleReportGig(gig)}
+                          activeOpacity={0.75}
+                          accessibilityRole="button"
+                          accessibilityLabel={tr("Report Freelancer")}
+                        >
+                          <Ionicons name="flag-outline" size={12} color={colors.error} />
+                          <Text style={styles.assignedReportLinkText}>{tr("Report")}</Text>
+                        </TouchableOpacity>
                       </View>
                     )}
 
@@ -940,7 +987,8 @@ export default function MyGigs() {
                           onPress={() => {
                             setRatingTarget({
                               userId: gig.assignedYouthId!,
-                              userName: tr("Youth Freelancer"),
+                              userName: gig.assignedYouthName || tr("Youth Freelancer"),
+                              userPhotoURL: gig.assignedYouthPhotoURL,
                               gigId: gig.id,
                               gigTitle: gig.title,
                             });
@@ -964,6 +1012,21 @@ export default function MyGigs() {
                           color={colors.text}
                         />
                         <Text style={styles.actionDetailsBtnText}>{tr("Details")}</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.actionReportBtn}
+                        onPress={() => handleReportGig(gig)}
+                        activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel={tr("Report")}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons
+                          name="flag-outline"
+                          size={15}
+                          color={colors.error}
+                        />
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -1361,6 +1424,20 @@ export default function MyGigs() {
                 <Ionicons name="sync-outline" size={16} color={colors.primary} />
                 <Text style={styles.detailChangeStatusBtnText}>{tr("Update Status")}</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.detailReportBtn}
+                onPress={() => {
+                  setDetailModalVisible(false);
+                  if (selectedGigDetail) handleReportGig(selectedGigDetail);
+                }}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={tr("Report")}
+              >
+                <Ionicons name="flag-outline" size={16} color={colors.error} />
+                <Text style={styles.detailReportBtnText}>{tr("Report")}</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1387,6 +1464,7 @@ export default function MyGigs() {
           visible={ratingModalVisible}
           targetUserId={ratingTarget.userId}
           targetUserName={ratingTarget.userName}
+          targetUserPhotoURL={ratingTarget.userPhotoURL}
           targetRole="freelancer"
           gigId={ratingTarget.gigId}
           gigTitle={ratingTarget.gigTitle}
@@ -1398,6 +1476,24 @@ export default function MyGigs() {
             setRatingModalVisible(false);
             setRatingTarget(null);
             toast.success(tr("Review submitted successfully!"));
+          }}
+        />
+      )}
+
+      {/* Report Modal */}
+      {reportTarget && (
+        <ReportModal
+          visible={Boolean(reportTarget)}
+          targetType={reportTarget.targetType}
+          targetId={reportTarget.targetId}
+          targetUserId={reportTarget.targetUserId}
+          targetUserName={reportTarget.targetUserName}
+          targetGigId={reportTarget.targetGigId}
+          targetGigTitle={reportTarget.targetGigTitle}
+          onClose={() => setReportTarget(null)}
+          onSuccess={() => {
+            setReportTarget(null);
+            toast.success(tr("Report submitted"), tr("Our moderation team will review this report shortly."));
           }}
         />
       )}
@@ -2079,7 +2175,7 @@ const styles = StyleSheet.create({
   assignedHireBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
     backgroundColor: colors.successLight,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -2088,10 +2184,32 @@ const styles = StyleSheet.create({
     borderColor: colors.successBorder,
     marginBottom: spacing.xs,
   },
+  assignedHireBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
   assignedHireBannerText: {
     fontSize: 12,
     fontFamily: fonts.bodySemiBold,
     color: colors.success,
+  },
+  assignedReportLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+  },
+  assignedReportLinkText: {
+    fontSize: 10,
+    fontFamily: fonts.bodyBold,
+    color: colors.error,
   },
   actionRateBtn: {
     flex: 1,
@@ -2109,6 +2227,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: colors.warning,
+  },
+  actionReportBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+    alignItems: "center",
+    justifyContent: "center",
   },
   actionDeleteBtn: {
     width: 34,
@@ -2412,6 +2540,23 @@ const styles = StyleSheet.create({
   },
   detailChangeStatusBtnText: {
     color: colors.text,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold,
+  },
+  detailReportBtn: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: borderRadius.full,
+    gap: 6,
+  },
+  detailReportBtnText: {
+    color: colors.error,
     fontSize: 14,
     fontFamily: fonts.bodyBold,
   },

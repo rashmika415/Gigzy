@@ -19,6 +19,8 @@ import GigMeetingPoint from '../../../components/GigMeetingPoint';
 import GigApplicationAction from '../../../components/applications/GigApplicationAction';
 import { ApplicantListModal } from '../../../components/applications';
 import { RatingModal } from '../../../components/reviews';
+import { ReportModal } from '../../../components/reports';
+import type { ReportReason } from '../../../types/report';
 import { distanceKm, validCoordinates } from '../../../services/discoveryFilters';
 import { getCurrentCoordinates } from '../../../services/locationService';
 import type { Gig } from '../../../types/gig';
@@ -56,6 +58,38 @@ export default function GigDetailScreen() {
   const [startingChat, setStartingChat] = useState(false);
   const [showApplicantsModal, setShowApplicantsModal] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportModalConfig, setReportModalConfig] = useState<{
+    targetType: 'user' | 'gig' | 'no-show';
+    defaultReason?: ReportReason;
+    targetUserId?: string;
+    targetUserName?: string;
+  }>({ targetType: 'gig' });
+
+  const handleOpenReportGig = () => {
+    setReportModalConfig({
+      targetType: 'gig',
+      targetUserId: typeof gig?.postedBy === 'object' ? gig?.postedBy?.uid : gig?.postedBy,
+      targetUserName: typeof gig?.postedBy === 'object' ? gig?.postedBy?.fullName : undefined,
+    });
+    setShowReportModal(true);
+  };
+
+  const handleOpenNoShowReport = () => {
+    const targetUid = gigOwner
+      ? (gig?.assignedYouthId || '')
+      : (typeof gig?.postedBy === 'object' ? gig?.postedBy?.uid : gig?.postedBy || '');
+    const targetName = gigOwner
+      ? (gig?.assignedYouthName || tr("Youth Freelancer"))
+      : (typeof gig?.postedBy === 'object' ? gig?.postedBy?.fullName : tr("Business Owner"));
+    setReportModalConfig({
+      targetType: 'no-show',
+      defaultReason: 'no-show',
+      targetUserId: targetUid,
+      targetUserName: targetName,
+    });
+    setShowReportModal(true);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -196,6 +230,7 @@ export default function GigDetailScreen() {
         onBack={() => router.back()}
         onShare={handleShare}
         onEdit={gigOwner ? handleEditGig : undefined}
+        onReport={!gigOwner ? handleOpenReportGig : undefined}
       />
 
       <ScrollView
@@ -369,14 +404,24 @@ export default function GigDetailScreen() {
           <GigApplicationAction gig={gig} />
 
           {Boolean(gig.assignedYouthId === user?.uid && (gig.status === 'in-progress' || gig.status === 'completed')) && (
-            <TouchableOpacity
-              style={styles.rateFreelancerBtn}
-              onPress={() => setShowRatingModal(true)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="star" size={16} color={colors.star} />
-              <Text style={styles.rateFreelancerBtnText}>{tr("Rate Client")}</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.rateFreelancerBtn}
+                onPress={() => setShowRatingModal(true)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="star" size={16} color={colors.star} />
+                <Text style={styles.rateFreelancerBtnText}>{tr("Rate Client")}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.reportNoShowBtn}
+                onPress={handleOpenNoShowReport}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="flag-outline" size={15} color={colors.error} />
+                <Text style={styles.reportNoShowBtnText}>{tr("No-Show")}</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
       )}
@@ -395,14 +440,24 @@ export default function GigDetailScreen() {
           </TouchableOpacity>
 
           {Boolean(gig.assignedYouthId && (gig.status === 'in-progress' || gig.status === 'completed')) && (
-            <TouchableOpacity
-              style={styles.rateFreelancerBtn}
-              onPress={() => setShowRatingModal(true)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="star" size={16} color={colors.star} />
-              <Text style={styles.rateFreelancerBtnText}>{tr("Rate")}</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.rateFreelancerBtn}
+                onPress={() => setShowRatingModal(true)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="star" size={16} color={colors.star} />
+                <Text style={styles.rateFreelancerBtnText}>{tr("Rate Freelancer")}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.reportNoShowBtn}
+                onPress={handleOpenNoShowReport}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="flag-outline" size={15} color={colors.error} />
+                <Text style={styles.reportNoShowBtnText}>{tr("No-Show")}</Text>
+              </TouchableOpacity>
+            </>
           )}
 
           <TouchableOpacity
@@ -444,7 +499,8 @@ export default function GigDetailScreen() {
         <RatingModal
           visible={showRatingModal}
           targetUserId={gigOwner ? (gig.assignedYouthId || '') : (gig.postedBy?.uid || '')}
-          targetUserName={gigOwner ? tr("Youth Freelancer") : (gig.postedBy?.fullName || tr("Business Owner"))}
+          targetUserName={gigOwner ? (gig.assignedYouthName || tr("Youth Freelancer")) : (gig.postedBy?.fullName || tr("Business Owner"))}
+          targetUserPhotoURL={gigOwner ? gig.assignedYouthPhotoURL : undefined}
           targetRole={gigOwner ? 'freelancer' : 'client'}
           gigId={gig.id}
           gigTitle={gig.title}
@@ -455,13 +511,27 @@ export default function GigDetailScreen() {
           }}
         />
       )}
+
+      {gig && showReportModal && (
+        <ReportModal
+          visible={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          targetType={reportModalConfig.targetType}
+          targetId={reportModalConfig.targetType === 'no-show' ? `${gig.id}_${reportModalConfig.targetUserId || ''}` : gig.id}
+          targetGigId={gig.id}
+          targetGigTitle={gig.title}
+          targetUserId={reportModalConfig.targetUserId}
+          targetUserName={reportModalConfig.targetUserName}
+          defaultReason={reportModalConfig.defaultReason}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 // ── Sub-components ──
 
-function Header({ onBack, onShare, onEdit }: { onBack: () => void; onShare?: () => void; onEdit?: () => void }) {
+function Header({ onBack, onShare, onEdit, onReport }: { onBack: () => void; onShare?: () => void; onEdit?: () => void; onReport?: () => void }) {
   useTranslation();
   return (
     <View style={styles.header}>
@@ -487,6 +557,17 @@ function Header({ onBack, onShare, onEdit }: { onBack: () => void; onShare?: () 
             <Ionicons name="create-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
         )}
+        {onReport && (
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={onReport}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel={tr("Report")}
+          >
+            <Ionicons name="flag-outline" size={18} color={colors.error} />
+          </TouchableOpacity>
+        )}
         {onShare ? (
           <TouchableOpacity
             style={styles.headerBtn}
@@ -496,7 +577,7 @@ function Header({ onBack, onShare, onEdit }: { onBack: () => void; onShare?: () 
           >
             <Ionicons name="share-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
-        ) : !onEdit ? (
+        ) : !onEdit && !onReport ? (
           <View style={{ width: 38 }} />
         ) : null}
       </View>
@@ -917,5 +998,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fonts.bodyBold,
     color: colors.warning,
+  },
+  reportNoShowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.errorLight,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+    borderRadius: borderRadius.lg,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    gap: 6,
+  },
+  reportNoShowBtnText: {
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+    color: colors.error,
   },
 });

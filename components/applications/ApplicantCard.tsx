@@ -14,6 +14,7 @@ interface ApplicantCardProps {
   onPress: () => void;
   onAccept?: () => void;
   onReject?: () => void;
+  onRate?: () => void;
 }
 
 function formatDate(timestamp: any): string {
@@ -36,13 +37,16 @@ export default function ApplicantCard({
   onPress,
   onAccept,
   onReject,
+  onRate,
 }: ApplicantCardProps) {
   useTranslation();
   const statusTheme = getStatusTheme(application.status);
   const appliedDate = formatDate(application.createdAt);
   const initial = (application.youthName?.[0] || 'Y').toUpperCase();
   const skills = (application.youthSkills || []).slice(0, 3);
-  const isPending = (application.status || '').toLowerCase() === 'pending';
+  const statusLower = (application.status || '').toLowerCase();
+  const isPending = statusLower === 'pending';
+  const isAccepted = ['accepted', 'approved', 'in-progress', 'completed'].includes(statusLower);
 
   return (
     <TouchableOpacity
@@ -171,6 +175,20 @@ export default function ApplicantCard({
               </TouchableOpacity>
             )}
           </View>
+        ) : isAccepted && onRate ? (
+          <TouchableOpacity
+            style={styles.cardRateBtn}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onRate();
+            }}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={tr("Rate Freelancer")}
+          >
+            <Ionicons name="star" size={14} color={colors.star} />
+            <Text style={styles.cardRateBtnText}>{tr("Rate Freelancer")}</Text>
+          </TouchableOpacity>
         ) : (
           <View style={styles.availabilityBadge}>
             <Ionicons name="checkmark-circle" size={13} color={colors.success} />
@@ -379,5 +397,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fonts.bodySemiBold,
     color: colors.primaryOnColor,
+  },
+  cardRateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.warningLight,
+    borderWidth: 1,
+    borderColor: colors.warningBorder,
+    paddingVertical: 5,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.full,
+  },
+  cardRateBtnText: {
+    fontSize: 12,
+    fontFamily: fonts.bodyBold,
+    color: colors.warning,
   },
 });

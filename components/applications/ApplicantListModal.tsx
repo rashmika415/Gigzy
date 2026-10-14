@@ -13,6 +13,7 @@ import { useToast } from '../../context/ToastContext';
 import ApplicantCard from './ApplicantCard';
 import ApplicantDetailModal from './ApplicantDetailModal';
 import CelebrationModal from './CelebrationModal';
+import { RatingModal } from '../reviews';
 
 interface ApplicantListModalProps {
   visible: boolean;
@@ -47,6 +48,7 @@ export default function ApplicantListModal({
   const [retry, setRetry] = useState(0);
   const [filter, setFilter] = useState<ApplicationFilterStatus>('all');
   const [selectedApplicant, setSelectedApplicant] = useState<Application | null>(null);
+  const [selectedApplicantForRating, setSelectedApplicantForRating] = useState<Application | null>(null);
   const [acceptedCelebrationApp, setAcceptedCelebrationApp] = useState<Application | null>(null);
 
   useEffect(() => {
@@ -300,6 +302,7 @@ export default function ApplicantListModal({
                 onPress={() => setSelectedApplicant(item)}
                 onAccept={() => handleQuickAccept(item)}
                 onReject={() => handleQuickReject(item)}
+                onRate={() => setSelectedApplicantForRating(item)}
               />
             )}
             contentContainerStyle={styles.listContent}
@@ -327,6 +330,27 @@ export default function ApplicantListModal({
             }
           }}
         />
+
+        {/* Rating Modal for Accepted Youth Freelancer */}
+        {selectedApplicantForRating && (
+          <RatingModal
+            visible={!!selectedApplicantForRating}
+            targetUserId={
+              typeof selectedApplicantForRating.youthId === 'object' && selectedApplicantForRating.youthId !== null
+                ? (selectedApplicantForRating.youthId as any).uid || (selectedApplicantForRating.youthId as any).id || ''
+                : String(selectedApplicantForRating.youthId || '')
+            }
+            targetUserName={selectedApplicantForRating.youthName || tr('Youth Freelancer')}
+            targetUserPhotoURL={selectedApplicantForRating.youthPhotoURL}
+            targetRole="freelancer"
+            gigId={selectedApplicantForRating.gigId || gigId}
+            gigTitle={selectedApplicantForRating.gigTitle || gigTitle}
+            onClose={() => setSelectedApplicantForRating(null)}
+            onSuccess={() => {
+              setSelectedApplicantForRating(null);
+            }}
+          />
+        )}
 
         {/* Celebration Modal on Gig Acceptance */}
         <CelebrationModal

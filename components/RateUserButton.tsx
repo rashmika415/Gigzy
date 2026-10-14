@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../FirebaseConfig';
 import { subscribeToProfile } from '../services/profileService';
+import ReportModal from './reports/ReportModal';
 import type { UserData } from '../context/AuthContext';
 import type { Gig } from '../types/gig';
 
@@ -19,6 +20,7 @@ export default function RateUserButton({ gig }: { gig: Gig }) {
   const { user, userData } = useAuth();
   const toast = useToast();
   const [visible, setVisible] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [error, setError] = useState('');
@@ -53,10 +55,16 @@ export default function RateUserButton({ gig }: { gig: Gig }) {
   };
   if (!target) return null;
   return <>
-    <TouchableOpacity accessibilityRole="button" style={styles.button} disabled={reviewed} onPress={() => { setError(''); setVisible(true); }}>
-      <Ionicons name="star-outline" size={18} color={colors.primary} />
-      <Text style={styles.label}>{t(reviewed ? 'Review submitted' : 'Rate User')}</Text>
-    </TouchableOpacity>
+    <View style={styles.buttonRow}>
+      <TouchableOpacity accessibilityRole="button" style={styles.button} disabled={reviewed} onPress={() => { setError(''); setVisible(true); }}>
+        <Ionicons name="star-outline" size={18} color={colors.primary} />
+        <Text style={styles.label}>{t(reviewed ? 'Review submitted' : 'Rate User')}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" style={styles.reportBtn} onPress={() => setShowReportModal(true)} accessibilityLabel={t('Report')}>
+        <Ionicons name="flag-outline" size={16} color={colors.error} />
+        <Text style={styles.reportBtnText}>{t('Report')}</Text>
+      </TouchableOpacity>
+    </View>
     <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { if (!submitting.current) setVisible(false); }}>
       <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><ScrollView style={styles.dialog} contentContainerStyle={styles.dialogContent} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>{t('Rate User')}</Text>
@@ -77,12 +85,41 @@ export default function RateUserButton({ gig }: { gig: Gig }) {
           <TouchableOpacity style={styles.button} disabled={saving} onPress={() => setVisible(false)}><Text style={styles.text}>{t('Cancel')}</Text></TouchableOpacity>
           <TouchableOpacity style={styles.button} disabled={saving || !rating || reviewed} onPress={submit}>{saving ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.label}>{t('Submit Review')}</Text>}</TouchableOpacity>
         </View>
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={styles.dialogReportBtn}
+          disabled={saving}
+          onPress={() => {
+            setVisible(false);
+            setShowReportModal(true);
+          }}
+        >
+          <Ionicons name="flag-outline" size={14} color={colors.error} />
+          <Text style={styles.dialogReportText}>{t('Report an issue with this user')}</Text>
+        </TouchableOpacity>
       </ScrollView></KeyboardAvoidingView>
     </Modal>
+    {showReportModal && (
+      <ReportModal
+        visible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="user"
+        targetId={target}
+        targetUserId={target}
+        targetUserName={otherName}
+        targetGigId={gig.id}
+        targetGigTitle={gig.title}
+      />
+    )}
   </>;
 }
 const styles = StyleSheet.create({
-  button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: spacing.sm, minHeight: 44, borderWidth: 1, borderColor: colors.surfaceBorder, borderRadius: borderRadius.md },
+  buttonRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  button: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: spacing.sm, minHeight: 44, borderWidth: 1, borderColor: colors.surfaceBorder, borderRadius: borderRadius.md },
+  reportBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: spacing.sm, minHeight: 44, borderWidth: 1, borderColor: colors.errorBorder, borderRadius: borderRadius.md, backgroundColor: colors.errorLight },
+  reportBtnText: { color: colors.error, fontFamily: fonts.bodySemiBold, fontSize: 13 },
+  dialogReportBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: spacing.sm, marginTop: spacing.xs },
+  dialogReportText: { color: colors.error, fontFamily: fonts.bodyMedium, fontSize: 13 },
   label: { color: colors.primary, fontFamily: fonts.bodyBold },
   overlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: spacing.lg },
   dialog: { width: '100%', maxWidth: 420, backgroundColor: colors.surface, borderRadius: borderRadius.xl, maxHeight: '90%' },

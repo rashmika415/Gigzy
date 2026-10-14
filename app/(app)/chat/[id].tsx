@@ -20,6 +20,7 @@ import {
 } from "../../../services/chatService";
 import { addGigToCalendar } from "../../../services/calendarService";
 import { RatingModal } from "../../../components/reviews";
+import { ReportModal } from "../../../components/reports";
 import {
     BUSINESS_QUICK_REPLIES,
     Chat,
@@ -70,6 +71,7 @@ export default function ChatRoomScreen() {
   const [showGigBanner, setShowGigBanner] = useState(true);
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
 
@@ -428,24 +430,50 @@ export default function ChatRoomScreen() {
           </View>
         </View>
 
-        {/* Action button */}
-        {chat?.gigId && (
-          <TouchableOpacity
-            style={styles.gigToggleBtn}
-            onPress={() => setShowGigBanner((v) => !v)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons
-              name={
-                showGigBanner
-                  ? "chevron-up-circle-outline"
-                  : "briefcase-outline"
-              }
-              size={22}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
-        )}
+        {/* Action buttons */}
+        <View style={styles.headerRightActions}>
+          {Boolean(otherParticipant?.uid) && (
+            <TouchableOpacity
+              style={styles.headerRateBtn}
+              onPress={() => setShowRatingModal(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={isOtherBusiness ? t("Rate Business Client") : t("Rate Freelancer")}
+            >
+              <Ionicons name="star" size={20} color={colors.star} />
+            </TouchableOpacity>
+          )}
+
+          {Boolean(otherParticipant?.uid) && (
+            <TouchableOpacity
+              style={styles.headerReportBtn}
+              onPress={() => setShowReportModal(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={t("Report User")}
+            >
+              <Ionicons name="flag-outline" size={19} color={colors.error} />
+            </TouchableOpacity>
+          )}
+
+          {chat?.gigId && (
+            <TouchableOpacity
+              style={styles.gigToggleBtn}
+              onPress={() => setShowGigBanner((v) => !v)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={
+                  showGigBanner
+                    ? "chevron-up-circle-outline"
+                    : "briefcase-outline"
+                }
+                size={22}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Collapsible Gig Context Banner */}
@@ -650,6 +678,20 @@ export default function ChatRoomScreen() {
           }}
         />
       ) : null}
+
+      {/* Report Modal for Chat Counterpart */}
+      {otherParticipant.uid && showReportModal ? (
+        <ReportModal
+          visible={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          targetType="user"
+          targetId={otherParticipant.uid}
+          targetUserId={otherParticipant.uid}
+          targetUserName={otherParticipant.fullName}
+          targetGigId={chat?.gigId}
+          targetGigTitle={chat?.gigTitle}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -751,6 +793,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
     fontFamily: fonts.bodyMedium,
+  },
+  headerRightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  headerRateBtn: {
+    padding: spacing.xs,
+  },
+  headerReportBtn: {
+    padding: spacing.xs,
   },
   gigToggleBtn: {
     padding: spacing.xs,

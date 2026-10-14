@@ -25,6 +25,7 @@ import {
   ApplicantDetailModal,
   CelebrationModal,
 } from '../../components/applications';
+import { RatingModal } from '../../components/reviews';
 
 export default function MyApplicationsScreen() {
   useTranslation();
@@ -39,6 +40,7 @@ export default function MyApplicationsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [selectedApplicant, setSelectedApplicant] = useState<Application | null>(null);
+  const [selectedApplicantForRating, setSelectedApplicantForRating] = useState<Application | null>(null);
   const [acceptedCelebrationApp, setAcceptedCelebrationApp] = useState<Application | null>(null);
 
   // Real-time synchronization of applications (freelancer youth or business client)
@@ -396,6 +398,7 @@ export default function MyApplicationsScreen() {
                 onPress={() => setSelectedApplicant(item)}
                 onAccept={() => handleQuickAccept(item)}
                 onReject={() => handleQuickReject(item)}
+                onRate={() => setSelectedApplicantForRating(item)}
               />
             ) : (
               <ApplicationCard
@@ -443,6 +446,27 @@ export default function MyApplicationsScreen() {
                 status: newStatus,
               });
             }
+          }}
+        />
+      )}
+
+      {/* Rating Modal for Business Owner to Rate Accepted Youth Freelancer */}
+      {isBusiness && selectedApplicantForRating && (
+        <RatingModal
+          visible={!!selectedApplicantForRating}
+          targetUserId={
+            typeof selectedApplicantForRating.youthId === 'object' && selectedApplicantForRating.youthId !== null
+              ? (selectedApplicantForRating.youthId as any).uid || (selectedApplicantForRating.youthId as any).id || ''
+              : String(selectedApplicantForRating.youthId || '')
+          }
+          targetUserName={selectedApplicantForRating.youthName || tr('Youth Freelancer')}
+          targetUserPhotoURL={selectedApplicantForRating.youthPhotoURL}
+          targetRole="freelancer"
+          gigId={selectedApplicantForRating.gigId}
+          gigTitle={selectedApplicantForRating.gigTitle}
+          onClose={() => setSelectedApplicantForRating(null)}
+          onSuccess={() => {
+            setSelectedApplicantForRating(null);
           }}
         />
       )}
