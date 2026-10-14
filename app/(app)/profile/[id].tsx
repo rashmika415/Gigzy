@@ -34,7 +34,7 @@ export default function PublicProfileScreen() {
   return <View style={styles.container}><ScrollView contentContainerStyle={styles.content}>
     <View style={styles.header}><TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color={colors.text}/></TouchableOpacity><Text style={styles.headerTitle}>{t("Profile")}</Text><View style={{width:24}}/></View>
     <View style={styles.hero}>{profile.photoURL ? <Image source={{uri:profile.photoURL}} style={styles.avatar}/> : <View style={styles.fallback}><Text style={styles.initial}>{name?.[0]?.toUpperCase()}</Text></View>}
-      <View style={styles.nameRow}><Text style={styles.name}>{name}</Text>{!youth && profile.isVerified && <Ionicons name="checkmark-circle" size={21} color={colors.primary}/>}</View>
+      <View style={styles.nameRow}><Text style={styles.name}>{name}</Text><VerifiedBusinessBadge key={id} userId={id} /></View>
       <Text style={styles.role}>{youth ? t("Youth freelancer") : profile.businessCategory || t("Business")}</Text>
       <View style={styles.rating}><Ionicons name="star" size={16} color={colors.star}/><Text style={styles.ratingText}>{t('{{rating}} · Reviews: {{count}}', { rating: formatNumber(profile.ratingAverage ?? 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), count: profile.ratingCount ?? reviews.length })}</Text></View>
       {user && user.uid !== profile.uid && (
@@ -48,7 +48,7 @@ export default function PublicProfileScreen() {
         </TouchableOpacity>
       )}
     </View>
-    {youth && <ProfileRatingActions key={id} userId={id} />}
+    <ProfileRatingActions key={id} userId={id} />
     <Card title={youth ? t("About") : t("Business description")}><Text style={styles.body}>{youth ? profile.bio || t("No bio yet.") : profile.businessDetails || t("No description yet.")}</Text></Card>
     <Card title={t("Details")}><Text style={styles.body}>{profile.location || profile.address || t("Location not provided")}</Text>{youth && profile.age ? <Text style={styles.body}>{t('Age: {{age}}', { age: profile.age })}</Text> : null}<Text style={styles.body}>{profile.availability || profile.phone || ''}</Text></Card>
     {youth && skills.length > 0 && <Card title={t("Skills")}><View style={styles.tags}>{skills.map((skill) => <View key={skill} style={styles.tag}><Text style={styles.tagText}>{skill}</Text></View>)}</View></Card>}

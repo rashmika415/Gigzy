@@ -1,7 +1,6 @@
 import { ReviewSummary, ReviewHistory } from '../../../components/ProfileReviews';
 import { useProfileReviews } from '../../../hooks/useProfileReviews';
 import { Text } from '../../../components/LocalizedText';
-import ReferralCard from '../../../components/ReferralCard';
 import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Image } from 'react-native';
@@ -204,7 +203,6 @@ export default function Profile() {
         )}
 
         <LanguageSelector />
-        <ReferralCard />
         {/* Action Buttons */}
         <View style={styles.actionSection}>
           {isYouth && (
@@ -276,14 +274,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   backButton: {
-    padding: spacing.xs,
+    padding: spacing.xs
+,
     minWidth: 44,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   editHeaderButton: {
-    padding: spacing.xs,
+    padding: spacing.xs
+,
     minWidth: 44,
     minHeight: 44,
     alignItems: 'center',

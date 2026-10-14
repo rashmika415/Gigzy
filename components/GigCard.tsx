@@ -53,11 +53,12 @@ export default function GigCard({
             <Text style={styles.categoryText}>{t(GIG_CATEGORIES.find(category => category.id === categoryId(gig.category))?.name ?? gig.category)}</Text>
           </View>
 
-          <StatusPill
-            status={gig.status}
-            showChevron={!!onStatusPress}
-            onPress={onStatusPress ? () => onStatusPress(gig) : undefined}
-          />
+        <VerifiedBusinessBadge userId={gig.postedBy.uid} />
+        <StatusPill
+          status={gig.status}
+          showChevron={!!onStatusPress}
+          onPress={onStatusPress ? () => onStatusPress(gig) : undefined}
+        />
         </View>
         {showBookmark && <BookmarkButton gigId={gig.id} title={gig.title} />}
       </View>

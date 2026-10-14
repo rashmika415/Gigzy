@@ -20,8 +20,45 @@ service cloud.firestore {
     function protectedUserFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
         'role', 'isVerified', 'suspended', 'suspensionReason',
+        'suspensionType', 'suspendedUntil', 'warningCount',
+        'lastWarningReason', 'lastWarnedAt',
         'ratingAverage', 'ratingCount', 'skillBadges'
       ]);
+    }
+    match /announcements/{announcementId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly([
+          'title', 'body', 'audience', 'targetUserId', 'status',
+          'deliveredCount', 'createdBy', 'createdAt'
+        ])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 80
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 5 && request.resource.data.body.size() <= 500
+        && request.resource.data.audience in ['all', 'freelancer', 'client', 'user']
+        && ((request.resource.data.audience == 'user'
+            && request.resource.data.targetUserId is string
+            && request.resource.data.targetUserId.size() > 0)
+          || (request.resource.data.audience != 'user'
+            && !request.resource.data.keys().hasAny(['targetUserId'])))
+        && request.resource.data.status == 'queued'
+        && request.resource.data.deliveredCount == 0
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      // On the Spark plan the authenticated admin client performs bounded
+      // delivery batches. Content and audience stay immutable after creation.
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'deliveredCount', 'lastUserId', 'startedAt',
+          'completedAt', 'failedAt', 'errorMessage'
+        ])
+        && request.resource.data.status in ['processing', 'sent', 'failed']
+        && request.resource.data.deliveredCount is int
+        && request.resource.data.deliveredCount >= resource.data.deliveredCount
+        && request.resource.data.get('errorMessage', '') is string
+        && request.resource.data.get('errorMessage', '').size() <= 500;
+      allow delete: if false;
     }
     function validReferralCodeUpdate(userId) {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['referralCode'])
@@ -31,16 +68,107 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/referralCodes/$(request.resource.data.referralCode)).data.ownerId == userId);
     }
     match /users/{userId} {
+      function verificationSubmission() {
+        let requestDoc = getAfter(/databases/$(database)/documents/businessVerificationRequests/$(userId)).data;
+        return owns(userId) && active() && resource.data.role == 'client'
+          && resource.data.get('verificationStatus', '') in ['', 'REJECTED']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verificationStatus', 'updatedAt'])
+          && request.resource.data.verificationStatus == 'PENDING'
+          && request.resource.data.updatedAt == request.time
+          && requestDoc.status == 'PENDING' && requestDoc.businessId == userId
+          && requestDoc.submittedAt == request.time;
+      }
+      function verificationDecision() {
+        let decision = getAfter(/databases/$(database)/documents/businessVerificationRequests/$(userId)).data;
+        return isAdmin() && resource.data.role == 'client' && resource.data.verificationStatus == 'PENDING'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verificationStatus', 'isVerified', 'updatedAt'])
+          && request.resource.data.verificationStatus in ['VERIFIED', 'REJECTED']
+          && request.resource.data.isVerified == (request.resource.data.verificationStatus == 'VERIFIED')
+          && request.resource.data.updatedAt == request.time
+          && decision.status == request.resource.data.verificationStatus
+          && decision.reviewedBy == request.auth.uid && decision.reviewedAt == request.time;
+      }
       allow read: if signedIn();
       allow create: if owns(userId) && validRole() && validProfilePhoto()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.get('suspended', false) != true
-        && request.resource.data.get('isVerified', false) != true;
-      allow update: if isAdmin()
-        || (owns(userId) && active() && protectedUserFieldsUnchanged())
-        || (active() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingAverage', 'ratingCount', 'updatedAt']));
+
+        && request.resource.data.get('isVerified', false) != true
+        && !request.resource.data.keys().hasAny(['referralCode']);
+      allow update: if (isAdmin() && userId != request.auth.uid && resource.data.role != 'admin'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'suspended', 'suspensionReason', 'suspensionType', 'suspendedUntil',
+          'warningCount', 'lastWarningReason', 'lastWarnedAt', 'updatedAt'
+        ])
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.get('warningCount', 0) is int
+        && request.resource.data.get('warningCount', 0) >= resource.data.get('warningCount', 0)
+        && request.resource.data.get('lastWarningReason', '') is string
+        && request.resource.data.get('lastWarningReason', '').size() <= 500
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'suspended', 'suspensionReason', 'suspensionType', 'suspendedUntil'
+          ]) || (
+            request.resource.data.suspended is bool
+            && request.resource.data.suspensionReason is string
+            && request.resource.data.suspensionReason.size() <= 500
+            && ((request.resource.data.suspended == false
+                && request.resource.data.suspensionReason == ''
+                && request.resource.data.suspensionType == 'none'
+                && request.resource.data.suspendedUntil == null)
+              || (request.resource.data.suspended == true
+                && request.resource.data.suspensionReason.size() >= 5
+                && request.resource.data.suspensionType in ['temporary', 'permanent']
+                && ((request.resource.data.suspensionType == 'permanent'
+                    && request.resource.data.suspendedUntil == null)
+                  || (request.resource.data.suspensionType == 'temporary'
+                    && request.resource.data.suspendedUntil is timestamp
+                    && request.resource.data.suspendedUntil > request.time
+                    && request.resource.data.suspendedUntil <= request.time + duration.value(365, 'd'))))))))
+        || (owns(userId)
+          && resource.data.get('suspended', false) == true
+          && resource.data.get('suspensionType', '') == 'temporary'
+          && resource.data.suspendedUntil is timestamp
+          && resource.data.suspendedUntil <= request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'suspended', 'suspensionReason', 'suspensionType', 'suspendedUntil', 'updatedAt'
+          ])
+          && request.resource.data.suspended == false
+          && request.resource.data.suspensionReason == ''
+          && request.resource.data.suspensionType == 'none'
+          && request.resource.data.suspendedUntil == null
+          && request.resource.data.updatedAt == request.time)
+        || (owns(userId) && active() && protectedUserFieldsUnchanged() && validReferralCodeUpdate(userId)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || validProfilePhoto()))
+        // Rating aggregates: admin-only client updates. Prefer trusted server-side aggregation.
+        || (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'ratingAverage', 'ratingCount', 'updatedAt'
+          ])
+          && request.resource.data.get('ratingAverage', 0) is number
+          && request.resource.data.get('ratingAverage', 0) >= 0
+          && request.resource.data.get('ratingAverage', 0) <= 5
+          && request.resource.data.get('ratingCount', 0) is int
+          && request.resource.data.get('ratingCount', 0) >= 0
+          && request.resource.data.updatedAt == request.time);
+
+
       allow delete: if false;
+      match /moderationHistory/{eventId} {
+        allow read: if owns(userId) || isAdmin();
+        allow create: if isAdmin()
+          && request.resource.data.keys().hasOnly(['type', 'reason', 'actorId', 'suspendedUntil', 'createdAt'])
+          && request.resource.data.type in ['warning', 'temporary_suspension', 'permanent_suspension', 'reinstated']
+          && request.resource.data.reason is string
+          && request.resource.data.reason.size() >= 5 && request.resource.data.reason.size() <= 500
+          && request.resource.data.actorId == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && ((request.resource.data.type == 'temporary_suspension'
+              && request.resource.data.suspendedUntil is timestamp)
+            || (request.resource.data.type != 'temporary_suspension'
+              && !request.resource.data.keys().hasAny(['suspendedUntil'])));
+        allow update, delete: if false;
+      }
       match /savedGigs/{gigId} {
         allow read: if owns(userId) && active();
         allow create: if owns(userId) && active() && currentUser().data.role == 'freelancer'
@@ -105,6 +233,35 @@ service cloud.firestore {
       match /pushTokens/{tokenId} {
         allow read, create, update, delete: if owns(userId) && active();
       }
+    }
+    match /businessVerificationRequests/{businessId} {
+      function validSubmission() {
+        let data = request.resource.data;
+        let business = get(/databases/$(database)/documents/users/$(businessId)).data;
+        return owns(businessId) && active() && business.role == 'client'
+          && data.keys().hasOnly(['businessId', 'status', 'businessName', 'fullName', 'email', 'phone', 'address', 'businessCategory', 'businessDetails', 'details', 'submittedAt'])
+          && data.businessId == businessId && data.status == 'PENDING' && data.submittedAt == request.time
+          && data.businessName == business.businessName && data.businessName is string && data.businessName.size() > 0
+          && data.email == business.email && data.email is string && data.email.size() > 0
+          && data.phone == business.phone && data.phone is string && data.phone.size() > 0
+          && data.address == business.address && data.address is string && data.address.size() > 0
+          && data.businessDetails == business.businessDetails && data.businessDetails is string && data.businessDetails.size() > 0
+          && data.fullName == business.get('fullName', '') && data.businessCategory == business.get('businessCategory', '')
+          && data.details is string && data.details.size() >= 5 && data.details.size() <= 2000
+          && business.get('verificationStatus', '') in ['', 'REJECTED']
+          && getAfter(/databases/$(database)/documents/users/$(businessId)).data.verificationStatus == 'PENDING';
+      }
+      allow read: if isAdmin() || (owns(businessId) && active());
+      allow create: if validSubmission();
+      allow update: if (resource.data.status == 'REJECTED' && validSubmission())
+        || (isAdmin() && resource.data.status == 'PENDING'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rejectionReason', 'reviewedBy', 'reviewedAt'])
+          && request.resource.data.status in ['VERIFIED', 'REJECTED']
+          && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time
+          && request.resource.data.rejectionReason is string && request.resource.data.rejectionReason.size() <= 500
+          && (request.resource.data.status == 'VERIFIED' ? request.resource.data.rejectionReason == '' : request.resource.data.rejectionReason.size() >= 5)
+          && getAfter(/databases/$(database)/documents/users/$(businessId)).data.verificationStatus == request.resource.data.status);
+      allow delete: if false;
     }
     match /referralCodes/{code} {
       // Public lookup exposes only the code owner ID, never profile or contact data.
