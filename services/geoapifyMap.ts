@@ -11,8 +11,8 @@ export function createGeoapifyMapHTML(pins: GigMapPin[], apiKey: string, locatio
     count: pin.gigs.length, title: pin.gigs.length === 1 ? pin.gigs[0].title : labels?.group(pin.gigs.length) ?? `${pin.gigs.length} gigs at this location` }));
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<style>html,body,#map{height:100%;width:100%;margin:0;background:#FAF9F6}.gig-pin{background:#087F73;border:2px solid white;border-radius:50%;color:white;text-align:center;line-height:28px;font-weight:bold;box-shadow:0 2px 6px #0004}.leaflet-control-attribution{max-width:calc(100vw - 12px);font-size:10px}</style></head><body><div id="map" role="application" aria-label="Gig locations"></div>
-<script>function emit(type,key,point){var message={channel:'gigzy-map',type:type,key:key,point:point};if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(message));else window.parent.postMessage(message,'*');}</script>
+<style>html,body,#map{height:100%;width:100%;margin:0;background:#F7F8F8}.gig-pin{background:#087F73;border:2px solid white;border-radius:50%;color:white;text-align:center;line-height:28px;font-weight:bold;box-shadow:0 2px 6px #0004}.leaflet-control-attribution{max-width:calc(100vw - 12px);font-size:10px}</style></head><body><div id="map" role="application" aria-label="Gig locations"></div>
+<script>function emit(type,key,point){var message={channel:'localworks-map',type:type,key:key,point:point};if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(message));else window.parent.postMessage(message,'*');}</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" onerror="emit('error')"></script>
 <script>
 try {
@@ -41,10 +41,10 @@ if(notify)emit('location',null,point);
 }
 if(locationOptions){if(selectedPoint)selectPoint(selectedPoint,false);if(locationOptions.editable)map.on('click',function(event){selectPoint({latitude:event.latlng.lat,longitude:event.latlng.lng},true);});}
 function fit(){if(selectedPoint)map.setView([selectedPoint.latitude,selectedPoint.longitude],15);else if(pins.length===1)map.setView([pins[0].latitude,pins[0].longitude],14);else if(pins.length)map.fitBounds(pins.map(function(pin){return [pin.latitude,pin.longitude];}),{padding:[40,40],maxZoom:15});}
-window.gigzyCommand=function(command){if(command.type==='clear-location'&&locationOptions){if(locationMarker)map.removeLayer(locationMarker);locationMarker=null;selectedPoint=null;}else if(command.type==='set-location'&&locationOptions&&Number.isFinite(command.latitude)&&Number.isFinite(command.longitude)){selectPoint(command,false);fit();}else if(command.type==='fit')fit();else if(command.type==='locate'&&Number.isFinite(command.latitude)&&Number.isFinite(command.longitude)){
+window.localworksCommand=function(command){if(command.type==='clear-location'&&locationOptions){if(locationMarker)map.removeLayer(locationMarker);locationMarker=null;selectedPoint=null;}else if(command.type==='set-location'&&locationOptions&&Number.isFinite(command.latitude)&&Number.isFinite(command.longitude)){selectPoint(command,false);fit();}else if(command.type==='fit')fit();else if(command.type==='locate'&&Number.isFinite(command.latitude)&&Number.isFinite(command.longitude)){
 if(userMarker)map.removeLayer(userMarker);userMarker=L.circleMarker([command.latitude,command.longitude],{radius:7,color:'#fff',weight:2,fillColor:'#2379db',fillOpacity:1}).addTo(map);map.setView([command.latitude,command.longitude],13);
 }};
-window.addEventListener('message',function(event){if(event.source===window.parent&&event.data&&event.data.channel==='gigzy-map-command')window.gigzyCommand(event.data);});
+window.addEventListener('message',function(event){if(event.source===window.parent&&event.data&&event.data.channel==='localworks-map-command')window.localworksCommand(event.data);});
 fit();emit('ready');
 }catch(error){emit('error');}
 </script></body></html>`;

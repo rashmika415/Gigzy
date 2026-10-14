@@ -29,7 +29,7 @@ npx tsc --noEmit
 npx expo export --platform web
 ```
 
-The rules command uses the demo project `demo-gigzy-saved` and a local Firestore emulator on port 8085; Java is required. It does not contact production Firestore. Ordinary service tests skip the emulator-only test when `FIRESTORE_EMULATOR_HOST` is absent. The rules suite checks ownership, anonymous access, role and suspension restrictions, schema validation, duplicate saves, and removal after a gig is deleted.
+The rules command uses the demo project `demo-localworks-saved` and a local Firestore emulator on port 8085; Java is required. It does not contact production Firestore. Ordinary service tests skip the emulator-only test when `FIRESTORE_EMULATOR_HOST` is absent. The rules suite checks ownership, anonymous access, role and suspension restrictions, schema validation, duplicate saves, and removal after a gig is deleted.
 
 Latest validation: 35 tests pass, with the emulator-only rules test skipped. TypeScript and bookmark-component lint pass. The local rules suite could not execute because the official emulator download stalled. The published rules passed Firebase's compilation check and were read back to verify the exact scoped update. An authenticated bookmark write from a real account has not been exercised in this session.
 

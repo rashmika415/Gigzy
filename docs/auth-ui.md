@@ -1,4 +1,4 @@
-# Gigzy authentication UI
+# LocalWorks authentication UI
 
 The landing, sign-in, sign-up, role selection and password reset screens use a warm white and teal theme. Shared components live in `components/auth/AuthUI.tsx`; their colour and form tokens live in `constants/authTheme.ts`.
 
@@ -8,13 +8,13 @@ The existing Firebase handlers, stored account roles, password requirements and 
 
 ## Image asset
 
-Saved asset: `assets/images/auth/gigzy-cafe-hero.png`.
+Saved asset: `assets/images/auth/localworks-cafe-hero.png`.
 
 Generated using the built-in imagegen tool under the imagegen skill, then copied into the project. The original is retained in the generator output directory. The image is bundled locally and reused across the authentication flow; no remote image service is needed.
 
 Final generation prompt:
 
-> Use case: editorial lifestyle photography. Asset type: a bundled hero photo for Gigzy, a youth and local-business gig marketplace mobile app. Create one photorealistic landscape 3:2 photograph of two Sri Lankan young adults, clearly ages 20-25, a woman and a man, collaborating with a female small cafe owner in her 30s at a bright neighborhood cafe in Colombo. One young adult is arranging a coffee order, another is discussing a notebook with the owner; natural candid warmth, authentic working moment, relaxed smart casual clothes in muted sage, cream and terracotta, no uniforms or visible brands. Scene: sunlit cafe with pale plaster walls, wood counter, leafy plant, subtle teal details. Composition: medium-wide waist-up scene; all faces and main action contained in central 65% so the photo also crops well into a portrait mobile card; main subjects near the middle, uncluttered light background. Lighting: soft daylight, true skin texture, editorial quality, friendly and credible, low contrast, warm white/forest teal palette. No text, no logos, no watermarks, no UI, no collage, no illustrated look, no exaggerated poses.
+> Use case: editorial lifestyle photography. Asset type: a bundled hero photo for LocalWorks, a youth and local-business gig marketplace mobile app. Create one photorealistic landscape 3:2 photograph of two Sri Lankan young adults, clearly ages 20-25, a woman and a man, collaborating with a female small cafe owner in her 30s at a bright neighborhood cafe in Colombo. One young adult is arranging a coffee order, another is discussing a notebook with the owner; natural candid warmth, authentic working moment, relaxed smart casual clothes in muted sage, cream and terracotta, no uniforms or visible brands. Scene: sunlit cafe with pale plaster walls, wood counter, leafy plant, subtle teal details. Composition: medium-wide waist-up scene; all faces and main action contained in central 65% so the photo also crops well into a portrait mobile card; main subjects near the middle, uncluttered light background. Lighting: soft daylight, true skin texture, editorial quality, friendly and credible, low contrast, warm white/forest teal palette. No text, no logos, no watermarks, no UI, no collage, no illustrated look, no exaggerated poses.
 
 ## Verification
 

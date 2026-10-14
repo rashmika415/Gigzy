@@ -1,8 +1,8 @@
 import { Text } from './LocalizedText';
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { View, StyleSheet, Pressable, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, borderRadius, typography } from '../constants/theme';
+import { colors, borderRadius, spacing, typography } from '../constants/theme';
 
 type ChipVariant = 'default' | 'selected' | 'outline';
 type ChipSize = 'sm' | 'md';
@@ -16,6 +16,8 @@ interface ChipProps {
   size?: ChipSize;
   /** Optional Ionicon name rendered to the left of the label */
   icon?: keyof typeof Ionicons.glyphMap;
+  /** Optional count badge rendered after the label (e.g. filter tabs) */
+  count?: number;
   /** When provided, the chip becomes pressable */
   onPress?: () => void;
   /** Show an ✕ removal button */
@@ -29,24 +31,24 @@ export default function Chip({
   variant = 'default',
   size = 'md',
   icon,
+  count,
   onPress,
   onRemove,
   style,
 }: ChipProps) {
   const isSm = size === 'sm';
+  const selected = variant === 'selected';
 
   const chipStyles = [
     styles.container,
     isSm && styles.containerSm,
-    variant === 'selected' && styles.selected,
+    onPress && !isSm && styles.pressable,
+    selected && styles.selected,
     variant === 'outline' && styles.outline,
     style,
   ];
 
-  const labelColor =
-    variant === 'selected' ? colors.primaryOnColor : colors.textSecondary;
-  const iconColor =
-    variant === 'selected' ? colors.primaryOnColor : colors.textSecondary;
+  const foreground = selected ? colors.primaryOnColor : colors.textSecondary;
 
   const inner = (
     <>
@@ -54,42 +56,53 @@ export default function Chip({
         <Ionicons
           name={icon}
           size={isSm ? 12 : 14}
-          color={iconColor}
-          style={{ marginRight: 4 }}
+          color={foreground}
+          style={{ marginRight: spacing.xs }}
         />
       )}
       <Text
         style={[
           styles.label,
           isSm && styles.labelSm,
-          { color: labelColor },
-          variant === 'selected' && styles.labelSelected,
+          { color: foreground },
+          selected && styles.labelSelected,
         ]}
         numberOfLines={1}
       >
         {label}
       </Text>
+      {count !== undefined && (
+        <View style={[styles.count, selected && styles.countSelected]}>
+          <Text style={[styles.countText, selected && styles.countTextSelected]}>{count}</Text>
+        </View>
+      )}
       {onRemove && (
-        <TouchableOpacity
+        <Pressable
           onPress={onRemove}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          hitSlop={8}
+          accessibilityRole="button"
           style={styles.removeBtn}
         >
           <Ionicons
             name="close-circle"
             size={isSm ? 13 : 15}
-            color={variant === 'selected' ? colors.primaryOnColor : colors.textMuted}
+            color={selected ? colors.primaryOnColor : colors.textMuted}
           />
-        </TouchableOpacity>
+        </Pressable>
       )}
     </>
   );
 
   if (onPress) {
     return (
-      <TouchableOpacity style={chipStyles} onPress={onPress} activeOpacity={0.8}>
+      <Pressable
+        style={({ pressed }) => [chipStyles, pressed && styles.pressed]}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+      >
         {inner}
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
@@ -105,12 +118,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     paddingVertical: 5,
-    paddingHorizontal: 12,
+    paddingHorizontal: spacing.sm + spacing.xs,
   },
   containerSm: {
     paddingVertical: 2,
-    paddingHorizontal: 8,
+    paddingHorizontal: spacing.sm,
     borderRadius: borderRadius.sm,
+  },
+  // Tappable chips (filters) get a comfortable touch height.
+  pressable: {
+    minHeight: 36,
+    backgroundColor: colors.surface,
+  },
+  pressed: {
+    opacity: 0.75,
   },
   selected: {
     backgroundColor: colors.primary,
@@ -133,7 +154,25 @@ const styles = StyleSheet.create({
   labelSelected: {
     fontFamily: typography.label.fontFamily,
   },
+  count: {
+    marginLeft: spacing.xs + 2,
+    minWidth: 20,
+    paddingHorizontal: 6,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+  },
+  countSelected: {
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  countText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  countTextSelected: {
+    color: colors.primaryOnColor,
+  },
   removeBtn: {
-    marginLeft: 4,
+    marginLeft: spacing.xs,
   },
 });

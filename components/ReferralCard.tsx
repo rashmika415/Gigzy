@@ -28,7 +28,7 @@ function AccountReferrals({ userId }: { userId: string }) {
     return () => { active = false; unsubscribe(); };
   }, [userId, attempt]);
   const share = async () => {
-    try { await Share.share({ message: t('Join me on Gigzy! Enter my referral code {{code}} when creating your account.', { code }) }); }
+    try { await Share.share({ message: t('Join me on LocalWorks! Enter my referral code {{code}} when creating your account.', { code }) }); }
     catch { setError('Could not share the code. You can copy the code above.'); }
   };
   return <View style={styles.card}>

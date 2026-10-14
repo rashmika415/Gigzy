@@ -7,7 +7,7 @@ const { doc, setDoc, getDoc, getDocs, collection, updateDoc, deleteDoc, serverTi
 
 test('messaging firestore rules enforce participant-only access and validation', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async (t) => {
   const environment = await initializeTestEnvironment({
-    projectId: 'demo-gigzy-messaging',
+    projectId: 'demo-localworks-messaging',
     firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') },
   });
 
@@ -38,6 +38,7 @@ test('messaging firestore rules enforce participant-only access and validation',
 
     await t.test('participants can create and read their conversation', async () => {
       const youth = db('youth-001');
+      await assertSucceeds(getDoc(doc(youth, 'conversations', 'conv_app-001')));
       await assertSucceeds(setDoc(doc(youth, 'conversations', 'conv_app-001'), convData));
       await assertSucceeds(getDoc(doc(youth, 'conversations', 'conv_app-001')));
 

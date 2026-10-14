@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
 import AppBanner, { AppPhoto } from '../../../components/AppBanner';
-import React, { useEffect, useState } from 'react';
-import { View, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, TouchableOpacity, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Text } from '../../../components/LocalizedText';
@@ -10,25 +10,48 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../../context/AuthContext';
-import { useSavedGigs } from '../../../context/SavedGigsContext';
 import { colors, spacing, borderRadius, fonts, typography } from '../../../constants/theme';
-import { formatCurrency, formatNumber } from '../../../localization/format';
-import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig } from '../../../services/gigService';
+import { formatNumber } from '../../../localization/format';
+import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig, updateGigStatus } from '../../../services/gigService';
 import { subscribeToUserChats, getOrCreateChat } from '../../../services/chatService';
+import { subscribeToMyApplications, getApplicantsForGig } from '../../../services/applicationService';
+import { addGigToCalendar } from '../../../services/calendarService';
 import { Gig } from '../../../types/gig';
+import type { Application } from '../../../types/application';
 import { subscribeToNotifications } from '../../../services/notificationService';
 import GigCard from '../../../components/GigCard';
 import EmptyState from '../../../components/EmptyState';
 import ErrorState from '../../../components/ErrorState';
 import SkeletonList from '../../../components/Skeleton';
 import { useToast } from '../../../context/ToastContext';
+import ApplyModal from '../../../components/applications/ApplyModal';
+import { ApplicantListModal, ApplicationCard, ApplicationDetailModal } from '../../../components/applications';
+import { RatingModal } from '../../../components/reviews';
+import { ReportModal } from '../../../components/reports';
+import { isHiredStatus, uidOf } from '../../../components/applications/ApplicationCard';
+import { hasUserReviewedGig } from '../../../services/reviewService';
+import ConfirmSheet from '../../../components/ConfirmSheet';
+import BusinessGigActions from '../../../components/business/BusinessGigActions';
+import HiredGigCard from '../../../components/business/HiredGigCard';
 
 const openGig = (gig: Gig) => router.push({ pathname: '/(app)/gig/[id]', params: { id: gig.id } });
+
+/** The hired freelancer: from the gig itself, or from the accepted application when older gigs lack it. */
+async function resolveHiredYouth(gig: Gig): Promise<{ id: string; name?: string; photoURL?: string } | null> {
+  if (gig.assignedYouthId) return { id: gig.assignedYouthId, name: gig.assignedYouthName, photoURL: gig.assignedYouthPhotoURL };
+  if (!gig.id) return null;
+  try {
+    const accepted = (await getApplicantsForGig(gig.id, gig.postedBy?.uid)).find(app => isHiredStatus(app.status));
+    const id = accepted ? uidOf(accepted.youthId) : '';
+    return id ? { id, name: gig.assignedYouthName || accepted!.youthName, photoURL: gig.assignedYouthPhotoURL || accepted!.youthPhotoURL } : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function Home() {
   useTranslation();
   const { user, userData } = useAuth();
-  const { savedIds } = useSavedGigs();
   const toast = useToast();
   const firstName = userData?.fullName?.split(' ')[0] ?? user?.displayName?.split(' ')[0] ?? 'there';
   const role = userData?.role ?? 'freelancer';
@@ -41,6 +64,68 @@ export default function Home() {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [startingChatGigId, setStartingChatGigId] = useState<string | null>(null);
+  const [selectedGigForApply, setSelectedGigForApply] = useState<Gig | null>(null);
+  const [selectedGigForApplicants, setSelectedGigForApplicants] = useState<Gig | null>(null);
+  const [myApplications, setMyApplications] = useState<Application[]>([]);
+  const [appsError, setAppsError] = useState('');
+  const [appsAttempt, setAppsAttempt] = useState(0);
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [calendarAddingGigId, setCalendarAddingGigId] = useState<string | null>(null);
+  const [calendarAddedGigIds, setCalendarAddedGigIds] = useState<Record<string, boolean>>({});
+  const [ratingTarget, setRatingTarget] = useState<{
+    userId: string;
+    userName: string;
+    userPhotoURL?: string;
+    targetRole?: 'freelancer' | 'client';
+    gigId: string;
+    gigTitle: string;
+  } | null>(null);
+  const [reviewedGigIds, setReviewedGigIds] = useState<Record<string, boolean>>({});
+  const [reportTarget, setReportTarget] = useState<{
+    targetType: 'user' | 'gig';
+    targetId: string;
+    targetUserId?: string;
+    targetUserName?: string;
+    targetGigId: string;
+    targetGigTitle: string;
+  } | null>(null);
+
+  const totalApplicants = useMemo(
+    () => gigs.reduce((acc, g) => acc + (g.applicantsCount || 0), 0),
+    [gigs]
+  );
+
+  const acceptedApplications = useMemo(
+    () => myApplications.filter((app) => app.status === 'accepted' || app.status === 'completed'),
+    [myApplications]
+  );
+
+  const inProgressGigs = useMemo(
+    () => (isClient ? gigs.filter((g) => g.status === 'in-progress' || g.status === 'completed' || !!g.assignedYouthId) : []),
+    [gigs, isClient]
+  );
+
+  const spotlightApplications = useMemo(() => {
+    const priority: Record<string, number> = { accepted: 3, pending: 2, completed: 1 };
+    return myApplications
+      .filter((app) => priority[app.status])
+      .sort((a, b) => priority[b.status] - priority[a.status]);
+  }, [myApplications]);
+
+  const openGigs = useMemo(
+    () => gigs.filter((g) => g.status === 'open' || !g.status).slice(0, isClient ? undefined : 10),
+    [gigs, isClient]
+  );
+
+  // Real-time synchronization of youth applications
+  useEffect(() => {
+    if (!user || isClient) return;
+    return subscribeToMyApplications(
+      user.uid,
+      (apps) => { setMyApplications(apps); setAppsError(''); },
+      (err) => setAppsError(err.message || 'Failed to load applications.')
+    );
+  }, [user, isClient, appsAttempt]);
 
   // Real-time unread messages listener
   useEffect(() => {
@@ -62,6 +147,37 @@ export default function Home() {
       setUnreadNotificationCount(items.filter((item) => !item.read).length);
     }, () => {});
   }, [user]);
+
+  // Check review completion status for active gigs and applications
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    const checkReviews = async () => {
+      const results: Record<string, boolean> = {};
+
+      if (isClient) {
+        for (const gig of inProgressGigs) {
+          const hired = await resolveHiredYouth(gig);
+          if (hired && gig.id) {
+            try {
+              const reviewed = await hasUserReviewedGig(user.uid, hired.id, gig.id);
+              if (reviewed) results[gig.id] = true;
+            } catch {}
+          }
+        }
+      }
+
+      if (!cancelled) {
+        setReviewedGigIds((prev) => ({ ...prev, ...results }));
+      }
+    };
+
+    checkReviews();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isClient, inProgressGigs]);
 
   // Real-time Firestore synchronization
   useEffect(() => {
@@ -93,7 +209,7 @@ export default function Home() {
     } else {
       // Freelancer: subscribe to recent open gigs across the platform
       unsubscribe = subscribeToRecentGigs(
-        10,
+        30,
         (recentGigs) => {
           setLoadError('');
           setGigs(recentGigs);
@@ -113,30 +229,37 @@ export default function Home() {
     };
   }, [user, role, loadAttempt]);
 
-  const handleDeleteGig = (gigId: string, gigTitle: string) => {
-    Alert.alert(
-      tr("Delete Gig"),
-      tr("Are you sure you want to remove \"{{value0}}\"? This cannot be undone.", { value0: gigTitle }),
-      [
-        { text: tr("Cancel"), style: 'cancel' },
-        {
-          text: tr("Delete"),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteGig(gigId);
-              toast.success(tr("Gig deleted"));
-              try {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              } catch {}
-            } catch (err: any) {
-              toast.error(tr("Failed to delete gig."), err.message);
-            }
-          },
-        },
-      ]
-    );
+  // Owner confirmations (delete listing / mark hired gig as done) share one themed dialog.
+  const [confirmAction, setConfirmAction] = useState<{ kind: 'delete' | 'complete'; gig: Gig } | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
+
+  const runConfirmedAction = async () => {
+    if (!confirmAction || confirmBusy) return;
+    const { kind, gig } = confirmAction;
+    setConfirmBusy(true);
+    setConfirmError('');
+    try {
+      if (kind === 'delete') {
+        await deleteGig(gig.id, user?.uid);
+        toast.success(tr("Gig deleted"));
+      } else {
+        await updateGigStatus(gig.id, 'completed');
+        toast.success(tr("Gig Marked as Completed! 🎉"), tr("Thank you! Please leave a review for the freelancer."));
+        if (gig.assignedYouthId) handleRateFreelancer(gig);
+      }
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      setConfirmAction(null);
+    } catch (err: any) {
+      setConfirmError(err?.message || (kind === 'delete' ? 'Failed to delete gig.' : 'Failed to update gig status.'));
+    } finally {
+      setConfirmBusy(false);
+    }
   };
+
+  const handleDeleteGig = (gig: Gig) => { setConfirmError(''); setConfirmAction({ kind: 'delete', gig }); };
 
   const handleContactBusiness = async (gig: Gig) => {
     if (!user) {
@@ -183,6 +306,101 @@ export default function Home() {
     }
   };
 
+  const handleAddToCalendar = async (gig: Gig) => {
+    setCalendarAddingGigId(gig.id);
+    try {
+      const result = await addGigToCalendar({
+        title: gig.title,
+        date: gig.date || new Date().toISOString().split('T')[0],
+        time: gig.time,
+        location: gig.location,
+        description: gig.description,
+        gigId: gig.id,
+        pay: gig.pay,
+        payType: gig.payType,
+        counterpartName: gig.assignedYouthName || 'Youth Freelancer',
+        counterpartRole: 'freelancer',
+      });
+      if (!result.success) throw new Error(result.error || 'Could not add gig to calendar.');
+      setCalendarAddedGigIds((prev) => ({ ...prev, [gig.id]: true }));
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      toast.success(tr("Added to calendar"));
+    } catch (err: any) {
+      toast.error(tr("Could not add gig to calendar."), err?.message ? tr(err.message) : undefined);
+    } finally {
+      setCalendarAddingGigId(null);
+    }
+  };
+
+  const handleMessageAssignedFreelancer = async (gig: Gig) => {
+    if (!user) return;
+    try {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+      if (gig.conversationId) {
+        router.push({
+          pathname: '/(app)/chat/[id]',
+          params: { id: gig.conversationId },
+        } as any);
+        return;
+      }
+      if (gig.assignedYouthId) {
+        const currentParticipant = {
+          uid: user.uid,
+          fullName: userData?.fullName || user.displayName || 'Business Owner',
+          photoURL: userData?.photoURL || '',
+          role: 'client' as const,
+          email: user.email || '',
+        };
+        const youthParticipant = {
+          uid: gig.assignedYouthId,
+          fullName: gig.assignedYouthName || 'Youth Freelancer',
+          photoURL: gig.assignedYouthPhotoURL || '',
+          role: 'freelancer' as const,
+          email: '',
+        };
+        const chat = await getOrCreateChat(currentParticipant, youthParticipant, gig);
+        router.push({
+          pathname: '/(app)/chat/[id]',
+          params: { id: chat.id },
+        } as any);
+      } else {
+        router.push('/(app)/(tabs)/messages' as any);
+      }
+    } catch (err: any) {
+      toast.error(tr("Failed to start conversation."), err.message);
+    }
+  };
+
+  const handleRateFreelancer = async (gig: Gig) => {
+    const hired = await resolveHiredYouth(gig);
+    if (!hired) {
+      toast.info(tr("Freelancer information unavailable."));
+      return;
+    }
+    setRatingTarget({
+      userId: hired.id,
+      userName: hired.name || tr("Youth Freelancer"),
+      userPhotoURL: hired.photoURL,
+      targetRole: 'freelancer',
+      gigId: gig.id,
+      gigTitle: gig.title,
+    });
+  };
+
+  const handleReportGig = async (gig: Gig) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    const hired = await resolveHiredYouth(gig);
+    setReportTarget(hired
+      ? { targetType: 'user', targetId: hired.id, targetUserId: hired.id, targetUserName: hired.name || tr("Assigned Freelancer"), targetGigId: gig.id, targetGigTitle: gig.title }
+      : { targetType: 'gig', targetId: gig.id, targetGigId: gig.id, targetGigTitle: gig.title });
+  };
+
+  const handleCompleteGig = (gig: Gig) => { setConfirmError(''); setConfirmAction({ kind: 'complete', gig }); };
+
   const getRoleLabel = () => {
     if (role === 'admin') return 'Platform Admin';
     if (role === 'client') return 'Business Owner';
@@ -202,39 +420,20 @@ export default function Home() {
 
   const stats: { label: string; value: string; icon: keyof typeof Ionicons.glyphMap; onPress?: () => void }[] = isClient
     ? [
-        { label: 'Gigs Posted', value: formatNumber(gigs.length), icon: 'briefcase-outline', onPress: goMyGigs },
-        { label: 'Total Value', value: formatCurrency(gigs.reduce((acc, g) => acc + (g.pay || 0), 0)), icon: 'wallet-outline', onPress: goMyGigs },
-        { label: 'Rating', value: userData?.ratingCount ? formatNumber(userData.ratingAverage ?? 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—', icon: 'star-outline' },
+        { label: 'In Progress', value: formatNumber(inProgressGigs.length), icon: 'flash-outline', onPress: goMyGigs },
+        { label: 'Open Listings', value: formatNumber(openGigs.length), icon: 'briefcase-outline', onPress: goMyGigs },
+        { label: 'Applicants', value: formatNumber(totalApplicants), icon: 'people-outline', onPress: () => router.push('/(app)/applications' as any) },
       ]
     : [
-        { label: 'New Gigs', value: formatNumber(gigs.length), icon: 'flash-outline', onPress: goBrowse },
-        { label: 'Saved', value: formatNumber(savedIds.size), icon: 'bookmark-outline', onPress: () => router.push('/(app)/(tabs)/saved' as any) },
+        { label: 'Accepted Gigs', value: formatNumber(acceptedApplications.length), icon: 'checkmark-circle-outline', onPress: () => router.push('/(app)/applications' as any) },
+        { label: 'My Applications', value: formatNumber(myApplications.length), icon: 'document-text-outline', onPress: () => router.push('/(app)/applications' as any) },
         { label: 'Rating', value: userData?.ratingCount ? formatNumber(userData.ratingAverage ?? 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—', icon: 'star-outline' },
       ];
 
   const renderGigActions = (gig: Gig) =>
     isClient ? (
-      <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={styles.secondaryAction}
-          onPress={tap(() => editGig(gig))}
-          accessibilityRole="button"
-          accessibilityLabel={tr("Edit gig")}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="create-outline" size={18} color={colors.primary} />
-          <Text style={styles.secondaryActionText}>{tr("Edit")}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.iconAction}
-          onPress={() => handleDeleteGig(gig.id, gig.title)}
-          accessibilityRole="button"
-          accessibilityLabel={tr("Delete gig")}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="trash-outline" size={18} color={colors.error} />
-        </TouchableOpacity>
-      </View>
+      <BusinessGigActions gig={gig} onApplicants={setSelectedGigForApplicants}
+        onEdit={target => tap(() => editGig(target))()} onDelete={handleDeleteGig} />
     ) : (
       <View style={styles.actionsRow}>
         <TouchableOpacity
@@ -243,22 +442,48 @@ export default function Home() {
           accessibilityRole="button"
           activeOpacity={0.8}
         >
-          <Text style={styles.secondaryActionText}>{tr("View Details")}</Text>
+          <Text style={styles.secondaryActionText}>{tr("Details")}</Text>
         </TouchableOpacity>
+
+        {myApplications.some(app => app.gigId === gig.id) ? (
+          <TouchableOpacity
+            style={styles.appliedAction}
+            onPress={() => router.push('/(app)/applications' as any)}
+            accessibilityRole="button"
+            activeOpacity={0.8}
+          >
+            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+            <Text style={styles.appliedActionText}>{tr("Applied")}</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.primaryAction}
+            onPress={() => {
+              if (!user) {
+                router.push('/(auth)/login' as any);
+                return;
+              }
+              setSelectedGigForApply(gig);
+            }}
+            accessibilityRole="button"
+            activeOpacity={0.85}
+          >
+            <Ionicons name="paper-plane" size={15} color={colors.primaryOnColor} />
+            <Text style={styles.primaryActionText}>{tr("Apply Now")}</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
-          style={styles.primaryAction}
+          style={styles.chatAction}
           onPress={() => handleContactBusiness(gig)}
           disabled={startingChatGigId === gig.id}
           accessibilityRole="button"
           activeOpacity={0.85}
         >
           {startingChatGigId === gig.id ? (
-            <ActivityIndicator size="small" color={colors.primaryOnColor} />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : (
-            <>
-              <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primaryOnColor} />
-              <Text style={styles.primaryActionText}>{tr("Chat")}</Text>
-            </>
+            <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
           )}
         </TouchableOpacity>
       </View>
@@ -329,24 +554,19 @@ export default function Home() {
         {!isClient && <AppBanner kind="youth" title={tr("Your next opportunity starts here.")} description={tr("Find local gigs that fit your skills and your schedule.")} action="Explore gigs" onPress={goBrowse} />}
         {isClient && (
           <View style={styles.ctaCard}>
-            <View style={{ marginBottom: spacing.md }}><AppPhoto kind="business" /></View>
-            <View style={styles.ctaBadge}>
-              <Ionicons name="flash" size={14} color={colors.primaryOnColor} />
-              <Text style={styles.ctaBadgeText}>{tr("FOR BUSINESS OWNERS")}</Text>
+            <AppPhoto kind="business" />
+            <View style={styles.ctaCopy}>
+              <Text style={styles.ctaTitle}>{tr("Need help with a task?")}</Text>
+              <Text style={styles.ctaSubtitle}>{tr("Post a gig in minutes and connect with skilled local people.")}</Text>
             </View>
-            <Text style={styles.ctaTitle}>{tr("Need Help with a Task?")}</Text>
-            <Text style={styles.ctaSubtitle}>{tr("Post a new gig in minutes and connect with local skilled youth and talented freelancers.")}</Text>
-
             <View style={styles.ctaButtonsRow}>
-              <TouchableOpacity style={styles.postGigButton} onPress={tap(goPostGig)} accessibilityRole="button" activeOpacity={0.85}>
-                <Ionicons name="add-circle-outline" size={20} color={colors.primaryOnColor} />
-                <Text style={styles.postGigButtonText}>{tr("Post New Gig")}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.manageGigsButton} onPress={tap(goMyGigs)} accessibilityRole="button" activeOpacity={0.85}>
-                <Ionicons name="list-outline" size={18} color={colors.primary} />
-                <Text style={styles.manageGigsButtonText}>{tr("My Posted Gigs ({{count}})", { count: gigs.length })}</Text>
-              </TouchableOpacity>
+              <Pressable style={({ pressed }) => [styles.postGigButton, pressed && styles.pressed]} onPress={tap(goPostGig)} accessibilityRole="button">
+                <Ionicons name="add" size={20} color={colors.primaryOnColor} />
+                <Text style={styles.postGigButtonText}>{tr("Post a gig")}</Text>
+              </Pressable>
+              <Pressable style={({ pressed }) => [styles.manageGigsButton, pressed && styles.pressed]} onPress={tap(goMyGigs)} accessibilityRole="button">
+                <Text style={styles.manageGigsButtonText}>{tr("My Gigs ({{count}})", { count: gigs.length })}</Text>
+              </Pressable>
             </View>
           </View>
         )}
@@ -371,11 +591,61 @@ export default function Home() {
           ))}
         </View>
 
-        {/* Gig list */}
+        {/* My applications (Youth Freelancer) */}
+        {!isClient && (spotlightApplications.length > 0 || !!appsError) && (
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{tr("My Applications")}</Text>
+              <Pressable onPress={() => router.push('/(app)/applications' as any)} accessibilityRole="button" hitSlop={12}>
+                <Text style={styles.seeAllText}>{tr("See all ({{count}})", { count: myApplications.length })}</Text>
+              </Pressable>
+            </View>
+            {appsError ? (
+              <Pressable onPress={() => setAppsAttempt((n) => n + 1)} accessibilityRole="button"
+                style={({ pressed }) => [styles.inlineError, pressed && styles.pressed]}>
+                <Ionicons name="alert-circle-outline" size={18} color={colors.error} />
+                <Text style={styles.inlineErrorText}>{tr("Couldn't load your applications.")}</Text>
+                <Text style={styles.inlineErrorAction}>{tr("Retry")}</Text>
+              </Pressable>
+            ) : spotlightApplications.slice(0, 3).map((app) => (
+              <ApplicationCard key={app.id} application={app} onPress={() => setSelectedApplication(app)} />
+            ))}
+          </View>
+        )}
+
+        {/* Hired gigs (Business Owner) */}
+        {isClient && inProgressGigs.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{tr("Hired gigs ({{count}})", { count: inProgressGigs.length })}</Text>
+              <Pressable onPress={goMyGigs} accessibilityRole="button" hitSlop={12}>
+                <Text style={styles.seeAllText}>{tr("Manage")}</Text>
+              </Pressable>
+            </View>
+            <View style={styles.gigsList}>
+              {inProgressGigs.map((gig) => (
+                <HiredGigCard
+                  key={gig.id}
+                  gig={gig}
+                  calendarState={calendarAddingGigId === gig.id ? 'adding' : calendarAddedGigIds[gig.id] ? 'added' : 'idle'}
+                  reviewed={!!reviewedGigIds[gig.id]}
+                  onOpen={openGig}
+                  onMessage={handleMessageAssignedFreelancer}
+                  onCalendar={handleAddToCalendar}
+                  onComplete={handleCompleteGig}
+                  onRate={handleRateFreelancer}
+                  onReport={handleReportGig}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Part 2: Your Open Listings (Business Owner) / Explore Latest Gigs (Freelancer) */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
-              {isClient ? tr("Your Posted Gigs") : tr("Explore Latest Gigs")}
+              {isClient ? tr("Your Open Listings") : tr("Explore Latest Gigs")}
             </Text>
             <TouchableOpacity
               onPress={isClient ? goMyGigs : goBrowse}
@@ -383,7 +653,7 @@ export default function Home() {
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <Text style={styles.seeAllText}>
-                {isClient ? tr("Manage All ({{count}})", { count: gigs.length }) : tr("Browse All")} →
+                {isClient ? tr("Manage All ({{count}})", { count: openGigs.length }) : tr("Browse All")} →
               </Text>
             </TouchableOpacity>
           </View>
@@ -392,7 +662,16 @@ export default function Home() {
             <SkeletonList variant="gig" count={3} />
           ) : loadError ? (
             <ErrorState message={loadError} onRetry={() => setLoadAttempt((n) => n + 1)} />
-          ) : gigs.length === 0 ? (
+          ) : isClient && openGigs.length === 0 && inProgressGigs.length > 0 ? (
+            <EmptyState
+              icon="sparkles-outline"
+              title="Every gig has someone working on it"
+              description={tr("Post a new gig whenever you need more help.")}
+              actionLabel="Post a gig"
+              actionIcon="add"
+              onAction={goPostGig}
+            />
+          ) : openGigs.length === 0 ? (
             isClient ? (
               <EmptyState
                 icon="briefcase-outline"
@@ -413,7 +692,7 @@ export default function Home() {
             )
           ) : (
             <View style={styles.gigsList}>
-              {gigs.map((gig) => (
+              {openGigs.map((gig) => (
                 <GigCard
                   key={gig.id}
                   gig={gig}
@@ -426,6 +705,112 @@ export default function Home() {
           )}
         </View>
       </ScrollView>
+
+      {selectedGigForApply && user && (
+        <ApplyModal
+          visible={Boolean(selectedGigForApply)}
+          gig={selectedGigForApply}
+          youthId={user.uid}
+          youthName={userData?.fullName || user.displayName || 'Youth Freelancer'}
+          youthPhotoURL={userData?.photoURL || ''}
+          youthSkills={userData?.skills?.split(',').map(s => s.trim()).filter(Boolean)}
+          youthBio={userData?.bio || ''}
+          onClose={() => setSelectedGigForApply(null)}
+          onSuccess={() => {
+            const appliedGig = selectedGigForApply;
+            setSelectedGigForApply(null);
+            toast.success(tr("Application Submitted! 🎉"), tr("Your application has been sent to the business owner."));
+            if (user && appliedGig) {
+              setMyApplications((prev) => [
+                {
+                  id: `app_${appliedGig.id}_${user.uid}`,
+                  gigId: appliedGig.id,
+                  youthId: user.uid,
+                  gigTitle: appliedGig.title,
+                  gigLocation: appliedGig.location,
+                  gigPay: appliedGig.pay,
+                  gigPayType: appliedGig.payType,
+                  businessName: appliedGig.postedBy?.fullName || 'Business Owner',
+                  status: 'pending',
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                } as any,
+                ...prev.filter((a) => a.gigId !== appliedGig.id),
+              ]);
+            }
+          }}
+        />
+      )}
+
+      {!isClient && (
+        <ApplicationDetailModal
+          visible={!!selectedApplication}
+          application={selectedApplication}
+          onClose={() => setSelectedApplication(null)}
+        />
+      )}
+
+      {selectedGigForApplicants && (
+        <ApplicantListModal
+          visible={Boolean(selectedGigForApplicants)}
+          gigId={selectedGigForApplicants.id}
+          gigTitle={selectedGigForApplicants.title}
+          businessId={user?.uid || ''}
+          gigDate={selectedGigForApplicants.date}
+          gigTime={selectedGigForApplicants.time}
+          gigLocation={selectedGigForApplicants.location}
+          gigPay={selectedGigForApplicants.pay}
+          gigPayType={selectedGigForApplicants.payType}
+          onClose={() => setSelectedGigForApplicants(null)}
+        />
+      )}
+
+      <ConfirmSheet
+        visible={!!confirmAction}
+        destructive={confirmAction?.kind === 'delete'}
+        icon={confirmAction?.kind === 'delete' ? 'trash-outline' : 'checkmark-done-outline'}
+        title={confirmAction?.kind === 'delete' ? 'Delete Gig' : 'Mark as Completed'}
+        message={confirmAction?.kind === 'delete'
+          ? tr("Are you sure you want to remove \"{{value0}}\"? This cannot be undone.", { value0: confirmAction.gig.title })
+          : confirmAction ? tr("Are you sure you want to mark \"{{value0}}\" as completed? You can then rate and review the freelancer.", { value0: confirmAction.gig.title }) : undefined}
+        confirmLabel={confirmAction?.kind === 'delete' ? 'Delete' : 'Complete Gig'}
+        loading={confirmBusy}
+        error={confirmError}
+        onConfirm={runConfirmedAction}
+        onCancel={() => setConfirmAction(null)}
+      />
+      {ratingTarget && (
+        <RatingModal
+          visible={Boolean(ratingTarget)}
+          targetUserId={ratingTarget.userId}
+          targetUserName={ratingTarget.userName}
+          targetUserPhotoURL={ratingTarget.userPhotoURL}
+          targetRole={ratingTarget.targetRole || (isClient ? 'freelancer' : 'client')}
+          gigId={ratingTarget.gigId}
+          gigTitle={ratingTarget.gigTitle}
+          onClose={() => setRatingTarget(null)}
+          onSuccess={() => {
+            if (ratingTarget?.gigId) {
+              setReviewedGigIds((prev) => ({ ...prev, [ratingTarget.gigId]: true }));
+            }
+            setRatingTarget(null);
+          }}
+        />
+      )}
+
+      {reportTarget && (
+        <ReportModal
+          visible
+          targetType={reportTarget.targetType}
+          targetId={reportTarget.targetId}
+          targetUserId={reportTarget.targetUserId}
+          targetUserName={reportTarget.targetUserName}
+          targetGigId={reportTarget.targetGigId}
+          targetGigTitle={reportTarget.targetGigTitle}
+          onClose={() => setReportTarget(null)}
+          onSuccess={() => setReportTarget(null)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -492,7 +877,7 @@ const styles = StyleSheet.create({
   },
   headerBadgeText: {
     fontFamily: fonts.bodyBold,
-    fontSize: 11,
+    fontSize: 12,
     color: colors.primaryOnColor,
   },
   greeting: {
@@ -527,36 +912,26 @@ const styles = StyleSheet.create({
   // CTA Card
   ctaCard: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
-    padding: spacing.lg,
+    padding: spacing.md,
+    gap: spacing.md,
     marginBottom: spacing.lg,
   },
-  ctaBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-    gap: 4,
-    marginBottom: spacing.sm,
+  ctaCopy: {
+    gap: spacing.xs,
   },
-  ctaBadgeText: {
-    ...typography.overline,
-    color: colors.primaryOnColor,
+  pressed: {
+    opacity: 0.8,
   },
   ctaTitle: {
     ...typography.h2,
     color: colors.text,
-    marginBottom: 4,
   },
   ctaSubtitle: {
-    ...typography.bodySmall,
+    ...typography.body,
     color: colors.textSecondary,
-    marginBottom: spacing.md,
   },
   ctaButtonsRow: {
     flexDirection: 'row',
@@ -694,12 +1069,51 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.primary,
   },
-  iconAction: {
+  appliedAction: {
+    flex: 1.2,
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.successLight,
+    borderWidth: 1,
+    borderColor: colors.successBorder,
+    borderRadius: borderRadius.md,
+  },
+  appliedActionText: {
+    ...typography.label,
+    fontSize: 14,
+    color: colors.success,
+  },
+  chatAction: {
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.errorLight,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.md,
+  },
+  inlineError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minHeight: 52,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.errorLight,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+  },
+  inlineErrorText: {
+    ...typography.bodySmall,
+    color: colors.error,
+    flex: 1,
+  },
+  inlineErrorAction: {
+    ...typography.label,
+    color: colors.error,
   },
 });

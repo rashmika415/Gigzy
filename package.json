@@ -1,5 +1,5 @@
 {
-  "name": "gigzy",
+  "name": "localworks",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
@@ -11,9 +11,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "node --test tests/*.test.cjs",
-    "test:rules": "npx --yes firebase-tools emulators:exec --only firestore --project demo-gigzy-saved --config firebase.test.json \"node --test tests/saved-gigs.rules.test.cjs\"",
-    "test:rules:member3": "npx --yes firebase-tools emulators:exec --only firestore --project demo-gigzy-member3 --config firebase.test.json \"node --test tests/member3.rules.test.cjs tests/saved-gigs.rules.test.cjs tests/close-gig.rules.test.cjs\"",
-    "test:rules:admin": "npx --yes firebase-tools emulators:exec --only firestore --project demo-gigzy-admin --config firebase.test.json \"node --test tests/admin-dashboard.rules.test.cjs\""
+    "test:rules": "npx --yes firebase-tools emulators:exec --only firestore --project demo-localworks-saved --config firebase.test.json \"node --test tests/saved-gigs.rules.test.cjs\"",
+    "test:rules:member3": "npx --yes firebase-tools emulators:exec --only firestore --project demo-localworks-member3 --config firebase.test.json \"node --test tests/member3.rules.test.cjs tests/saved-gigs.rules.test.cjs tests/close-gig.rules.test.cjs\"",
+    "test:rules:admin": "npx --yes firebase-tools emulators:exec --only firestore --project demo-localworks-admin --config firebase.test.json \"node --test tests/admin-dashboard.rules.test.cjs\""
   },
   "dependencies": {
     "@expo-google-fonts/hanken-grotesk": "^0.4.3",
@@ -26,6 +26,7 @@
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
     "expo": "^57.0.23",
+    "expo-calendar": "~57.0.5",
     "expo-constants": "~57.0.18",
     "expo-device": "~57.0.2",
     "expo-font": "~57.0.4",

@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import { translate as tr } from '../../localization/i18n';
-import React, { useState } from 'react';
-import { Modal, View, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { useRef, useState } from 'react';
+import { Modal, View, Pressable, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import { colors, spacing, borderRadius, typography } from '../../constants/theme';
 import { createApplication } from '../../services/applicationService';
+import { formatCalendarDate, formatCurrency } from '../../localization/format';
 import type { Gig } from '../../types/gig';
 
 interface ApplyModalProps {
@@ -21,46 +22,46 @@ interface ApplyModalProps {
   onSuccess: () => void;
 }
 
-export default function ApplyModal({
-  visible,
-  gig,
-  youthId,
-  youthName,
-  youthPhotoURL,
-  youthSkills,
-  youthBio,
-  onClose,
-  onSuccess,
-}: ApplyModalProps) {
-  useTranslation();
+const MIN_MESSAGE = 5;
+const MAX_MESSAGE = 500;
+
+/** The form only mounts while open, so every opening starts with an empty message and unticked availability. */
+export default function ApplyModal({ visible, gig, ...props }: ApplyModalProps) {
+  if (!visible || !gig) return null;
+  return <ApplyForm key={gig.id} gig={gig} {...props} />;
+}
+
+function ApplyForm({
+  gig, youthId, youthName, youthPhotoURL, youthSkills, youthBio, onClose, onSuccess,
+}: Omit<ApplyModalProps, 'visible' | 'gig'> & { gig: Gig }) {
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [message, setMessage] = useState('');
   const [availabilityConfirmed, setAvailabilityConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const inFlight = useRef(false);
 
-  if (!gig) return null;
-
-  const isMessageValid = message.trim().length >= 5;
-  const canSubmit = isMessageValid && availabilityConfirmed && !submitting;
+  const messageLength = message.trim().length;
+  const canSubmit = messageLength >= MIN_MESSAGE && availabilityConfirmed && !submitting;
+  const rating = (gig.postedBy as any)?.ratingAverage;
 
   const handleSubmit = async () => {
-    if (!canSubmit) {
-      if (!isMessageValid) {
-        setErrorMsg('Please write a message explaining why you are suitable (at least 5 characters).');
-      } else if (!availabilityConfirmed) {
-        setErrorMsg('Please confirm your availability on the required date and time.');
-      }
+    if (inFlight.current) return;
+    if (messageLength < MIN_MESSAGE) {
+      setErrorMsg('Please write a message explaining why you are suitable (at least 5 characters).');
+      return;
+    }
+    if (!availabilityConfirmed) {
+      setErrorMsg('Please confirm your availability on the required date and time.');
       return;
     }
 
+    inFlight.current = true;
     setErrorMsg('');
     setSubmitting(true);
-
     try {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      } catch {}
-
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       await createApplication({
         gigId: gig.id,
         youthId,
@@ -79,143 +80,118 @@ export default function ApplyModal({
         youthSkills,
         youthBio,
       });
-
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
-
-      setMessage('');
-      setAvailabilityConfirmed(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       onSuccess();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Unable to submit your application. Please try again.');
+      setErrorMsg(err?.message || 'Unable to submit your application. Please try again.');
     } finally {
+      inFlight.current = false;
       setSubmitting(false);
     }
   };
 
   const handleClose = () => {
-    if (submitting) return;
-    setErrorMsg('');
-    onClose();
+    if (!submitting) onClose();
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
+    <Modal visible animationType="slide" transparent onRequestClose={handleClose} statusBarTranslucent>
+      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} accessibilityLabel={t('Close')} />
 
-        <View style={styles.sheet}>
-          {/* Header */}
+        <View style={styles.sheet} accessibilityViewIsModal>
+          <View style={styles.handle} />
           <View style={styles.header}>
-            <View style={styles.headerIconWrap}>
-              <Ionicons name="document-text-outline" size={20} color={colors.primary} />
-            </View>
-            <View style={styles.headerTextWrap}>
-              <Text style={styles.headerTitle}>{tr("Apply to Gig")}</Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {gig.title}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={handleClose}
-              disabled={submitting}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={22} color={colors.textSecondary} />
-            </TouchableOpacity>
+            <Text accessibilityRole="header" style={styles.headerTitle}>{t('Apply to Gig')}</Text>
+            <Pressable onPress={handleClose} disabled={submitting} accessibilityRole="button" accessibilityLabel={t('Close')}
+              style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}>
+              <Ionicons name="close" size={20} color={colors.textSecondary} />
+            </Pressable>
           </View>
 
-          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-            {/* Gig Summary Pill */}
-            <View style={styles.gigSummaryPill}>
-              <Ionicons name="briefcase-outline" size={14} color={colors.primary} />
-              <Text style={styles.gigSummaryText} numberOfLines={1}>
-                {gig.title} • ${gig.pay}{gig.payType === 'hourly' ? tr("/hr") : tr(" fixed")} • {gig.location}
+          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {/* Gig summary */}
+            <View style={styles.summary}>
+              <Text style={styles.summaryTitle} numberOfLines={2}>{gig.title}</Text>
+              <Text style={styles.summaryPay}>
+                {formatCurrency(gig.pay)}
+                <Text style={styles.summaryPayType}>{gig.payType === 'hourly' ? t('/hr') : t(' fixed')}</Text>
               </Text>
+              <View style={styles.summaryMeta}>
+                {!!gig.date && <View style={styles.metaItem}>
+                  <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
+                  <Text style={styles.metaText}>{formatCalendarDate(gig.date)}{gig.time ? ` · ${gig.time}` : ''}</Text>
+                </View>}
+                {!!gig.location && <View style={styles.metaItem}>
+                  <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
+                  <Text style={styles.metaText} numberOfLines={1}>{gig.location}</Text>
+                </View>}
+                {!!gig.postedBy?.fullName && <View style={styles.metaItem}>
+                  <Ionicons name="business-outline" size={14} color={colors.textSecondary} />
+                  <Text style={styles.metaText} numberOfLines={1}>
+                    {gig.postedBy.fullName}{typeof rating === 'number' && rating > 0 ? ` · ★ ${rating.toFixed(1)}` : ''}
+                  </Text>
+                </View>}
+              </View>
             </View>
 
-            {/* Error Message if any */}
-            {Boolean(errorMsg) && (
-              <View style={styles.errorBanner}>
-                <Ionicons name="alert-circle-outline" size={16} color={colors.errorText} />
-                <Text style={styles.errorBannerText}>{tr(errorMsg)}</Text>
-              </View>
-            )}
-
-            {/* Message input */}
+            {/* Message */}
             <View style={styles.fieldWrap}>
-              <Text style={styles.fieldLabel}>{tr("Application Message")}<Text style={styles.requiredStar}>*</Text>
-              </Text>
+              <Text style={styles.fieldLabel}>{t('Application Message')}</Text>
               <TextInput
                 style={styles.messageInput}
-                placeholder={tr("Tell the business why you are interested and why you are suitable for this gig.")}
+                placeholder={t('Tell the business why you are interested and why you are suitable for this gig.')}
                 placeholderTextColor={colors.placeholder}
                 value={message}
-                onChangeText={(text) => {
-                  setMessage(text);
-                  if (errorMsg) setErrorMsg('');
-                }}
+                onChangeText={text => { setMessage(text); if (errorMsg) setErrorMsg(''); }}
                 multiline
-                numberOfLines={4}
-                maxLength={500}
+                maxLength={MAX_MESSAGE}
                 editable={!submitting}
+                accessibilityLabel={t('Application Message')}
               />
-              <Text style={styles.charCount}>{message.trim().length}{tr("/ 500 characters")}</Text>
+              <Text style={styles.charCount}>{t('{{count}} / {{max}}', { count: messageLength, max: MAX_MESSAGE })}</Text>
             </View>
 
-            {/* Availability Confirmation Checkbox */}
-            <TouchableOpacity
-              style={styles.checkboxRow}
+            {/* Availability */}
+            <Pressable
+              style={({ pressed }) => [styles.checkboxRow, availabilityConfirmed && styles.checkboxRowActive, pressed && styles.pressed]}
               onPress={() => {
-                try {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                } catch {}
-                setAvailabilityConfirmed((prev) => !prev);
+                Haptics.selectionAsync().catch(() => {});
+                setAvailabilityConfirmed(prev => !prev);
                 if (errorMsg) setErrorMsg('');
               }}
-              activeOpacity={0.8}
               disabled={submitting}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: availabilityConfirmed, disabled: submitting }}
             >
               <View style={[styles.checkbox, availabilityConfirmed && styles.checkboxActive]}>
                 {availabilityConfirmed && <Ionicons name="checkmark" size={16} color={colors.primaryOnColor} />}
               </View>
-              <Text style={styles.checkboxLabel}>{tr("I confirm that I am available on the required date and time.")}<Text style={styles.requiredStar}>*</Text>
-              </Text>
-            </TouchableOpacity>
+              <Text style={styles.checkboxLabel}>{t('I confirm that I am available on the required date and time.')}</Text>
+            </Pressable>
 
-            {/* Action buttons */}
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={handleClose}
-                disabled={submitting}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.cancelBtnText}>{tr("Cancel")}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.applyBtn, !canSubmit && styles.applyBtnDisabled]}
-                onPress={handleSubmit}
-                disabled={!canSubmit}
-                activeOpacity={0.85}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color={colors.primaryOnColor} />
-                ) : (
-                  <>
-                    <Ionicons name="paper-plane" size={16} color={colors.primaryOnColor} />
-                    <Text style={styles.applyBtnText}>{tr("Submit Application")}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
+            {!!errorMsg && (
+              <View style={styles.errorBanner} accessibilityRole="alert">
+                <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
+                <Text style={styles.errorBannerText}>{t(errorMsg)}</Text>
+              </View>
+            )}
           </ScrollView>
+
+          <View style={[styles.footer, { paddingBottom: spacing.md + insets.bottom }]}>
+            <Pressable onPress={handleClose} disabled={submitting} accessibilityRole="button"
+              style={({ pressed }) => [styles.button, styles.cancelBtn, pressed && styles.pressed]}>
+              <Text style={styles.cancelBtnText}>{t('Cancel')}</Text>
+            </Pressable>
+            <Pressable onPress={handleSubmit} disabled={submitting} accessibilityRole="button"
+              accessibilityState={{ disabled: !canSubmit, busy: submitting }}
+              style={({ pressed }) => [styles.button, styles.applyBtn, !canSubmit && !submitting && styles.applyBtnDisabled, pressed && styles.pressed]}>
+              {submitting ? <ActivityIndicator size="small" color={colors.primaryOnColor} /> : <>
+                <Ionicons name="paper-plane" size={16} color={canSubmit ? colors.primaryOnColor : colors.textMuted} />
+                <Text style={[styles.applyBtnText, !canSubmit && styles.applyBtnTextDisabled]}>{t('Submit Application')}</Text>
+              </>}
+            </Pressable>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -223,192 +199,39 @@ export default function ApplyModal({
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-  },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    maxHeight: '85%',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceBorderSubtle,
-    gap: spacing.sm,
-  },
-  headerIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTextWrap: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: colors.primary,
-    fontFamily: fonts.bodySemiBold,
-    marginTop: 1,
-  },
-  closeBtn: {
-    padding: spacing.xs,
-  },
-  body: {
-    flexGrow: 0,
-  },
-  bodyContent: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  gigSummaryPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorderSubtle,
-  },
-  gigSummaryText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontFamily: fonts.bodySemiBold,
-    flex: 1,
-  },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.errorLight,
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.errorBorder,
-  },
-  errorBannerText: {
-    fontSize: 12,
-    color: colors.error,
-    flex: 1,
-  },
-  fieldWrap: {
-    gap: 6,
-  },
-  fieldLabel: {
-    fontSize: 13,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-  },
-  requiredStar: {
-    color: colors.error,
-  },
-  messageInput: {
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    padding: spacing.md,
-    fontSize: 14,
-    color: colors.text,
-    minHeight: 110,
-    textAlignVertical: 'top',
-  },
-  charCount: {
-    fontSize: 11,
-    color: colors.textMuted,
-    textAlign: 'right',
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.surfaceBorder,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  checkboxActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  checkboxLabel: {
-    fontSize: 13,
-    color: colors.text,
-    lineHeight: 18,
-    flex: 1,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.lg,
-  },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelBtnText: {
-    fontSize: 14,
-    fontFamily: fonts.bodyBold,
-    color: colors.textSecondary,
-  },
-  applyBtn: {
-    flex: 2,
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  applyBtnDisabled: {
-    opacity: 0.45,
-  },
-  applyBtnText: {
-    fontSize: 14,
-    fontFamily: fonts.bodyBold,
-    color: colors.primaryOnColor,
-  },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay },
+  sheet: { width: '100%', maxWidth: 640, alignSelf: 'center', maxHeight: '90%', backgroundColor: colors.surface, borderTopLeftRadius: borderRadius.xl, borderTopRightRadius: borderRadius.xl, paddingTop: spacing.sm },
+  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: borderRadius.full, backgroundColor: colors.surfaceBorder, marginBottom: spacing.sm },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg },
+  headerTitle: { ...typography.h2, color: colors.text },
+  closeBtn: { width: 44, height: 44, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated },
+  pressed: { opacity: 0.8 },
+  body: { flexGrow: 0 },
+  bodyContent: { padding: spacing.lg, gap: spacing.md },
+  summary: { padding: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.surfaceBorderSubtle, gap: spacing.xs },
+  summaryTitle: { ...typography.title, color: colors.text },
+  summaryPay: { ...typography.h3, color: colors.primary },
+  summaryPayType: { ...typography.bodySmall, color: colors.primary },
+  summaryMeta: { gap: spacing.xs, marginTop: spacing.xs },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  metaText: { ...typography.bodySmall, color: colors.textSecondary, flexShrink: 1 },
+  fieldWrap: { gap: spacing.xs + 2 },
+  fieldLabel: { ...typography.label, color: colors.text },
+  messageInput: { ...typography.body, backgroundColor: colors.inputBg, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.inputBorder, padding: spacing.md, color: colors.text, minHeight: 120, textAlignVertical: 'top' },
+  charCount: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + spacing.xs, padding: spacing.md, minHeight: 56, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.surfaceBorder },
+  checkboxRowActive: { borderColor: colors.primaryBorder, backgroundColor: colors.primaryLight },
+  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: colors.surfaceBorder, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkboxLabel: { ...typography.bodySmall, color: colors.text, flex: 1 },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm + spacing.xs, borderRadius: borderRadius.md, backgroundColor: colors.errorLight, borderWidth: 1, borderColor: colors.errorBorder },
+  errorBannerText: { ...typography.bodySmall, color: colors.error, flex: 1 },
+  footer: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.surfaceBorder },
+  button: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderRadius: borderRadius.md, paddingHorizontal: spacing.md },
+  cancelBtn: { flex: 1, borderWidth: 1, borderColor: colors.surfaceBorder, backgroundColor: colors.surface },
+  cancelBtnText: { ...typography.title, fontSize: 15, color: colors.textSecondary },
+  applyBtn: { flex: 2, backgroundColor: colors.primary },
+  applyBtnDisabled: { backgroundColor: colors.surfaceElevated },
+  applyBtnText: { ...typography.title, fontSize: 15, color: colors.primaryOnColor },
+  applyBtnTextDisabled: { color: colors.textMuted },
 });

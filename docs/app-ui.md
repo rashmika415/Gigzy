@@ -1,4 +1,4 @@
-# Gigzy shared light theme
+# LocalWorks shared light theme
 
 All implemented app screens inherit the warm-white, teal and mint palette from `constants/theme.ts`. Authentication uses aliases to the same tokens. Cards, inputs, selected controls, status labels, messaging bubbles, modal surfaces and the tab bar use colors suitable for a light background. Dark decorative glows are removed. Native appearance and splash background use the light theme; those config changes require a new native build.
 
@@ -13,11 +13,11 @@ Created with the imagegen skill and tool, then copied into this repository. Orig
 
 Final youth image prompt:
 
-> Use case: photorealistic-natural. Asset type: bundled dashboard banner for Gigzy, a Sri Lankan local youth gig app. A warm editorial landscape 3:2 photograph of two Sri Lankan young adults clearly ages 20-25 collaborating on a creative freelance project at a sunlit neighborhood shared workspace. One woman using a laptop and a man arranging printed design swatches on a pale wooden desk, natural candid concentration and smiles, casual muted sage and cream clothes. Both faces and laptop contained within central 65 percent, medium-wide composition that crops into a short horizontal banner. Warm white plaster wall, leafy plant, subtle muted teal decor, soft natural daylight, true skin texture. Authentic and approachable, professional photography. No text, no branding, no watermark, no UI, no collage.
+> Use case: photorealistic-natural. Asset type: bundled dashboard banner for LocalWorks, a Sri Lankan local youth gig app. A warm editorial landscape 3:2 photograph of two Sri Lankan young adults clearly ages 20-25 collaborating on a creative freelance project at a sunlit neighborhood shared workspace. One woman using a laptop and a man arranging printed design swatches on a pale wooden desk, natural candid concentration and smiles, casual muted sage and cream clothes. Both faces and laptop contained within central 65 percent, medium-wide composition that crops into a short horizontal banner. Warm white plaster wall, leafy plant, subtle muted teal decor, soft natural daylight, true skin texture. Authentic and approachable, professional photography. No text, no branding, no watermark, no UI, no collage.
 
 Final business image prompt:
 
-> Use case: photorealistic-natural. Asset type: bundled business dashboard banner for Gigzy, a Sri Lankan local gig marketplace. One warm editorial landscape 3:2 photograph of a Sri Lankan female small-business owner in her 30s and a Sri Lankan young male adult clearly age 22-25 preparing kraft-paper customer packages together at a sunlit neighborhood plant and homewares shop. They are talking naturally while one folds a box and the other checks a notebook. Medium-wide composition, faces and hands in the central 65 percent so this crops to a short horizontal banner. White plaster, pale wood, leafy plants, restrained terracotta details and teal apron. Soft daylight, credible candid moment, realistic skin and hands, inviting warm-white and teal palette. No text, logos, watermark, UI or collage.
+> Use case: photorealistic-natural. Asset type: bundled business dashboard banner for LocalWorks, a Sri Lankan local gig marketplace. One warm editorial landscape 3:2 photograph of a Sri Lankan female small-business owner in her 30s and a Sri Lankan young male adult clearly age 22-25 preparing kraft-paper customer packages together at a sunlit neighborhood plant and homewares shop. They are talking naturally while one folds a box and the other checks a notebook. Medium-wide composition, faces and hands in the central 65 percent so this crops to a short horizontal banner. White plaster, pale wood, leafy plants, restrained terracotta details and teal apron. Soft daylight, credible candid moment, realistic skin and hands, inviting warm-white and teal palette. No text, logos, watermark, UI or collage.
 
 ## Verification
 

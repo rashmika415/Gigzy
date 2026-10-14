@@ -7,7 +7,7 @@ const { doc, setDoc, getDoc, getDocs, collection, updateDoc, deleteDoc, serverTi
 
 test('saved gig rules enforce ownership, role, schema and deletion handling', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async t => {
   const environment = await initializeTestEnvironment({
-    projectId: 'demo-gigzy-saved',
+    projectId: 'demo-localworks-saved',
     firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') },
   });
   try {

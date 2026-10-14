@@ -1,7 +1,7 @@
 import { Text } from './LocalizedText';
 import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, borderRadius, typography } from '../constants/theme';
 import type { GigStatus } from '../types/gig';
@@ -110,13 +110,15 @@ export default function StatusPill({
 
   if (onPress) {
     return (
-      <TouchableOpacity
-        style={pillStyle}
+      <Pressable
+        style={({ pressed }) => [pillStyle, pressed && styles.pressed]}
         onPress={onPress}
-        activeOpacity={0.8}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel={t('Change status: {{status}}', { status: t(cfg.label) })}
       >
         {content}
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
@@ -132,6 +134,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 3,
     gap: 4,
+  },
+  pressed: {
+    opacity: 0.75,
   },
   containerSm: {
     paddingHorizontal: 7,

@@ -8,9 +8,9 @@ export function currentLocale() {
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions) {
   return new Intl.NumberFormat(currentLocale(), options).format(value);
 }
-// Gig pay is stored in Sri Lankan rupees. The prefix is translated (Rs. / රු. / ரூ.).
+// Gig pay is stored in Sri Lankan rupees and always shown with the ISO code, e.g. "LKR 1,000".
 export function formatCurrency(value: number) {
-  return translate('Rs. {{amount}}', { amount: formatNumber(value || 0) });
+  return translate('LKR {{amount}}', { amount: formatNumber(value || 0, { maximumFractionDigits: 2 }) });
 }
 export function formatDate(value: Date | number, options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' }) {
   const date = new Date(value);

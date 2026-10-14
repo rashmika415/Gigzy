@@ -1,7 +1,7 @@
 import { Text } from './LocalizedText';
 import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, fonts } from '../constants/theme';
 
@@ -18,6 +18,8 @@ interface EmptyStateProps {
   actionIcon?: keyof typeof Ionicons.glyphMap;
   /** Called when the action button is pressed */
   onAction?: () => void;
+  /** Outlined button for low-emphasis actions such as "Clear filters" */
+  secondary?: boolean;
 }
 
 export default function EmptyState({
@@ -27,6 +29,7 @@ export default function EmptyState({
   actionLabel,
   actionIcon,
   onAction,
+  secondary = false,
 }: EmptyStateProps) {
   const { t } = useTranslation();
   return (
@@ -42,18 +45,17 @@ export default function EmptyState({
       ) : null}
 
       {onAction && actionLabel && (
-        <TouchableOpacity
+        <Pressable
           accessibilityRole="button"
           accessibilityLabel={t(actionLabel ?? '')}
-          style={styles.actionBtn}
+          style={({ pressed }) => [styles.actionBtn, secondary && styles.secondaryBtn, pressed && styles.pressed]}
           onPress={onAction}
-          activeOpacity={0.85}
         >
           {actionIcon && (
-            <Ionicons name={actionIcon} size={20} color={colors.primaryOnColor} />
+            <Ionicons name={actionIcon} size={20} color={secondary ? colors.primary : colors.primaryOnColor} />
           )}
-          <Text style={styles.actionText}>{t(actionLabel ?? '')}</Text>
-        </TouchableOpacity>
+          <Text style={[styles.actionText, secondary && styles.secondaryText]}>{t(actionLabel ?? '')}</Text>
+        </Pressable>
       )}
     </View>
   );
@@ -98,16 +100,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    minHeight: 44,
+    paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.full,
-    gap: 8,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
     marginTop: spacing.sm,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
+  },
+  secondaryBtn: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+  secondaryText: {
+    color: colors.primary,
+  },
+  pressed: {
+    opacity: 0.8,
   },
   actionText: {
     color: colors.primaryOnColor,

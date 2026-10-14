@@ -24,8 +24,14 @@ export interface UserData {
   skillBadges?: import('../types/profile').SkillBadge[];
   endorsements?: import('../types/profile').CommunityEndorsement[];
   isVerified?: boolean;
+  verificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED';
   suspended?: boolean;
   suspensionReason?: string;
+  suspensionType?: 'none' | 'temporary' | 'permanent';
+  suspendedUntil?: any;
+  warningCount?: number;
+  lastWarningReason?: string;
+  lastWarnedAt?: any;
   notifyOnMatch?: boolean;
   createdAt?: any;
   updatedAt?: any;

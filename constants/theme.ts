@@ -1,11 +1,11 @@
-// Shared warm-white and teal design tokens for Gigzy.
+// Shared warm-white and teal design tokens for LocalWorks.
 
 export const colors = {
-  background: '#FAF9F6',
+  background: '#F7F8F8',
   surface: '#FFFFFF',
-  surfaceElevated: '#F3F6F3',
-  surfaceBorder: '#DFE7E2',
-  surfaceBorderSubtle: '#ECF0EC',
+  surfaceElevated: '#F1F4F3',
+  surfaceBorder: '#E6EAE8',
+  surfaceBorderSubtle: '#EEF1F0',
   surfaceHover: '#E7F4EF',
 
   primary: '#087F73',
@@ -46,14 +46,17 @@ export const colors = {
   overlay: 'rgba(23, 43, 39, 0.42)',
 
   inputBg: '#FFFFFF',
-  inputBorder: '#DFE7E2',
+  inputBorder: '#E6EAE8',
   inputBorderFocus: '#087F73',
 };
 
+// One family (Hanken Grotesk) for all UI text keeps the look calm and sits well
+// beside the Noto Sinhala/Tamil fallbacks. Syne is reserved for the wordmark.
 export const fonts = {
-  display: 'Syne_800ExtraBold',
-  heading: 'Syne_700Bold',
-  headingSemiBold: 'Syne_600SemiBold',
+  brand: 'Syne_700Bold',
+  display: 'HankenGrotesk_700Bold',
+  heading: 'HankenGrotesk_700Bold',
+  headingSemiBold: 'HankenGrotesk_600SemiBold',
   body: 'HankenGrotesk_400Regular',
   bodyMedium: 'HankenGrotesk_500Medium',
   bodySemiBold: 'HankenGrotesk_600SemiBold',
@@ -64,9 +67,9 @@ export const fonts = {
 // instead of fontWeight (Android ignores fontWeight on custom families).
 // Keep text at 12px or larger so Sinhala and Tamil glyphs stay legible.
 export const typography = {
-  display: { fontFamily: fonts.display, fontSize: 28, lineHeight: 34, letterSpacing: -0.4 },
-  h1: { fontFamily: fonts.heading, fontSize: 24, lineHeight: 30, letterSpacing: -0.3 },
-  h2: { fontFamily: fonts.heading, fontSize: 20, lineHeight: 26, letterSpacing: -0.2 },
+  display: { fontFamily: fonts.display, fontSize: 26, lineHeight: 32, letterSpacing: -0.3 },
+  h1: { fontFamily: fonts.heading, fontSize: 22, lineHeight: 28, letterSpacing: -0.2 },
+  h2: { fontFamily: fonts.heading, fontSize: 20, lineHeight: 26, letterSpacing: -0.1 },
   h3: { fontFamily: fonts.headingSemiBold, fontSize: 18, lineHeight: 24 },
   title: { fontFamily: fonts.bodyBold, fontSize: 16, lineHeight: 22 },
   body: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22 },

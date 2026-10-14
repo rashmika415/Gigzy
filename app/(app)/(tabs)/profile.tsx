@@ -1,6 +1,6 @@
-import { formatNumber } from '../../../localization/format';
+import { ReviewSummary, ReviewHistory } from '../../../components/ProfileReviews';
+import { useProfileReviews } from '../../../hooks/useProfileReviews';
 import { Text } from '../../../components/LocalizedText';
-import ReferralCard from '../../../components/ReferralCard';
 import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Image } from 'react-native';
@@ -15,6 +15,7 @@ import LanguageSelector from '../../../components/LanguageSelector';
 export default function Profile() {
   const { t } = useTranslation();
   const { user, userData, loading } = useAuth();
+  const reviewState = useProfileReviews(user?.uid);
 
   const handleSignOut = async () => {
     try {
@@ -92,12 +93,11 @@ export default function Profile() {
               <Text style={[styles.roleText, { color: isYouth ? colors.primary : colors.accent }]}>{t(getRoleLabel())}</Text>
             </View>
             <Text style={styles.emailText}>{user?.email}</Text>
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={15} color={colors.star} />
-              <Text style={styles.emailText}>{t('{{rating}} · Reviews: {{count}}', { rating: formatNumber(userData?.ratingAverage ?? 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), count: userData?.ratingCount ?? 0 })}</Text>
-            </View>
+            <ReviewSummary {...reviewState} />
           </View>
         </View>
+
+        <ReviewHistory {...reviewState} />
 
         {/* Role-Specific Content */}
         {isYouth ? (
@@ -203,7 +203,6 @@ export default function Profile() {
         )}
 
         <LanguageSelector />
-        <ReferralCard />
         {/* Action Buttons */}
         <View style={styles.actionSection}>
           {isYouth && (
@@ -275,14 +274,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   backButton: {
-    padding: spacing.xs,
+    padding: spacing.xs
+,
     minWidth: 44,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   editHeaderButton: {
-    padding: spacing.xs,
+    padding: spacing.xs
+,
     minWidth: 44,
     minHeight: 44,
     alignItems: 'center',

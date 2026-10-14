@@ -7,7 +7,7 @@ const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@fir
 const { doc, setDoc, getDoc, getDocs, collection, query, where, writeBatch, updateDoc, serverTimestamp, increment } = require('firebase/firestore');
 
 test('referrals bind a unique code to its owner and attribute only a new signup', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async () => {
-  const env = await initializeTestEnvironment({ projectId: 'demo-gigzy-referrals', firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') } });
+  const env = await initializeTestEnvironment({ projectId: 'demo-localworks-referrals', firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') } });
   const db = uid => env.authenticatedContext(uid, { email: `${uid}@test.com` }).firestore();
   try {
     await env.withSecurityRulesDisabled(async ctx => {
@@ -45,7 +45,7 @@ test('referrals bind a unique code to its owner and attribute only a new signup'
 });
 
 test('applications allow the discovery flow, deny duplicates and isolate applicants', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, async () => {
-  const env = await initializeTestEnvironment({ projectId: 'demo-gigzy-applications', firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') } });
+  const env = await initializeTestEnvironment({ projectId: 'demo-localworks-applications', firestore: { rules: fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf8') } });
   const db = uid => env.authenticatedContext(uid).firestore();
   try {
     await env.withSecurityRulesDisabled(async ctx => {

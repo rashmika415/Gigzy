@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLocales } from 'expo-localization';
 import { ActivityIndicator, Platform, View } from 'react-native';
 import i18n from './i18n';
-import { LANGUAGE_STORAGE_KEY, resolveLanguage, type Language } from './language';
+import { LANGUAGE_STORAGE_KEY, LEGACY_LANGUAGE_STORAGE_KEY, resolveLanguage, type Language } from './language';
 import { colors } from '../constants/theme';
 
 const LanguageContext = createContext<{ changeLanguage: (language: Language) => void; error: string }>({ changeLanguage: () => {}, error: '' });
@@ -18,7 +18,17 @@ export default function LanguageProvider({ children }: { children: ReactNode }) 
     let active = true;
     async function restore() {
       let saved: string | null = null;
-      try { saved = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY); } catch { /* Device language remains usable. */ }
+      try {
+        saved = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+        if (saved === null) {
+          // Carry the choice over from the pre-rename key, then drop the old entry.
+          saved = await AsyncStorage.getItem(LEGACY_LANGUAGE_STORAGE_KEY);
+          if (saved !== null) {
+            await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, saved);
+            await AsyncStorage.removeItem(LEGACY_LANGUAGE_STORAGE_KEY);
+          }
+        }
+      } catch { /* Device language remains usable. */ }
       let languages: (string | null)[] = [];
       try { languages = getLocales().map(locale => locale.languageTag); } catch { /* Default to English. */ }
       if (!active) return;

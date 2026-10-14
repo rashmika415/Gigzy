@@ -1,23 +1,35 @@
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../localization/i18n';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
   StyleSheet,
   TouchableOpacity,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { useToast } from '../../context/ToastContext';
+import { router } from 'expo-router';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import { addGigToCalendar } from '../../services/calendarService';
 
 export interface CelebrationModalProps {
   visible: boolean;
   youthName: string;
   gigTitle: string;
   onClose: () => void;
+  applicationId?: string;
+  gigId?: string;
+  gigDate?: string;
+  gigTime?: string;
+  gigLocation?: string;
+  gigPay?: number;
+  gigPayType?: string;
+  onOpenChat?: () => void;
 }
 
 export default function CelebrationModal({
@@ -25,8 +37,20 @@ export default function CelebrationModal({
   youthName,
   gigTitle,
   onClose,
+  applicationId,
+  gigId,
+  gigDate,
+  gigTime,
+  gigLocation,
+  gigPay,
+  gigPayType,
+  onOpenChat,
 }: CelebrationModalProps) {
   useTranslation();
+  const toast = useToast();
+  const [calendarAdding, setCalendarAdding] = useState(false);
+  const [calendarAdded, setCalendarAdded] = useState(false);
+
   if (!visible) return null;
 
   const handleClose = () => {
@@ -34,10 +58,61 @@ export default function CelebrationModal({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     onClose();
+    router.push('/(app)/(tabs)/home' as any);
   };
 
   const displayName = youthName || 'Youth Freelancer';
   const displayGig = gigTitle || 'Gig';
+
+  const handleMessage = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    onClose();
+    if (onOpenChat) {
+      onOpenChat();
+    } else if (applicationId) {
+      router.push({
+        pathname: '/(app)/chat/[id]',
+        params: { id: `conv_${applicationId}` },
+      } as any);
+    } else {
+      router.push('/(app)/(tabs)/messages' as any);
+    }
+  };
+
+  const handleAddToCalendar = async () => {
+    setCalendarAdding(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    try {
+      const result = await addGigToCalendar({
+        title: displayGig,
+        date: gigDate || new Date().toISOString().slice(0, 10),
+        time: gigTime,
+        location: gigLocation,
+        pay: gigPay,
+        payType: gigPayType,
+        counterpartName: displayName,
+        counterpartRole: 'freelancer',
+        gigId,
+        applicationId,
+        description: `LocalWorks scheduled gig with ${displayName}`,
+      });
+      if (!result.success) throw new Error(result.error || 'Could not add gig to calendar.');
+      setCalendarAdded(true);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      toast.success(tr('Added to calendar'));
+    } catch (err: any) {
+      toast.error(tr('Could not add gig to calendar.'), err?.message ? tr(err.message) : undefined);
+    } finally {
+      setCalendarAdding(false);
+    }
+  };
 
   return (
     <Modal
@@ -99,17 +174,76 @@ export default function CelebrationModal({
                 <Text style={styles.statusPillText}>{tr("In Progress")}</Text>
               </View>
             </View>
+
+            {gigDate ? (
+              <>
+                <View style={styles.divider} />
+                <View style={styles.overviewRow}>
+                  <View style={styles.overviewIconCol}>
+                    <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                  </View>
+                  <View style={styles.overviewTextCol}>
+                    <Text style={styles.overviewLabel}>Scheduled Date & Time</Text>
+                    <Text style={styles.overviewValue} numberOfLines={1}>
+                      {gigDate}{gigTime ? ` at ${gigTime}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              </>
+            ) : null}
           </View>
 
-          {/* Dismiss / Confirmation Button */}
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleClose}
-            activeOpacity={0.88}
-          >
-            <Ionicons name="checkmark-done" size={20} color={colors.primaryOnColor} style={{ marginRight: 8 }} />
-            <Text style={styles.actionButtonText}>{tr("Done")}</Text>
-          </TouchableOpacity>
+          {/* Actions Stack */}
+          <View style={styles.buttonStack}>
+            <TouchableOpacity
+              style={styles.messageButton}
+              onPress={handleMessage}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="chatbubbles" size={19} color={colors.primaryOnColor} style={{ marginRight: 8 }} />
+              <Text style={styles.actionButtonText}>{tr("Message Freelancer")}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.calendarButton,
+                calendarAdded && styles.calendarButtonAdded,
+              ]}
+              onPress={handleAddToCalendar}
+              disabled={calendarAdding || calendarAdded}
+              activeOpacity={0.88}
+            >
+              {calendarAdding ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <>
+                  <Ionicons
+                    name={calendarAdded ? 'checkmark-circle' : 'calendar-outline'}
+                    size={19}
+                    color={calendarAdded ? colors.success : colors.primary}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text
+                    style={[
+                      styles.calendarButtonText,
+                      calendarAdded && styles.calendarButtonTextAdded,
+                    ]}
+                  >
+                    {calendarAdded ? tr("Scheduled in Calendar ✓") : tr("Add to Calendar")}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.doneButton}
+              onPress={handleClose}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="home-outline" size={18} color={colors.textSecondary} style={{ marginRight: 6 }} />
+              <Text style={styles.doneButtonText}>{tr("Go to Dashboard")}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -280,20 +414,24 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     color: colors.warning,
   },
-  actionButton: {
+  buttonStack: {
+    width: '100%',
+    gap: spacing.sm,
+  },
+  messageButton: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,
-    paddingVertical: 14,
+    paddingVertical: 13,
     borderRadius: borderRadius.md || 12,
     ...Platform.select({
       ios: {
         shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
       },
       android: {
         elevation: 3,
@@ -308,5 +446,50 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     color: colors.primaryOnColor,
     letterSpacing: 0.2,
+  },
+  calendarButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    paddingVertical: 12,
+    borderRadius: borderRadius.md || 12,
+  },
+  calendarButtonAdded: {
+    backgroundColor: colors.successLight,
+    borderColor: colors.success,
+  },
+  calendarButtonText: {
+    fontSize: 14.5,
+    fontFamily: fonts.bodyBold,
+    color: colors.primary,
+  },
+  calendarButtonTextAdded: {
+    color: colors.success,
+  },
+  doneButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: borderRadius.md || 12,
+  },
+  doneButtonText: {
+    fontSize: 14,
+    fontFamily: fonts.bodyMedium,
+    color: colors.textSecondary,
+  },
+  actionButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    paddingVertical: 13,
+    borderRadius: borderRadius.md || 12,
   },
 });

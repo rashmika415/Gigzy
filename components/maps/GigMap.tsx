@@ -43,7 +43,7 @@ function GigMapContent(props: GigMapProps) {
   const receive = useCallback((event: unknown) => {
     if (!event || typeof event !== 'object') return;
     const message = event as { channel?: string; type?: string; key?: string };
-    if (message.channel !== 'gigzy-map') return;
+    if (message.channel !== 'localworks-map') return;
     if (message.type === 'ready') setReady(true);
     else if (message.type === 'loaded') setLoaded(true);
     else if (message.type === 'error') setFailed(true);

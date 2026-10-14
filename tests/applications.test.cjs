@@ -1,3 +1,4 @@
+/* global __dirname */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -6,6 +7,8 @@ const { test } = require('node:test');
 const ts = require('typescript');
 
 function setupApplicationService() {
+  const auth = { currentUser: { uid: 'biz-1' } };
+  const sentNotifications = [];
   const collections = {
     applications: new Map(),
     gigs: new Map(),
@@ -57,11 +60,7 @@ function setupApplicationService() {
 
   const firestore = {
     collection: (_, name) => ({ name }),
-    doc: (_, collectionName, docId) => ({
-      collectionName,
-      id: docId,
-      path: `${collectionName}/${docId}`,
-    }),
+    doc: (_, ...segments) => ({ collectionName: segments.slice(0, -1).join('/'), id: segments.at(-1), path: segments.join('/') }),
     serverTimestamp: () => ({ _type: 'serverTimestamp', toMillis: () => Date.now() }),
     increment: (amount) => amount,
     runTransaction: async (_, updateFn) => {
@@ -79,6 +78,7 @@ function setupApplicationService() {
             collections[docRef.collectionName] = new Map();
           }
           collections[docRef.collectionName].set(docRef.id, { id: docRef.id, ...data });
+          if (docRef.collectionName.includes('/notifications')) sentNotifications.push(data);
         },
         update: (docRef, data) => {
           const table = collections[docRef.collectionName];
@@ -102,6 +102,22 @@ function setupApplicationService() {
         id: docRef.id,
         data: () => (item ? { ...item } : undefined),
       };
+    },
+    setDoc: async (docRef, data) => {
+      const colName = docRef.collectionName || (docRef.path && docRef.path.split('/')[0]);
+      if (!collections[colName]) {
+        collections[colName] = new Map();
+      }
+      collections[colName].set(docRef.id, { id: docRef.id, ...data });
+    },
+    addDoc: async (colRef, data) => {
+      const colName = colRef.name || (colRef.path && colRef.path.split('/')[0]);
+      if (!collections[colName]) {
+        collections[colName] = new Map();
+      }
+      const id = 'doc_' + Math.random().toString(36).substring(2, 9);
+      collections[colName].set(id, { id, ...data });
+      return { id };
     },
     getDocs: async (q) => {
       const table = collections[q.collectionName];
@@ -158,13 +174,12 @@ function setupApplicationService() {
   }).outputText;
 
   const exports = {};
-  const sentNotifications = [];
   vm.runInNewContext(compiled, {
     exports,
     module: { exports },
     require: (mod) => {
       if (mod === 'firebase/firestore') return firestore;
-      if (mod === '../FirebaseConfig') return { db: {}, auth: { currentUser: null } };
+      if (mod === '../FirebaseConfig') return { db: {}, auth };
       if (mod === './gigService') return { parseFirebaseError: (e) => e.message || String(e) };
       if (mod === './notificationService') return {
         sendNotification: async (userId, notif) => {
@@ -177,7 +192,14 @@ function setupApplicationService() {
     console,
   });
 
-  return { service: exports, collections, sentNotifications };
+  const create = exports.createApplication;
+  exports.createApplication = async input => {
+    const previous = auth.currentUser;
+    auth.currentUser = { uid: input.youthId };
+    try { return await create(input); }
+    finally { auth.currentUser = previous; }
+  };
+  return { service: exports, collections, sentNotifications, auth };
 }
 
 test('TEST 1 & 2: Submitting valid application sets pending status and updates applicant count', async () => {
@@ -535,7 +557,7 @@ test('TEST 15: Business owner only sees applications belonging to their gigs and
 });
 
 test('TEST 16: Business owner views applicants for a specific gig with businessId constraint and listener', async () => {
-  const { service, collections } = setupApplicationService();
+  const { service } = setupApplicationService();
 
   // Two youth apply to gig-open-1
   await service.createApplication({
@@ -703,7 +725,38 @@ test('TEST 21: A youth cannot be accepted twice for a gig and another applicant 
       await service.acceptApplication('app-2', 'biz-1');
     },
     (err) => {
-      return err.message.includes('This gig has already been accepted and is in progress. A youth cannot be accepted twice for this gig.');
+      return err.message.includes('cannot be accepted twice');
     }
   );
 });
+
+test('TEST 22: Accepting an application automatically establishes in-app conversation metadata and links conversationId', async () => {
+  const { service, collections } = setupApplicationService();
+
+  const app = await service.createApplication({
+    gigId: 'gig-open-1',
+    youthId: 'youth-1',
+    message: 'Excited to start right away',
+    availabilityConfirmed: true,
+  });
+
+  await service.acceptApplication(app.id, 'biz-1');
+
+  // Verify conversationId is linked onto the application document
+  const updatedApp = collections.applications.get(app.id);
+  assert.equal(updatedApp.status, 'accepted');
+  assert.equal(updatedApp.conversationId, `conv_${app.id}`);
+
+  // Verify conversations collection contains conversation record with participants
+  const conv = collections.conversations?.get(`conv_${app.id}`);
+  assert.ok(conv, 'Conversation document should be created');
+  assert.equal(conv.conversationId, `conv_${app.id}`);
+  assert.equal(conv.applicationId, app.id);
+  assert.equal(conv.participants[0], 'youth-1');
+  assert.equal(conv.participants[1], 'biz-1');
+  assert.equal(conv.participantDetails['youth-1'].role, 'freelancer');
+  assert.equal(conv.participantDetails['biz-1'].role, 'client');
+  assert.equal(conv.gigTitle, 'Graphic Designer Needed');
+  assert.equal(conv.unreadCount['youth-1'], 1);
+});
+

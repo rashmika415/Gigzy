@@ -18,6 +18,9 @@ import {
     subscribeToChatMessages,
     uploadChatImage,
 } from "../../../services/chatService";
+import { addGigToCalendar } from "../../../services/calendarService";
+import { RatingModal } from "../../../components/reviews";
+import { ReportModal } from "../../../components/reports";
 import {
     BUSINESS_QUICK_REPLIES,
     Chat,
@@ -66,6 +69,9 @@ export default function ChatRoomScreen() {
   >(null);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [showGigBanner, setShowGigBanner] = useState(true);
+  const [calendarAdding, setCalendarAdding] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
 
@@ -240,6 +246,27 @@ export default function ChatRoomScreen() {
       formatDateDivider(item.createdAt) !==
         formatDateDivider(prevMessage.createdAt);
 
+    if (item.type === 'system') {
+      return (
+        <View style={styles.messageRowWrapper}>
+          {showDateDivider && (
+            <View style={styles.dateDivider}>
+              <Text style={styles.dateDividerText}>
+                {formatDateDivider(item.createdAt)}
+              </Text>
+            </View>
+          )}
+          <View style={styles.systemMessageContainer}>
+            <View style={styles.systemMessagePill}>
+              <Ionicons name="sparkles" size={14} color={colors.success} style={{ marginRight: 6 }} />
+              <Text style={styles.systemMessageText}>{item.text}</Text>
+            </View>
+            <Text style={styles.systemMessageTime}>{formatMessageTime(item.createdAt)}</Text>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.messageRowWrapper}>
         {showDateDivider && (
@@ -403,24 +430,50 @@ export default function ChatRoomScreen() {
           </View>
         </View>
 
-        {/* Action button */}
-        {chat?.gigId && (
-          <TouchableOpacity
-            style={styles.gigToggleBtn}
-            onPress={() => setShowGigBanner((v) => !v)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons
-              name={
-                showGigBanner
-                  ? "chevron-up-circle-outline"
-                  : "briefcase-outline"
-              }
-              size={22}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
-        )}
+        {/* Action buttons */}
+        <View style={styles.headerRightActions}>
+          {Boolean(otherParticipant?.uid) && (
+            <TouchableOpacity
+              style={styles.headerRateBtn}
+              onPress={() => setShowRatingModal(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={isOtherBusiness ? t("Rate Business Client") : t("Rate Freelancer")}
+            >
+              <Ionicons name="star" size={20} color={colors.star} />
+            </TouchableOpacity>
+          )}
+
+          {Boolean(otherParticipant?.uid) && (
+            <TouchableOpacity
+              style={styles.headerReportBtn}
+              onPress={() => setShowReportModal(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={t("Report User")}
+            >
+              <Ionicons name="flag-outline" size={19} color={colors.error} />
+            </TouchableOpacity>
+          )}
+
+          {chat?.gigId && (
+            <TouchableOpacity
+              style={styles.gigToggleBtn}
+              onPress={() => setShowGigBanner((v) => !v)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={
+                  showGigBanner
+                    ? "chevron-up-circle-outline"
+                    : "briefcase-outline"
+                }
+                size={22}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Collapsible Gig Context Banner */}
@@ -608,6 +661,37 @@ export default function ChatRoomScreen() {
           )}
         </View>
       </Modal>
+
+      {/* Rating Modal for Chat Counterpart */}
+      {otherParticipant.uid ? (
+        <RatingModal
+          visible={showRatingModal}
+          targetUserId={otherParticipant.uid}
+          targetUserName={otherParticipant.fullName}
+          targetUserPhotoURL={otherParticipant.photoURL}
+          targetRole={otherParticipant.role === 'client' ? 'client' : 'freelancer'}
+          gigId={chat?.gigId}
+          gigTitle={chat?.gigTitle}
+          onClose={() => setShowRatingModal(false)}
+          onSuccess={() => {
+            setShowRatingModal(false);
+          }}
+        />
+      ) : null}
+
+      {/* Report Modal for Chat Counterpart */}
+      {otherParticipant.uid && showReportModal ? (
+        <ReportModal
+          visible={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          targetType="user"
+          targetId={otherParticipant.uid}
+          targetUserId={otherParticipant.uid}
+          targetUserName={otherParticipant.fullName}
+          targetGigId={chat?.gigId}
+          targetGigTitle={chat?.gigTitle}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -710,6 +794,17 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontFamily: fonts.bodyMedium,
   },
+  headerRightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  headerRateBtn: {
+    padding: spacing.xs,
+  },
+  headerReportBtn: {
+    padding: spacing.xs,
+  },
   gigToggleBtn: {
     padding: spacing.xs,
   },
@@ -745,6 +840,27 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
     marginTop: 1,
   },
+  gigBannerActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  gigBannerCalendarBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    gap: 4,
+  },
+  gigBannerCalendarText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.primary,
+  },
   gigBannerAction: {
     backgroundColor: colors.surfaceElevated,
     paddingHorizontal: 10,
@@ -759,6 +875,50 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: fonts.bodyBold,
     color: colors.primary,
+  },
+  gigBannerRateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.warningBorder,
+    gap: 4,
+  },
+  gigBannerRateText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.warning,
+  },
+  systemMessageContainer: {
+    alignItems: "center",
+    marginVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  systemMessagePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.successLight,
+    borderWidth: 1,
+    borderColor: colors.successBorder,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    maxWidth: "92%",
+  },
+  systemMessageText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: colors.success,
+    textAlign: "center",
+    flexShrink: 1,
+  },
+  systemMessageTime: {
+    fontSize: 10,
+    color: colors.textMuted,
+    marginTop: 4,
   },
   centerContainer: {
     flex: 1,

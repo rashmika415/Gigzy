@@ -1,18 +1,22 @@
 import { useTranslation } from 'react-i18next';
-import { translate as tr } from '../../localization/i18n';
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, TouchableOpacity, StyleSheet, SafeAreaView, FlatList, ActivityIndicator, RefreshControl, Platform } from 'react-native';
-import { Text, TextInput } from '../../components/LocalizedText';
+import { useState, useEffect, useMemo } from 'react';
+import { View, Pressable, StyleSheet, FlatList, RefreshControl, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text } from '../../components/LocalizedText';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
-import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import { useToast } from '../../context/ToastContext';
+import { colors, spacing, borderRadius, typography } from '../../constants/theme';
 import type { Application, ApplicationFilterStatus } from '../../types/application';
 import {
   subscribeToMyApplications,
   getMyApplications,
   subscribeToBusinessApplications,
   getApplicationsForBusiness,
+  acceptApplication,
+  rejectApplication,
 } from '../../services/applicationService';
 import {
   ApplicationCard,
@@ -20,291 +24,222 @@ import {
   ApplicantCard,
   ApplicantDetailModal,
 } from '../../components/applications';
+import { Chip, EmptyState, ErrorState, SearchBar, SkeletonList } from '../../components';
+import ConfirmSheet from '../../components/ConfirmSheet';
+import { RatingModal } from '../../components/reviews';
+import { uidOf } from '../../components/applications/ApplicationCard';
+
+const FILTERS: { id: ApplicationFilterStatus; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'pending', label: 'Pending' },
+  { id: 'accepted', label: 'Accepted' },
+  { id: 'completed', label: 'Completed' },
+  { id: 'rejected', label: 'Rejected' },
+];
+
+/** Older documents may still use "approved" for accepted applications. */
+const normalizedStatus = (app: Application) => {
+  const status = (app.status || '').toLowerCase();
+  return status === 'approved' ? 'accepted' : status;
+};
+
+type Decision = { app: Application; action: 'accept' | 'reject' };
 
 export default function MyApplicationsScreen() {
-  useTranslation();
+  const { t } = useTranslation();
   const { user, userData } = useAuth();
+  const toast = useToast();
   const isBusiness = userData?.role === 'client';
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [attempt, setAttempt] = useState(0);
   const [activeFilter, setActiveFilter] = useState<ApplicationFilterStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [selectedApplicant, setSelectedApplicant] = useState<Application | null>(null);
+  const [decision, setDecision] = useState<Decision | null>(null);
+  const [ratingApplicant, setRatingApplicant] = useState<Application | null>(null);
+  const [deciding, setDeciding] = useState(false);
+  const [decisionError, setDecisionError] = useState('');
 
-  // Real-time synchronization of applications (freelancer youth or business client)
+  // Real-time sync. `attempt` restarts the listener when the user taps Retry.
   useEffect(() => {
     let active = true;
     let unsubscribe = () => {};
     void Promise.resolve().then(() => {
-    if (!active) return;
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setErrorMsg('');
-
-    const onUpdate = (apps: Application[]) => {
-      setApplications(apps);
-      setLoading(false);
-      setErrorMsg('');
-    };
-
-    const onError = (error: Error) => {
-      setErrorMsg(error.message || 'Failed to load applications.');
-      setLoading(false);
-    };
-
-    unsubscribe = isBusiness
-      ? subscribeToBusinessApplications(user.uid, onUpdate, onError)
-      : subscribeToMyApplications(user.uid, onUpdate, onError);
-
+      if (!active) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      const onUpdate = (apps: Application[]) => {
+        setApplications(apps);
+        setLoading(false);
+        setErrorMsg('');
+      };
+      const onError = (error: Error) => {
+        setErrorMsg(error.message || 'Failed to load applications.');
+        setLoading(false);
+      };
+      unsubscribe = isBusiness
+        ? subscribeToBusinessApplications(user.uid, onUpdate, onError)
+        : subscribeToMyApplications(user.uid, onUpdate, onError);
     });
     return () => {
       active = false;
       unsubscribe();
     };
-  }, [user, isBusiness]);
+  }, [user, isBusiness, attempt]);
 
-  // Pull-to-refresh handler
+  const handleRetry = () => {
+    setLoading(true);
+    setErrorMsg('');
+    setAttempt(value => value + 1);
+  };
+
   const handleRefresh = async () => {
     if (!user) return;
     setRefreshing(true);
     try {
-      const fresh = isBusiness
-        ? await getApplicationsForBusiness(user.uid)
-        : await getMyApplications(user.uid);
-      setApplications(fresh);
+      setApplications(isBusiness ? await getApplicationsForBusiness(user.uid) : await getMyApplications(user.uid));
       setErrorMsg('');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to refresh applications.');
+      toast.error(t('Failed to refresh applications.'), err?.message ? t(err.message) : undefined);
     } finally {
       setRefreshing(false);
     }
   };
 
-  // Status counts
   const counts = useMemo(() => {
-    return {
-      all: applications.length,
-      pending: applications.filter((a) => (a.status || '').toLowerCase() === 'pending').length,
-      accepted: applications.filter((a) => {
-        const s = (a.status || '').toLowerCase();
-        return s === 'accepted' || s === 'approved';
-      }).length,
-      rejected: applications.filter((a) => (a.status || '').toLowerCase() === 'rejected').length,
-      completed: applications.filter((a) => (a.status || '').toLowerCase() === 'completed').length,
-    };
+    const result: Record<string, number> = { all: applications.length };
+    applications.forEach(app => { const status = normalizedStatus(app); result[status] = (result[status] || 0) + 1; });
+    return result;
   }, [applications]);
 
-  // Filtered applications
   const filteredApplications = useMemo(() => {
-    return applications.filter((app) => {
-      // 1. Status Filter
-      if (activeFilter !== 'all') {
-        const appStatus = (app.status || '').toLowerCase();
-        const targetFilter = activeFilter.toLowerCase();
-        if (targetFilter === 'accepted') {
-          if (appStatus !== 'accepted' && appStatus !== 'approved') return false;
-        } else if (appStatus !== targetFilter) {
-          return false;
-        }
-      }
-      // 2. Search Query Filter
-      if (searchQuery.trim().length > 0) {
-        const query = searchQuery.toLowerCase().trim();
-        const titleMatch = (app.gigTitle || '').toLowerCase().includes(query);
-        const businessMatch = (app.businessName || '').toLowerCase().includes(query);
-        const youthMatch = (app.youthName || '').toLowerCase().includes(query);
-        const locationMatch = (app.gigLocation || '').toLowerCase().includes(query);
-        const skillsMatch = (app.youthSkills || []).some((s) => s.toLowerCase().includes(query));
-        return titleMatch || businessMatch || youthMatch || locationMatch || skillsMatch;
-      }
-      return true;
+    const query = searchQuery.toLowerCase().trim();
+    return applications.filter(app => {
+      if (activeFilter !== 'all' && normalizedStatus(app) !== activeFilter) return false;
+      if (!query) return true;
+      return [app.gigTitle, app.businessName, app.youthName, app.gigLocation, ...(app.youthSkills || [])]
+        .some(value => (value || '').toLowerCase().includes(query));
     });
   }, [applications, activeFilter, searchQuery]);
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Top Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => router.back()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          activeOpacity={0.7}
-          accessibilityLabel={tr("Back")}
-        >
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </TouchableOpacity>
+  const confirmDecision = async () => {
+    if (!user || !decision || deciding) return;
+    const { app, action } = decision;
+    setDeciding(true);
+    setDecisionError('');
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      if (action === 'accept') {
+        await acceptApplication(app.id, user.uid);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        toast.success(t('Application Accepted! 🎉'), t('You have accepted {{value0}} for "{{value1}}". Work is now in progress and a notification has been sent to the youth freelancer\'s dashboard.', {
+          value0: app.youthName || t('this applicant'),
+          value1: app.gigTitle || t('this gig'),
+        }));
+      } else {
+        await rejectApplication(app.id, user.uid);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        toast.success(t('Application Rejected'), t('The application has been rejected.'));
+      }
+      setDecision(null);
+    } catch (err: any) {
+      setDecisionError(err?.message || (action === 'accept' ? 'Failed to accept application.' : 'Failed to reject application.'));
+    } finally {
+      setDeciding(false);
+    }
+  };
 
-        <View style={styles.headerTitleWrap}>
-          <Text style={styles.headerTitle}>
-            {isBusiness ? tr("Gig Applications") : tr("My Applications")}
-          </Text>
-        </View>
+  const activeLabel = t(FILTERS.find(filter => filter.id === activeFilter)?.label ?? 'All');
 
-        <View style={{ width: 38 }} />
-      </View>
-
-      {/* Search Input */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={18} color={colors.textMuted} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={
-              isBusiness
-                ? tr("Search by applicant, gig, or skill...")
-                : tr("Search by gig title or business...")
-            }
-            placeholderTextColor={colors.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="none"
-            clearButtonMode="while-editing"
+  const renderBody = () => {
+    if (loading) return <View style={styles.padded}><SkeletonList variant="row" count={4} /></View>;
+    if (errorMsg) {
+      return <View style={styles.padded}>
+        <ErrorState title="Unable to load applications" message={t(errorMsg)} retryLabel="Retry" onRetry={handleRetry} />
+      </View>;
+    }
+    if (filteredApplications.length === 0) {
+      return <View style={styles.padded}>
+        {searchQuery.trim() ? (
+          <EmptyState icon="search-outline" title={t('No matching applications')}
+            description={t('Try a different search or filter.')} actionLabel={t('Clear search')} actionIcon="close-circle-outline"
+            onAction={() => setSearchQuery('')} secondary />
+        ) : activeFilter !== 'all' ? (
+          <EmptyState icon="filter-outline" title={t('No {{value0}} applications', { value0: activeLabel })}
+            description={t('You do not have any applications marked as "{{value0}}".', { value0: activeLabel })}
+            actionLabel={t('Show all')} onAction={() => setActiveFilter('all')} secondary />
+        ) : (
+          <EmptyState
+            icon={isBusiness ? 'people-outline' : 'document-text-outline'}
+            title={isBusiness ? t('No applicants yet') : t('No applications yet')}
+            description={isBusiness
+              ? t('When youth freelancers apply to your gigs, their applications and details will appear here.')
+              : t('When you apply to gigs, your applications and their statuses will appear here.')}
+            actionLabel={isBusiness ? t('Manage Your Gigs') : t('Browse Available Gigs')}
+            actionIcon={isBusiness ? 'briefcase-outline' : 'compass-outline'}
+            onAction={() => router.push((isBusiness ? '/(app)/(tabs)/my-gigs' : '/(app)/(tabs)/browse') as any)}
           />
-          {searchQuery.length > 0 && Platform.OS !== 'ios' && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Status Filter Tabs */}
-      <View style={styles.filterTabsWrap}>
-        <FilterTab
-          label={tr("All")}
-          count={counts.all}
-          active={activeFilter === 'all'}
-          onPress={() => setActiveFilter('all')}
+        )}
+      </View>;
+    }
+    return <FlatList
+      data={filteredApplications}
+      keyExtractor={item => item.id}
+      renderItem={({ item }) => isBusiness ? (
+        <ApplicantCard
+          application={item}
+          onPress={() => setSelectedApplicant(item)}
+          onAccept={() => { setDecisionError(''); setDecision({ app: item, action: 'accept' }); }}
+          onReject={() => { setDecisionError(''); setDecision({ app: item, action: 'reject' }); }}
+          onRate={() => setRatingApplicant(item)}
+          busy={deciding && decision?.app.id === item.id}
         />
-        <FilterTab
-          label={tr("Pending")}
-          count={counts.pending}
-          active={activeFilter === 'pending'}
-          onPress={() => setActiveFilter('pending')}
-        />
-        <FilterTab
-          label={tr("Accepted")}
-          count={counts.accepted}
-          active={activeFilter === 'accepted'}
-          onPress={() => setActiveFilter('accepted')}
-        />
-        <FilterTab
-          label={tr("Rejected")}
-          count={counts.rejected}
-          active={activeFilter === 'rejected'}
-          onPress={() => setActiveFilter('rejected')}
-        />
-        <FilterTab
-          label={tr("Completed")}
-          count={counts.completed}
-          active={activeFilter === 'completed'}
-          onPress={() => setActiveFilter('completed')}
-        />
-      </View>
-
-      {/* Content Body */}
-      {loading ? (
-        <View style={styles.centerBox}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>
-            {isBusiness ? tr("Syncing received applications...") : tr("Syncing your applications...")}
-          </Text>
-        </View>
-      ) : errorMsg ? (
-        <View style={styles.centerBox}>
-          <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
-          <Text style={styles.errorTitle}>{tr("Unable to load applications")}</Text>
-          <Text style={styles.errorSubtitle}>{tr(errorMsg)}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
-            <Text style={styles.retryBtnText}>{tr("Retry")}</Text>
-          </TouchableOpacity>
-        </View>
-      ) : filteredApplications.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <View style={styles.emptyIconBg}>
-            <Ionicons
-              name={isBusiness ? 'people-outline' : 'document-text-outline'}
-              size={36}
-              color={colors.primary}
-            />
-          </View>
-          <Text style={styles.emptyTitle}>
-            {searchQuery
-              ? tr("No matching applications")
-              : activeFilter === 'all'
-              ? isBusiness
-                ? tr("No applicants yet")
-                : tr("No applications yet")
-              : tr("No {{value0}} applications", { value0: activeFilter })}
-          </Text>
-          <Text style={styles.emptySubtitle}>
-            {activeFilter === 'all'
-              ? isBusiness
-                ? tr("When youth freelancers apply to your gigs, their applications and details will appear here.")
-                : tr("When you apply to gigs, your applications and their statuses will appear here.")
-              : tr("You do not have any applications marked as \"{{value0}}\".", { value0: activeFilter })}
-          </Text>
-          {activeFilter === 'all' && !searchQuery ? (
-            <TouchableOpacity
-              style={styles.exploreBtn}
-              onPress={() =>
-                router.push(
-                  isBusiness
-                    ? ('/(app)/(tabs)/my-gigs' as any)
-                    : ('/(app)/(tabs)/browse' as any)
-                )
-              }
-              activeOpacity={0.85}
-            >
-              <Ionicons
-                name={isBusiness ? 'briefcase-outline' : 'compass-outline'}
-                size={18}
-                color={colors.primaryOnColor}
-              />
-              <Text style={styles.exploreBtnText}>
-                {isBusiness ? tr("Manage Your Gigs") : tr("Browse Available Gigs")}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
       ) : (
-        <FlatList
-          data={filteredApplications}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) =>
-            isBusiness ? (
-              <ApplicantCard
-                application={item}
-                onPress={() => setSelectedApplicant(item)}
-              />
-            ) : (
-              <ApplicationCard
-                application={item}
-                onPress={() => setSelectedApplication(item)}
-              />
-            )
-          }
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={colors.primary}
-            />
-          }
-        />
+        <ApplicationCard application={item} onPress={() => setSelectedApplication(item)} />
       )}
+      contentContainerStyle={styles.listContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+    />;
+  };
 
-      {/* Application Detail View Modal (Youth Freelancer View) */}
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={t('Back')}
+          style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
+          <Ionicons name="chevron-back" size={22} color={colors.text} />
+        </Pressable>
+        <View style={styles.headerCopy}>
+          <Text accessibilityRole="header" style={styles.headerTitle}>
+            {isBusiness ? t('Gig Applications') : t('My Applications')}
+          </Text>
+          {!loading && !errorMsg && <Text style={styles.headerSubtitle}>{t('{{count}} total', { count: applications.length })}</Text>}
+        </View>
+      </View>
+
+      <View style={styles.searchRow}>
+        <SearchBar value={searchQuery} onChangeText={setSearchQuery}
+          placeholder={isBusiness ? t('Search by applicant, gig, or skill...') : t('Search by gig title or business...')} />
+      </View>
+
+      <View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+          {FILTERS.map(filter => <Chip key={filter.id} label={t(filter.label)} count={counts[filter.id] || 0}
+            variant={activeFilter === filter.id ? 'selected' : 'default'}
+            onPress={() => { Haptics.selectionAsync().catch(() => {}); setActiveFilter(filter.id); }} />)}
+        </ScrollView>
+      </View>
+
+      <View style={styles.flex}>{renderBody()}</View>
+
       {!isBusiness && (
         <ApplicationDetailModal
           visible={!!selectedApplication}
@@ -313,242 +248,62 @@ export default function MyApplicationsScreen() {
         />
       )}
 
-      {/* Applicant Detail View Modal with Accept/Reject Actions (Business Owner View) */}
       {isBusiness && (
         <ApplicantDetailModal
           visible={!!selectedApplicant}
           application={selectedApplicant}
           businessId={user?.uid || ''}
           onClose={() => setSelectedApplicant(null)}
-          onStatusChanged={(newStatus) => {
-            if (selectedApplicant) {
-              setSelectedApplicant({
-                ...selectedApplicant,
-                status: newStatus,
-              });
-            }
+          onAccepted={() => setSelectedApplicant(null)}
+          onStatusChanged={newStatus => {
+            if (selectedApplicant) setSelectedApplicant({ ...selectedApplicant, status: newStatus });
           }}
+        />
+      )}
+
+      <ConfirmSheet
+        visible={!!decision}
+        destructive={decision?.action === 'reject'}
+        icon={decision?.action === 'reject' ? 'close-circle-outline' : 'checkmark-circle-outline'}
+        title={decision?.action === 'reject' ? 'Reject Application' : 'Accept Application'}
+        message={decision ? (decision.action === 'reject'
+          ? t('Are you sure you want to reject this application from {{value0}}?', { value0: decision.app.youthName || t('this applicant') })
+          : t('Are you sure you want to accept {{value0}} for "{{value1}}"?', { value0: decision.app.youthName || t('this applicant'), value1: decision.app.gigTitle || t('this gig') }))
+          : undefined}
+        confirmLabel={decision?.action === 'reject' ? 'Reject' : 'Accept Applicant'}
+        loading={deciding}
+        error={decisionError}
+        onConfirm={confirmDecision}
+        onCancel={() => setDecision(null)}
+      />
+      {isBusiness && ratingApplicant && (
+        <RatingModal
+          visible
+          targetUserId={uidOf(ratingApplicant.youthId)}
+          targetUserName={ratingApplicant.youthName || t('Youth Freelancer')}
+          targetUserPhotoURL={ratingApplicant.youthPhotoURL}
+          targetRole="freelancer"
+          gigId={ratingApplicant.gigId}
+          gigTitle={ratingApplicant.gigTitle}
+          onClose={() => setRatingApplicant(null)}
+          onSuccess={() => setRatingApplicant(null)}
         />
       )}
     </SafeAreaView>
   );
 }
 
-function FilterTab({
-  label,
-  count,
-  active,
-  onPress,
-}: {
-  label: string;
-  count: number;
-  active: boolean;
-  onPress: () => void;
-}) {
-  useTranslation();
-  return (
-    <TouchableOpacity
-      style={[styles.filterTab, active && styles.filterTabActive]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <Text style={[styles.filterTabText, active && styles.filterTabTextActive]}>
-        {label}
-      </Text>
-      <View style={[styles.filterCountBadge, active && styles.filterCountBadgeActive]}>
-        <Text style={[styles.filterCountText, active && styles.filterCountTextActive]}>
-          {count}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceBorder,
-  },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitleWrap: {
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-  },
-  searchContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: Platform.OS === 'ios' ? spacing.sm : 4,
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text,
-  },
-  filterTabsWrap: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    gap: 6,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceBorder,
-    overflow: 'hidden',
-  },
-  filterTab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  filterTabActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  filterTabText: {
-    fontSize: 12,
-    fontFamily: fonts.bodySemiBold,
-    color: colors.textSecondary,
-  },
-  filterTabTextActive: {
-    color: colors.primaryOnColor,
-  },
-  filterCountBadge: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: borderRadius.full,
-  },
-  filterCountBadgeActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  filterCountText: {
-    fontSize: 10,
-    fontFamily: fonts.bodyBold,
-    color: colors.textSecondary,
-  },
-  filterCountTextActive: {
-    color: colors.primaryOnColor,
-  },
-  listContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-  },
-  centerBox: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-    gap: spacing.md,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  errorTitle: {
-    fontSize: 16,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-  },
-  errorSubtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  retryBtn: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  retryBtnText: {
-    fontSize: 14,
-    fontFamily: fonts.bodySemiBold,
-    color: colors.primaryOnColor,
-  },
-  emptyBox: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-    gap: spacing.sm,
-  },
-  emptyIconBg: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 280,
-  },
-  exploreBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    marginTop: spacing.sm,
-  },
-  exploreBtnText: {
-    fontSize: 14,
-    fontFamily: fonts.bodyBold,
-    color: colors.primaryOnColor,
-  },
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
+  pressed: { opacity: 0.8 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, paddingTop: spacing.sm, paddingBottom: spacing.sm },
+  backBtn: { width: 44, height: 44, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1 },
+  headerTitle: { ...typography.h1, color: colors.text },
+  headerSubtitle: { ...typography.caption, color: colors.textSecondary },
+  searchRow: { flexDirection: 'row', paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  chipRow: { gap: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: spacing.sm + spacing.xs },
+  padded: { paddingHorizontal: spacing.md },
+  listContent: { paddingHorizontal: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.xxl },
 });
