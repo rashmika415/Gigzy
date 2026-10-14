@@ -20,6 +20,7 @@ import {
 } from "../../../services/chatService";
 import { addGigToCalendar } from "../../../services/calendarService";
 import { RatingModal } from "../../../components/reviews";
+import { ReportModal } from "../../../components/reports";
 import {
     BUSINESS_QUICK_REPLIES,
     Chat,
@@ -70,6 +71,7 @@ export default function ChatRoomScreen() {
   const [showGigBanner, setShowGigBanner] = useState(true);
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
 
@@ -442,6 +444,18 @@ export default function ChatRoomScreen() {
             </TouchableOpacity>
           )}
 
+          {Boolean(otherParticipant?.uid) && (
+            <TouchableOpacity
+              style={styles.headerReportBtn}
+              onPress={() => setShowReportModal(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={t("Report User")}
+            >
+              <Ionicons name="flag-outline" size={19} color={colors.error} />
+            </TouchableOpacity>
+          )}
+
           {chat?.gigId && (
             <TouchableOpacity
               style={styles.gigToggleBtn}
@@ -664,6 +678,20 @@ export default function ChatRoomScreen() {
           }}
         />
       ) : null}
+
+      {/* Report Modal for Chat Counterpart */}
+      {otherParticipant.uid && showReportModal ? (
+        <ReportModal
+          visible={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          targetType="user"
+          targetId={otherParticipant.uid}
+          targetUserId={otherParticipant.uid}
+          targetUserName={otherParticipant.fullName}
+          targetGigId={chat?.gigId}
+          targetGigTitle={chat?.gigTitle}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -772,6 +800,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   headerRateBtn: {
+    padding: spacing.xs,
+  },
+  headerReportBtn: {
     padding: spacing.xs,
   },
   gigToggleBtn: {

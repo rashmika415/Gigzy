@@ -394,5 +394,39 @@ service cloud.firestore {
       }
     }
 
+    match /reports/{reportId} {
+      function validReportData() {
+        let d = request.resource.data;
+        return d.reporterId == request.auth.uid
+          && d.status == 'pending'
+          && d.targetType in ['user', 'gig', 'no-show']
+          && d.targetId is string && d.targetId.size() > 0
+          && d.reason is string && d.reason.size() >= 3 && d.reason.size() <= 50
+          && d.details is string && d.details.size() >= 5 && d.details.size() <= 1000
+          && (!d.keys().hasAny(['note']) || (d.note is string && d.note.size() <= 1000))
+          && d.createdAt == request.time
+          && !d.keys().hasAny(['resolvedBy', 'resolvedAt', 'resolutionNotes', 'resolutionAction']);
+      }
+
+      allow read: if isAdmin() || (active() && resource.data.reporterId == request.auth.uid);
+      allow create: if active() && validReportData();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /{path=**}/reviews/{reviewId} {
+      allow read: if signedIn();
+      allow delete: if isAdmin() || (active() && (resource.data.get('authorId', '') == request.auth.uid || resource.data.get('reviewerId', '') == request.auth.uid));
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if signedIn();
+      allow create: if active() && (request.resource.data.get('authorId', '') == request.auth.uid || request.resource.data.get('reviewerId', '') == request.auth.uid)
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5;
+      allow update: if active() && (resource.data.get('authorId', '') == request.auth.uid || resource.data.get('reviewerId', '') == request.auth.uid);
+      allow delete: if isAdmin() || (active() && (resource.data.get('authorId', '') == request.auth.uid || resource.data.get('reviewerId', '') == request.auth.uid));
+    }
+
   }
 }

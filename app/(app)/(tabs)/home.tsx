@@ -29,6 +29,7 @@ import { useToast } from '../../../context/ToastContext';
 import ApplyModal from '../../../components/applications/ApplyModal';
 import { ApplicantListModal } from '../../../components/applications';
 import { RatingModal } from '../../../components/reviews';
+import { ReportModal } from '../../../components/reports';
 import { hasUserReviewedGig } from '../../../services/reviewService';
 
 const openGig = (gig: Gig) => router.push({ pathname: '/(app)/gig/[id]', params: { id: gig.id } });
@@ -61,6 +62,14 @@ export default function Home() {
     targetRole?: 'freelancer' | 'client';
     gigId: string;
     gigTitle: string;
+  } | null>(null);
+  const [reportTarget, setReportTarget] = useState<{
+    targetType: 'user' | 'gig' | 'no-show';
+    targetId: string;
+    targetUserId?: string;
+    targetUserName?: string;
+    targetGigId?: string;
+    targetGigTitle?: string;
   } | null>(null);
   const [reviewedGigIds, setReviewedGigIds] = useState<Record<string, boolean>>({});
 
@@ -411,6 +420,51 @@ export default function Home() {
     });
   };
 
+  const handleReportGig = async (gig: Gig) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    let youthId = gig.assignedYouthId;
+    let youthName = gig.assignedYouthName;
+
+    if (!youthId && gig.id) {
+      try {
+        const apps = await getApplicantsForGig(gig.id, user?.uid);
+        const acceptedApp = apps.find((a) =>
+          ['accepted', 'approved', 'in-progress', 'completed'].includes(
+            String(a.status || '').toLowerCase()
+          )
+        );
+        if (acceptedApp) {
+          youthId =
+            typeof acceptedApp.youthId === 'object' && acceptedApp.youthId !== null
+              ? (acceptedApp.youthId as any).uid || (acceptedApp.youthId as any).id || ''
+              : String(acceptedApp.youthId || '');
+          youthName = youthName || acceptedApp.youthName;
+        }
+      } catch {}
+    }
+
+    if (youthId) {
+      setReportTarget({
+        targetType: 'user',
+        targetId: youthId,
+        targetUserId: youthId,
+        targetUserName: youthName || tr("Assigned Freelancer"),
+        targetGigId: gig.id,
+        targetGigTitle: gig.title,
+      });
+    } else {
+      setReportTarget({
+        targetType: 'gig',
+        targetId: gig.id,
+        targetGigId: gig.id,
+        targetGigTitle: gig.title,
+      });
+    }
+  };
+
   const handleRateClient = (app: Application) => {
     if (!app.businessId) return;
     setRatingTarget({
@@ -531,6 +585,16 @@ export default function Home() {
         >
           <Ionicons name="create-outline" size={17} color={colors.primary} />
           <Text style={styles.secondaryActionText}>{tr("Edit")}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.reportIconAction}
+          onPress={() => handleReportGig(gig)}
+          accessibilityRole="button"
+          accessibilityLabel={tr("Report")}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="flag-outline" size={17} color={colors.error} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -894,9 +958,20 @@ export default function Home() {
                           {isCompleted ? tr("Completed 🎉") : tr("You Accepted ✓")}
                         </Text>
                       </View>
-                      <Text style={styles.projectPayText}>
-                        {formatCurrency(gig.pay || 0)}{gig.payType === 'hourly' ? tr('/hr') : tr(' fixed')}
-                      </Text>
+                      <View style={styles.projectTopRight}>
+                        <Text style={styles.projectPayText}>
+                          {formatCurrency(gig.pay || 0)}{gig.payType === 'hourly' ? tr('/hr') : tr(' fixed')}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.projectReportIconBtn}
+                          onPress={() => handleReportGig(gig)}
+                          activeOpacity={0.75}
+                          accessibilityRole="button"
+                          accessibilityLabel={tr("Report")}
+                        >
+                          <Ionicons name="flag-outline" size={16} color={colors.error} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
 
                     {/* Title */}
@@ -1005,6 +1080,17 @@ export default function Home() {
                           <Text style={styles.projectRateNowActionText}>{tr("Rate Freelancer")}</Text>
                         </TouchableOpacity>
                       )}
+
+                      <TouchableOpacity
+                        style={styles.projectReportAction}
+                        onPress={() => handleReportGig(gig)}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                        accessibilityLabel={tr("Report Freelancer")}
+                      >
+                        <Ionicons name="flag-outline" size={16} color={colors.error} />
+                        <Text style={styles.projectReportActionText}>{tr("Report")}</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
                 );
@@ -1153,6 +1239,23 @@ export default function Home() {
               setReviewedGigIds((prev) => ({ ...prev, [ratingTarget.gigId]: true }));
             }
             setRatingTarget(null);
+          }}
+        />
+      )}
+
+      {reportTarget && (
+        <ReportModal
+          visible={Boolean(reportTarget)}
+          targetType={reportTarget.targetType}
+          targetId={reportTarget.targetId}
+          targetUserId={reportTarget.targetUserId}
+          targetUserName={reportTarget.targetUserName}
+          targetGigId={reportTarget.targetGigId}
+          targetGigTitle={reportTarget.targetGigTitle}
+          onClose={() => setReportTarget(null)}
+          onSuccess={() => {
+            setReportTarget(null);
+            toast.success(tr("Report submitted"), tr("Our moderation team will review this report shortly."));
           }}
         />
       )}
@@ -1459,6 +1562,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.errorLight,
     borderRadius: borderRadius.md,
   },
+  reportIconAction: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+    borderRadius: borderRadius.md,
+  },
   acceptedSectionContainer: {
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.lg,
@@ -1679,6 +1792,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
+  },
+  projectTopRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  projectReportIconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   youAcceptedStatusPill: {
     flexDirection: 'row',
@@ -1906,6 +2034,23 @@ const styles = StyleSheet.create({
   },
   projectRatedActionText: {
     color: colors.success,
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+  },
+  projectReportAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    minHeight: 40,
+    paddingHorizontal: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+    borderRadius: borderRadius.md,
+  },
+  projectReportActionText: {
+    color: colors.error,
     fontSize: 13,
     fontFamily: fonts.bodyBold,
   },

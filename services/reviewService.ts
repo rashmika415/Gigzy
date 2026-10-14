@@ -1,13 +1,18 @@
 import {
   collection,
+  collectionGroup,
   doc,
   addDoc,
   getDocs,
+  getDoc,
+  setDoc,
+  deleteDoc,
   updateDoc,
   query,
   where,
   orderBy,
   limit,
+  startAfter,
   onSnapshot,
   runTransaction,
   serverTimestamp,
@@ -77,6 +82,23 @@ async function afterReviewSaved(
     });
   } catch (calcError) {
     console.warn('Warning: Could not recalculate user rating average:', calcError);
+  }
+
+  // Mirror to top-level reviews collection for global admin moderation
+  try {
+    if (typeof setDoc === 'function' && typeof getDoc === 'function') {
+      const snap = await getDoc(doc(db, 'users', targetUserId, 'reviews', reviewId));
+      if (snap && typeof snap.exists === 'function' && snap.exists()) {
+        await setDoc(doc(db, 'reviews', reviewId), {
+          ...snap.data(),
+          id: reviewId,
+          targetUserId,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+    }
+  } catch (mirrorErr) {
+    // Non-critical mirror failure is safely ignored
   }
 
   try {
@@ -351,3 +373,198 @@ export async function hasUserReviewedGig(
     return false;
   }
 }
+
+export interface AdminReviewsResult {
+  reviews: Review[];
+  cursor?: any;
+  hasMore: boolean;
+}
+
+/**
+ * Fetches all platform reviews for administration and moderation.
+ * Queries collectionGroup('reviews') with fallback to collection('reviews')
+ * and in-memory filtering/sorting so it is 100% resilient across Firestore indexing states.
+ */
+export async function fetchAdminReviews(
+  ratingFilter?: number,
+  cursor?: any,
+  limitCount: number = 25
+): Promise<AdminReviewsResult> {
+  const currentUid = auth.currentUser?.uid;
+  if (!currentUid) {
+    throw new Error('You must be signed in as an administrator to view reviews.');
+  }
+
+  const fetchedDocs: { id: string; [key: string]: any }[] = [];
+  let nextCursor: any = undefined;
+  let querySuccessful = false;
+
+  // 1. Try querying collectionGroup('reviews')
+  try {
+    const constraints: any[] = [];
+    if (typeof ratingFilter === 'number' && ratingFilter >= 1 && ratingFilter <= 5) {
+      constraints.push(where('rating', '==', ratingFilter));
+    }
+    constraints.push(orderBy('createdAt', 'desc'));
+    if (cursor) {
+      constraints.push(startAfter(cursor));
+    }
+    constraints.push(limit(limitCount + 1));
+
+    const q = query(collectionGroup(db, 'reviews'), ...constraints);
+    const snap = await getDocs(q);
+
+    snap.docs.forEach((d) => {
+      fetchedDocs.push({ id: d.id, ...d.data() });
+    });
+    if (snap.docs.length > limitCount) {
+      nextCursor = snap.docs[limitCount - 1];
+    }
+    querySuccessful = true;
+  } catch (cgErr: any) {
+    console.warn('CollectionGroup reviews query note:', cgErr?.message);
+  }
+
+  // 2. If collectionGroup returned empty or errored, try top-level collection('reviews')
+  if (!querySuccessful || fetchedDocs.length === 0) {
+    try {
+      const constraints: any[] = [];
+      if (typeof ratingFilter === 'number' && ratingFilter >= 1 && ratingFilter <= 5) {
+        constraints.push(where('rating', '==', ratingFilter));
+      }
+      constraints.push(orderBy('createdAt', 'desc'));
+      if (cursor) {
+        constraints.push(startAfter(cursor));
+      }
+      constraints.push(limit(limitCount + 1));
+
+      const q = query(collection(db, 'reviews'), ...constraints);
+      const snap = await getDocs(q);
+
+      snap.docs.forEach((d) => {
+        if (!fetchedDocs.some((existing) => existing.id === d.id)) {
+          fetchedDocs.push({ id: d.id, ...d.data() });
+        }
+      });
+      if (snap.docs.length > limitCount) {
+        nextCursor = snap.docs[limitCount - 1];
+      }
+      querySuccessful = true;
+    } catch (topErr: any) {
+      console.warn('Top-level reviews query note:', topErr?.message);
+    }
+  }
+
+  // 3. Fallback: If compound ordering failed because of building index, query without orderBy
+  if (!querySuccessful) {
+    try {
+      const snap = await getDocs(query(collectionGroup(db, 'reviews'), limit(50)));
+      snap.docs.forEach((d) => {
+        fetchedDocs.push({ id: d.id, ...d.data() });
+      });
+    } catch {
+      try {
+        const snap = await getDocs(query(collection(db, 'reviews'), limit(50)));
+        snap.docs.forEach((d) => {
+          fetchedDocs.push({ id: d.id, ...d.data() });
+        });
+      } catch (fallbackErr) {
+        console.error('All review fetch attempts failed:', fallbackErr);
+        throw new Error(parseFirebaseError(fallbackErr));
+      }
+    }
+  }
+
+  // Deduplicate by ID
+  const mapById = new Map<string, any>();
+  for (const docItem of fetchedDocs) {
+    mapById.set(docItem.id, docItem);
+  }
+  let allReviews = Array.from(mapById.values());
+
+  // In-memory filter if needed
+  if (typeof ratingFilter === 'number' && ratingFilter >= 1 && ratingFilter <= 5) {
+    allReviews = allReviews.filter((r) => Math.round(Number(r.rating)) === ratingFilter);
+  }
+
+  // Sort by createdAt desc in memory
+  allReviews.sort((a, b) => {
+    const timeA = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+    const timeB = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+    return timeB - timeA;
+  });
+
+  const hasMore = allReviews.length > limitCount;
+  const slicedReviews = hasMore ? allReviews.slice(0, limitCount) : allReviews;
+
+  return {
+    reviews: slicedReviews as Review[],
+    cursor: nextCursor,
+    hasMore,
+  };
+}
+
+/**
+ * Deletes a review across subcollection and top-level collection,
+ * and recalculates the recipient's overall ratingAverage and ratingCount.
+ */
+export async function deleteReviewByAdmin(
+  reviewId: string,
+  targetUserId: string
+): Promise<void> {
+  const currentUid = auth.currentUser?.uid;
+  if (!currentUid) {
+    throw new Error('You must be signed in as an administrator to delete a review.');
+  }
+
+  try {
+    // 1. Delete from target user's reviews subcollection
+    if (targetUserId) {
+      try {
+        if (typeof deleteDoc === 'function') {
+          await deleteDoc(doc(db, 'users', targetUserId, 'reviews', reviewId));
+        }
+      } catch (err) {
+        console.warn('Could not delete from user reviews subcollection:', err);
+      }
+    }
+
+    // 2. Delete from top-level reviews collection
+    try {
+      if (typeof deleteDoc === 'function') {
+        await deleteDoc(doc(db, 'reviews', reviewId));
+      }
+    } catch (err) {
+      console.warn('Could not delete from top-level reviews collection:', err);
+    }
+
+    // 3. Recalculate target user's rating stats
+    if (targetUserId) {
+      try {
+        const snap = await getDocs(collection(db, 'users', targetUserId, 'reviews'));
+        let totalRatingSum = 0;
+        let validReviewsCount = 0;
+
+        snap.forEach((d) => {
+          const item = d.data();
+          if (typeof item.rating === 'number' && item.rating >= 1 && item.rating <= 5) {
+            totalRatingSum += item.rating;
+            validReviewsCount += 1;
+          }
+        });
+
+        await updateDoc(doc(db, 'users', targetUserId), {
+          ratingAverage: validReviewsCount > 0 ? Math.round((totalRatingSum / validReviewsCount) * 10) / 10 : 0,
+          ratingCount: validReviewsCount,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (calcErr) {
+        console.warn('Could not recalculate user rating after review deletion:', calcErr);
+      }
+    }
+  } catch (error: any) {
+    console.error('Error deleting review by admin:', error);
+    throw new Error(parseFirebaseError(error));
+  }
+}
+

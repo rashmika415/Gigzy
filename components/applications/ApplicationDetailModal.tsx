@@ -11,6 +11,7 @@ import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import type { Application } from '../../types/application';
 import { addGigToCalendar } from '../../services/calendarService';
 import { RatingModal } from '../reviews';
+import { ReportModal } from '../reports';
 import { getStatusTheme } from './ApplicationCard';
 
 interface ApplicationDetailModalProps {
@@ -44,6 +45,7 @@ export default function ApplicationDetailModal({
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [calendarAdded, setCalendarAdded] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   if (!application) return null;
 
@@ -217,6 +219,15 @@ export default function ApplicationDetailModal({
                   <Ionicons name="star" size={17} color={colors.star} />
                   <Text style={styles.rateBizBtnText}>{tr("Rate Business Owner")}</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.reportNoShowBtn}
+                  onPress={() => setShowReportModal(true)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="flag-outline" size={17} color={colors.error} />
+                  <Text style={styles.reportNoShowBtnText}>{tr("Report No-Show")}</Text>
+                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -332,6 +343,21 @@ export default function ApplicationDetailModal({
             gigTitle={application.gigTitle}
             onClose={() => setShowRatingModal(false)}
             onSuccess={() => setShowRatingModal(false)}
+          />
+        ) : null}
+
+        {Boolean(application?.businessId) && showReportModal ? (
+          <ReportModal
+            visible={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            targetType="no-show"
+            targetId={`${application.gigId}_${typeof application.businessId === 'object' && application.businessId !== null ? (application.businessId as any).uid || (application.businessId as any).id : application.businessId}`}
+            targetUserId={typeof application.businessId === 'object' && application.businessId !== null ? (application.businessId as any).uid || (application.businessId as any).id : String(application.businessId)}
+            targetUserName={application.businessName || 'Business Owner'}
+            targetGigId={application.gigId}
+            targetGigTitle={application.gigTitle}
+            targetApplicationId={application.id}
+            defaultReason="no-show"
           />
         ) : null}
       </SafeAreaView>
@@ -575,6 +601,22 @@ const styles = StyleSheet.create({
   },
   rateBizBtnText: {
     color: colors.warning,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  reportNoShowBtn: {
+    backgroundColor: colors.errorLight,
+    borderWidth: 1.5,
+    borderColor: colors.errorBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: borderRadius.md,
+    gap: 6,
+  },
+  reportNoShowBtnText: {
+    color: colors.error,
     fontSize: 14,
     fontWeight: '700',
   },

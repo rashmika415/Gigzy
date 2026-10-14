@@ -11,6 +11,7 @@ import type { Application } from '../../types/application';
 import { acceptApplication, rejectApplication } from '../../services/applicationService';
 import { addGigToCalendar } from '../../services/calendarService';
 import { RatingModal } from '../reviews';
+import { ReportModal } from '../reports';
 import { getStatusTheme } from './ApplicationCard';
 import { router } from 'expo-router';
 import { useToast } from '../../context/ToastContext';
@@ -56,6 +57,7 @@ export default function ApplicantDetailModal({
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [calendarAdded, setCalendarAdded] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   if (!application) return null;
 
@@ -464,6 +466,15 @@ export default function ApplicantDetailModal({
                     <Ionicons name="star" size={18} color={colors.star} />
                     <Text style={styles.actionRateBtnText}>{tr("Rate Freelancer")}</Text>
                   </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.actionReportNoShowBtn}
+                    onPress={() => setShowReportModal(true)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="flag-outline" size={17} color={colors.error} />
+                    <Text style={styles.actionReportNoShowBtnText}>{tr("Report No-Show")}</Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </View>
@@ -487,6 +498,21 @@ export default function ApplicantDetailModal({
             onSuccess={() => {
               setShowRatingModal(false);
             }}
+          />
+        ) : null}
+
+        {Boolean(application?.youthId) && showReportModal ? (
+          <ReportModal
+            visible={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            targetType="no-show"
+            targetId={`${application.gigId}_${typeof application.youthId === 'object' && application.youthId !== null ? (application.youthId as any).uid || (application.youthId as any).id : application.youthId}`}
+            targetUserId={typeof application.youthId === 'object' && application.youthId !== null ? (application.youthId as any).uid || (application.youthId as any).id : String(application.youthId)}
+            targetUserName={application.youthName || 'Youth Freelancer'}
+            targetGigId={application.gigId}
+            targetGigTitle={application.gigTitle}
+            targetApplicationId={application.id}
+            defaultReason="no-show"
           />
         ) : null}
       </SafeAreaView>
@@ -826,6 +852,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: colors.warning,
+  },
+  actionReportNoShowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.errorLight,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+  },
+  actionReportNoShowBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.error,
   },
   finalizedNotice: {
     flexDirection: 'row',
