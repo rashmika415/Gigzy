@@ -2,19 +2,27 @@ import { translate as tr } from '../../localization/i18n';
 import { Text, TextInput } from '../LocalizedText';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
-import type { ReactNode } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import type { TextInputProps } from 'react-native';
+import type { ReactNode, Ref } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import type { TextInput as NativeTextInput, TextInputProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import type { ImageProps } from 'expo-image';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeInDown, ReduceMotion } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { authColors as palette } from '../../constants/authTheme';
-import { fonts } from '../../constants/theme';
+import { borderRadius, colors, fonts, shadows, spacing, typography } from '../../constants/theme';
+import { LANGUAGES } from '../../localization/language';
 import LanguageSelector from '../LanguageSelector';
+import PressableScale from '../PressableScale';
 
 export const authPhoto = require('../../assets/images/auth/gigzy-cafe-hero.png');
+
+// Minimum comfortable touch target and form control height.
+const TOUCH = 44;
+const CONTROL = 54;
 
 export function AuthBrand() {
   useTranslation();
@@ -27,19 +35,52 @@ export function AuthBrand() {
 export function AuthPhoto({ style, compact = false }: { style?: ImageProps['style']; compact?: boolean }) {
   const { t } = useTranslation();
   return <Image source={authPhoto} style={[styles.photo, compact && styles.compactPhoto, style]}
-    contentFit="cover" contentPosition="center" transition={200}
+    // The faces sit in the upper third of the photo; a centred crop cuts them off in short banners.
+    contentFit="cover" contentPosition={{ top: '25%', left: '50%' }} transition={200}
     accessibilityLabel={t("Young adults collaborating with a local café owner")} />;
 }
 
-export function AuthScreen({ title, subtitle, eyebrow = 'YOUR NEXT CHAPTER', children, compact = false, backTo = 'welcome' }: {
-  title: string; subtitle: string; eyebrow?: string; children: ReactNode; compact?: boolean;
+/** Compact header button showing the current language; opens a sheet with all options. */
+export function AuthLanguageButton() {
+  const { t, i18n } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const current = LANGUAGES.find(language => language.code === i18n.resolvedLanguage) ?? LANGUAGES[0];
+  return <>
+    <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel={`${t("Language")}: ${current.label}`}
+      hitSlop={4} style={({ pressed }) => [styles.languageButton, pressed && styles.pressed]}>
+      <Ionicons name="globe-outline" size={16} color={palette.primary} />
+      <Text style={styles.languageText} numberOfLines={1}>{current.label}</Text>
+    </Pressable>
+    <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)} statusBarTranslucent>
+      <View style={styles.sheetWrap}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} accessibilityRole="button" accessibilityLabel={t("Close")} />
+        <View style={styles.sheet}>
+          <LanguageSelector onSelect={() => setOpen(false)} />
+        </View>
+      </View>
+    </Modal>
+  </>;
+}
+
+/** Gentle staggered entrance; Reanimated skips it when the OS "reduce motion" setting is on. */
+export const authEntrance = (order = 0) => FadeInDown.duration(380).delay(order * 70).reduceMotion(ReduceMotion.System);
+
+export function AuthScreen({ title, subtitle, children, photo = false, backTo = 'welcome', onBack, above }: {
+  title: string; subtitle: string; children: ReactNode;
+  /** Show the hero photo above the form on narrow screens. Keep it off for short task screens. */
+  photo?: boolean;
   backTo?: 'welcome' | 'role-select' | 'login';
+  /** Overrides the header back button, e.g. to step back inside a multi-step form. */
+  onBack?: () => void;
+  /** Rendered above the title, e.g. a step indicator. */
+  above?: ReactNode;
 }) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const wide = width >= 900;
   const goBack = () => {
-    if (router.canGoBack()) router.back();
+    if (onBack) onBack();
+    else if (router.canGoBack()) router.back();
     else router.replace(`/(auth)/${backTo}`);
   };
   return <SafeAreaView style={styles.page}>
@@ -47,11 +88,14 @@ export function AuthScreen({ title, subtitle, eyebrow = 'YOUR NEXT CHAPTER', chi
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={goBack} accessibilityRole="button" accessibilityLabel={t("Go back")} style={styles.back}>
-            <Ionicons name="arrow-back" size={20} color={palette.text} />
-          </TouchableOpacity>
+          <View style={styles.headerSide}>
+            <Pressable onPress={goBack} accessibilityRole="button" accessibilityLabel={t("Go back")}
+              style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+              <Ionicons name="arrow-back" size={20} color={palette.text} />
+            </Pressable>
+          </View>
           <AuthBrand />
-          <View style={styles.headerSpacer} />
+          <View style={[styles.headerSide, styles.headerEnd]}><AuthLanguageButton /></View>
         </View>
         <View style={[styles.layout, wide && styles.wideLayout]}>
           {wide && <View style={styles.story}>
@@ -63,14 +107,13 @@ export function AuthScreen({ title, subtitle, eyebrow = 'YOUR NEXT CHAPTER', chi
             </View>
           </View>}
           <View style={[styles.formColumn, wide && styles.wideFormColumn]}>
-            {!wide && <AuthPhoto compact={compact} />}
-            <LanguageSelector />
-            <View style={styles.intro}>
-              <Text style={styles.eyebrow}>{t(eyebrow)}</Text>
+            {!wide && photo && <Animated.View entering={authEntrance(0)}><AuthPhoto compact /></Animated.View>}
+            <Animated.View entering={authEntrance(1)} style={styles.intro}>
+              {above}
               <Text accessibilityRole="header" style={styles.title}>{t(title)}</Text>
               <Text style={styles.subtitle}>{t(subtitle)}</Text>
-            </View>
-            {children}
+            </Animated.View>
+            <Animated.View entering={authEntrance(2)}>{children}</Animated.View>
           </View>
         </View>
       </ScrollView>
@@ -80,42 +123,59 @@ export function AuthScreen({ title, subtitle, eyebrow = 'YOUR NEXT CHAPTER', chi
 
 type AuthFieldProps = TextInputProps & {
   label: string; icon: keyof typeof Ionicons.glyphMap; password?: boolean; hint?: string; error?: string;
+  ref?: Ref<NativeTextInput>;
+  /** Small link shown at the end of the label row, e.g. "Forgot password?". */
+  action?: { label: string; onPress: () => void; disabled?: boolean };
 };
-export function AuthField({ label, icon, password = false, hint, error, ...props }: AuthFieldProps) {
+export function AuthField({ label, icon, password = false, hint, error, ref, action, ...props }: AuthFieldProps) {
   const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   const [visible, setVisible] = useState(false);
   return <View style={styles.field}>
-    <Text style={styles.label}>{t(label)}</Text>
+    <View style={styles.labelRow}>
+      <Text style={styles.label}>{t(label)}</Text>
+      {action && <Pressable onPress={action.onPress} disabled={action.disabled} accessibilityRole="link" hitSlop={12}
+        style={({ pressed }) => pressed && styles.pressed}>
+        <Text style={styles.labelAction}>{t(action.label)}</Text>
+      </Pressable>}
+    </View>
     <View style={[styles.inputWrap, focused && styles.focused, !!error && styles.invalid]}>
-      <Ionicons name={icon} size={19} color={focused ? palette.primary : palette.secondary} />
-      <TextInput {...props} accessibilityLabel={t(label)} style={styles.input}
+      <Ionicons name={icon} size={19} color={error ? palette.error : focused ? palette.primary : palette.secondary} />
+      <TextInput {...props} ref={ref} accessibilityLabel={t(label)} aria-invalid={!!error} style={styles.input}
         placeholderTextColor={palette.placeholder} secureTextEntry={password && !visible}
         onFocus={event => { setFocused(true); props.onFocus?.(event); }}
         onBlur={event => { setFocused(false); props.onBlur?.(event); }} />
-      {password && <TouchableOpacity accessibilityRole="button" accessibilityLabel={visible ? t("Hide {{value0}}", { value0: label.toLowerCase() }) : t("Show {{value0}}", { value0: label.toLowerCase() })}
+      {password && <Pressable accessibilityRole="button" accessibilityLabel={visible ? t("Hide {{value0}}", { value0: label.toLowerCase() }) : t("Show {{value0}}", { value0: label.toLowerCase() })}
         accessibilityState={{ disabled: props.editable === false }} disabled={props.editable === false}
-        style={styles.eye} onPress={() => setVisible(previous => !previous)}>
+        style={({ pressed }) => [styles.eye, pressed && styles.pressed]} onPress={() => setVisible(previous => !previous)}>
         <Ionicons name={visible ? 'eye-off-outline' : 'eye-outline'} size={20} color={palette.secondary} />
-      </TouchableOpacity>}
+      </Pressable>}
     </View>
-    {!!(error || hint) && <Text style={[styles.hint, !!error && styles.errorText]}>{t(error || hint || '')}</Text>}
+    {!!(error || hint) && <Text style={[styles.hint, !!error && styles.errorText]}
+      accessibilityLiveRegion={error ? 'polite' : 'none'}>{t(error || hint || '')}</Text>}
   </View>;
 }
 
-export function AuthButton({ title, onPress, loading = false, disabled = false, secondary = false }: {
+export function AuthButton({ title, onPress, loading = false, disabled = false, secondary = false, arrow = true }: {
   title: string; onPress: () => void; loading?: boolean; disabled?: boolean; secondary?: boolean;
+  /** Trailing arrow for forward-moving actions. Turn off for "back" or neutral actions. */
+  arrow?: boolean;
 }) {
   const { t } = useTranslation();
-  return <TouchableOpacity onPress={onPress} disabled={loading || disabled} activeOpacity={0.85}
-    accessibilityRole="button" accessibilityState={{ disabled: loading || disabled, busy: loading }}
-    aria-disabled={loading || disabled} aria-busy={loading}
-    style={[styles.button, secondary && styles.secondaryButton, (loading || disabled) && styles.disabled]}>
+  const inactive = loading || disabled;
+  const handlePress = () => {
+    if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    onPress();
+  };
+  return <PressableScale onPress={handlePress} disabled={inactive}
+    accessibilityRole="button" accessibilityState={{ disabled: inactive, busy: loading }}
+    aria-disabled={inactive} aria-busy={loading}
+    style={[styles.button, secondary && styles.secondaryButton, inactive && styles.disabled]}>
     {loading ? <ActivityIndicator color={secondary ? palette.primary : palette.surface} /> : <>
       <Text style={[styles.buttonText, secondary && styles.secondaryButtonText]}>{t(title)}</Text>
-      <Ionicons name="arrow-forward" size={18} color={secondary ? palette.primary : palette.surface} />
+      {arrow && <Ionicons name="arrow-forward" size={18} color={secondary ? palette.primary : palette.surface} />}
     </>}
-  </TouchableOpacity>;
+  </PressableScale>;
 }
 
 export function AuthError({ message }: { message: string }) {
@@ -131,47 +191,63 @@ export function AuthCheckbox({ checked, onPress, children, disabled = false }: {
   checked: boolean; onPress: () => void; children: ReactNode; disabled?: boolean;
 }) {
   useTranslation();
-  return <TouchableOpacity style={styles.checkboxRow} onPress={onPress} disabled={disabled} activeOpacity={0.8}
+  return <Pressable style={({ pressed }) => [styles.checkboxRow, pressed && styles.pressed]} onPress={onPress} disabled={disabled}
     accessibilityRole="checkbox" accessibilityState={{ checked, disabled }} aria-checked={checked} aria-disabled={disabled}>
     <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
       {checked && <Ionicons name="checkmark" size={15} color={palette.surface} />}
     </View>
     <Text style={styles.checkboxText}>{children}</Text>
-  </TouchableOpacity>;
+  </Pressable>;
 }
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: palette.background }, flex: { flex: 1 },
-  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 },
-  header: { width: '100%', maxWidth: 1080, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, marginBottom: 8 },
-  back: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
-  headerSpacer: { width: 44 }, brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  brandIcon: { width: 34, height: 34, borderRadius: 11, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center' },
-  brandName: { fontFamily: fonts.heading, fontSize: 26, letterSpacing: -1.3, color: palette.text }, brandDot: { color: palette.primary },
+  scroll: { flexGrow: 1, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  pressed: { opacity: 0.7 },
+
+  header: { width: '100%', maxWidth: 1080, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, marginBottom: spacing.sm },
+  headerSide: { flex: 1, alignItems: 'flex-start' }, headerEnd: { alignItems: 'flex-end' },
+  back: { width: TOUCH, height: TOUCH, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  brandIcon: { width: 34, height: 34, borderRadius: borderRadius.md, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center' },
+  brandName: { fontFamily: fonts.brand, fontSize: 26, letterSpacing: -1, color: palette.text }, brandDot: { color: palette.primary },
+
+  languageButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: TOUCH, maxWidth: 120, paddingHorizontal: spacing.sm + spacing.xs, borderRadius: borderRadius.full, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  languageText: { ...typography.caption, color: palette.text, flexShrink: 1 },
+  sheetWrap: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: colors.overlay },
+  sheet: { width: '100%', maxWidth: 400, alignSelf: 'center', backgroundColor: palette.surface, borderRadius: borderRadius.lg, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, ...shadows.card },
+
   layout: { width: '100%', maxWidth: 480, alignSelf: 'center', flex: 1 },
-  wideLayout: { maxWidth: 1080, flexDirection: 'row', gap: 72, alignItems: 'center', paddingVertical: 32 },
+  wideLayout: { maxWidth: 1080, flexDirection: 'row', gap: 72, alignItems: 'center', paddingVertical: spacing.xl },
   formColumn: { width: '100%' }, wideFormColumn: { flex: 1, maxWidth: 440 },
-  photo: { height: 160, width: '100%', borderRadius: 20, backgroundColor: palette.mint }, compactPhoto: { height: 108 },
-  story: { flex: 1 }, storyPhoto: { height: 340, borderRadius: 28 }, storyCopy: { paddingTop: 28, paddingHorizontal: 8 },
-  storyLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 }, storyEyebrow: { fontFamily: fonts.bodyMedium, fontSize: 11, letterSpacing: 1.5, color: palette.primary },
-  storyTitle: { fontFamily: fonts.heading, fontSize: 38, lineHeight: 44, letterSpacing: -1.5, color: palette.text, marginTop: 12 },
-  storyBody: { fontFamily: fonts.body, fontSize: 16, lineHeight: 25, color: palette.secondary, maxWidth: 350, marginTop: 12 },
-  intro: { paddingTop: 26, paddingBottom: 26, gap: 9 }, eyebrow: { fontFamily: fonts.bodyMedium, fontSize: 11, letterSpacing: 1.7, color: palette.primary },
-  title: { fontFamily: fonts.heading, fontSize: 31, lineHeight: 39, letterSpacing: -1.2, color: palette.text },
-  subtitle: { fontFamily: fonts.body, fontSize: 15, lineHeight: 23, color: palette.secondary },
-  field: { gap: 8 }, label: { fontFamily: fonts.bodyMedium, color: palette.text, fontSize: 14 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', minHeight: 54, borderRadius: 13, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface, paddingLeft: 16, paddingRight: 8, gap: 11 },
+  photo: { height: 160, width: '100%', borderRadius: borderRadius.lg, backgroundColor: palette.mint }, compactPhoto: { height: 140 },
+  story: { flex: 1 }, storyPhoto: { height: 340, borderRadius: borderRadius.xl }, storyCopy: { paddingTop: spacing.lg, paddingHorizontal: spacing.sm },
+  storyLabel: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 }, storyEyebrow: { ...typography.overline, color: palette.primary },
+  storyTitle: { fontFamily: fonts.heading, fontSize: 36, lineHeight: 42, letterSpacing: -0.6, color: palette.text, marginTop: spacing.sm + spacing.xs },
+  storyBody: { ...typography.body, fontSize: 16, lineHeight: 25, color: palette.secondary, maxWidth: 350, marginTop: spacing.sm + spacing.xs },
+
+  intro: { paddingTop: spacing.lg, paddingBottom: spacing.lg, gap: spacing.sm },
+  title: { ...typography.display, color: palette.text },
+  subtitle: { ...typography.body, color: palette.secondary },
+
+  field: { gap: spacing.sm }, label: { ...typography.label, color: palette.text, flexShrink: 1 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  labelAction: { ...typography.label, color: palette.primary },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', minHeight: CONTROL, borderRadius: borderRadius.md, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface, paddingLeft: spacing.md, paddingRight: spacing.sm, gap: spacing.sm + spacing.xs },
   focused: { borderColor: palette.primary }, invalid: { borderColor: palette.error },
-  input: { flex: 1, minWidth: 0, height: 52, fontFamily: fonts.body, fontSize: 16, color: palette.text, ...Platform.select({ web: { outlineWidth: 0 } }) },
-  eye: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  hint: { fontFamily: fonts.body, fontSize: 12, lineHeight: 18, color: palette.secondary }, errorText: { color: palette.error },
-  button: { minHeight: 54, borderRadius: 14, backgroundColor: palette.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 15 },
-  buttonText: { flexShrink: 1, textAlign: 'center', fontFamily: fonts.bodyMedium, fontSize: 16, color: palette.surface },
+  input: { flex: 1, minWidth: 0, height: CONTROL - 2, fontFamily: fonts.body, fontSize: 16, color: palette.text, ...Platform.select({ web: { outlineWidth: 0 } }) },
+  eye: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
+  hint: { ...typography.caption, fontFamily: fonts.body, lineHeight: 18, color: palette.secondary }, errorText: { color: palette.error },
+
+  button: { minHeight: CONTROL, borderRadius: borderRadius.md, backgroundColor: palette.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm + spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  buttonText: { ...typography.title, flexShrink: 1, textAlign: 'center', color: palette.surface },
   secondaryButton: { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border }, secondaryButtonText: { color: palette.primary }, disabled: { opacity: 0.65 },
-  error: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 12, backgroundColor: palette.errorBackground },
-  errorMessage: { flex: 1, fontFamily: fonts.body, fontSize: 14, lineHeight: 21, color: palette.error },
-  checkboxRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, minHeight: 44, paddingVertical: 6 },
-  checkbox: { width: 21, height: 21, borderWidth: 1, borderColor: palette.placeholder, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+
+  error: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2, padding: spacing.md, borderRadius: borderRadius.md, backgroundColor: palette.errorBackground },
+  errorMessage: { ...typography.body, fontSize: 14, lineHeight: 21, flex: 1, color: palette.error },
+
+  checkboxRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + spacing.xs, minHeight: TOUCH, paddingVertical: spacing.xs + 2 },
+  checkbox: { width: 22, height: 22, borderWidth: 1, borderColor: palette.placeholder, borderRadius: borderRadius.sm - 2, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   checkboxChecked: { backgroundColor: palette.primary, borderColor: palette.primary },
-  checkboxText: { flex: 1, fontFamily: fonts.body, fontSize: 13, lineHeight: 21, color: palette.secondary },
+  checkboxText: { ...typography.bodySmall, lineHeight: 21, flex: 1, color: palette.secondary },
 });

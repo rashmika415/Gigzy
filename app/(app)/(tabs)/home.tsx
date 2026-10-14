@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
 import AppBanner, { AppPhoto } from '../../../components/AppBanner';
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, TouchableOpacity, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Text } from '../../../components/LocalizedText';
@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../../context/AuthContext';
 import { useSavedGigs } from '../../../context/SavedGigsContext';
 import { colors, spacing, borderRadius, fonts, typography } from '../../../constants/theme';
-import { formatCurrency, formatNumber, formatCalendarDate } from '../../../localization/format';
+import { formatNumber } from '../../../localization/format';
 import { subscribeToClientGigs, subscribeToRecentGigs, deleteGig, updateGigStatus } from '../../../services/gigService';
 import { subscribeToUserChats, getOrCreateChat } from '../../../services/chatService';
 import { subscribeToMyApplications } from '../../../services/applicationService';
@@ -30,6 +30,9 @@ import ApplyModal from '../../../components/applications/ApplyModal';
 import { ApplicantListModal } from '../../../components/applications';
 import { RatingModal } from '../../../components/reviews';
 import { hasUserReviewedGig } from '../../../services/reviewService';
+import ConfirmSheet from '../../../components/ConfirmSheet';
+import BusinessGigActions from '../../../components/business/BusinessGigActions';
+import HiredGigCard from '../../../components/business/HiredGigCard';
 
 const openGig = (gig: Gig) => router.push({ pathname: '/(app)/gig/[id]', params: { id: gig.id } });
 
@@ -213,30 +216,37 @@ export default function Home() {
     };
   }, [user, role, loadAttempt]);
 
-  const handleDeleteGig = (gigId: string, gigTitle: string) => {
-    Alert.alert(
-      tr("Delete Gig"),
-      tr("Are you sure you want to remove \"{{value0}}\"? This cannot be undone.", { value0: gigTitle }),
-      [
-        { text: tr("Cancel"), style: 'cancel' },
-        {
-          text: tr("Delete"),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteGig(gigId);
-              toast.success(tr("Gig deleted"));
-              try {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              } catch {}
-            } catch (err: any) {
-              toast.error(tr("Failed to delete gig."), err.message);
-            }
-          },
-        },
-      ]
-    );
+  // Owner confirmations (delete listing / mark hired gig as done) share one themed dialog.
+  const [confirmAction, setConfirmAction] = useState<{ kind: 'delete' | 'complete'; gig: Gig } | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
+
+  const runConfirmedAction = async () => {
+    if (!confirmAction || confirmBusy) return;
+    const { kind, gig } = confirmAction;
+    setConfirmBusy(true);
+    setConfirmError('');
+    try {
+      if (kind === 'delete') {
+        await deleteGig(gig.id, user?.uid);
+        toast.success(tr("Gig deleted"));
+      } else {
+        await updateGigStatus(gig.id, 'completed');
+        toast.success(tr("Gig Marked as Completed! 🎉"), tr("Thank you! Please leave a review for the freelancer."));
+        if (gig.assignedYouthId) handleRateFreelancer(gig);
+      }
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      setConfirmAction(null);
+    } catch (err: any) {
+      setConfirmError(err?.message || (kind === 'delete' ? 'Failed to delete gig.' : 'Failed to update gig status.'));
+    } finally {
+      setConfirmBusy(false);
+    }
   };
+
+  const handleDeleteGig = (gig: Gig) => { setConfirmError(''); setConfirmAction({ kind: 'delete', gig }); };
 
   const handleContactBusiness = async (gig: Gig) => {
     if (!user) {
@@ -298,24 +308,16 @@ export default function Home() {
         counterpartName: gig.assignedYouthName || 'Youth Freelancer',
         counterpartRole: 'freelancer',
       });
-      setCalendarAddingGigId(null);
-      if (result.success) {
-        setCalendarAddedGigIds((prev) => ({ ...prev, [gig.id]: true }));
-        try {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch {}
-        Alert.alert(
-          tr("Gig Added to Calendar! 📅"),
-          result.method === 'native'
-            ? tr("Added \"{{value0}}\" to your device calendar.", { value0: gig.title })
-            : tr("Opened calendar for \"{{value0}}\".", { value0: gig.title })
-        );
-      } else {
-        Alert.alert(tr("Calendar"), result.error || tr("Could not add gig to calendar."));
-      }
+      if (!result.success) throw new Error(result.error || 'Could not add gig to calendar.');
+      setCalendarAddedGigIds((prev) => ({ ...prev, [gig.id]: true }));
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      toast.success(tr("Added to calendar"));
     } catch (err: any) {
+      toast.error(tr("Could not add gig to calendar."), err?.message ? tr(err.message) : undefined);
+    } finally {
       setCalendarAddingGigId(null);
-      Alert.alert(tr("Calendar"), err.message || tr("Could not add gig to calendar."));
     }
   };
 
@@ -383,40 +385,7 @@ export default function Home() {
     });
   };
 
-  const handleCompleteGig = (gig: Gig) => {
-    Alert.alert(
-      tr("Mark as Completed"),
-      tr("Are you sure you want to mark \"{{value0}}\" as completed? You can then rate and review the freelancer.", { value0: gig.title }),
-      [
-        { text: tr("Cancel"), style: 'cancel' },
-        {
-          text: tr("Complete Gig"),
-          style: 'default',
-          onPress: async () => {
-            try {
-              await updateGigStatus(gig.id, 'completed');
-              try {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              } catch {}
-              toast.success(tr("Gig Marked as Completed! 🎉"), tr("Thank you! Please leave a review for the freelancer."));
-              if (gig.assignedYouthId) {
-                setRatingTarget({
-                  userId: gig.assignedYouthId,
-                  userName: gig.assignedYouthName || 'Youth Freelancer',
-                  userPhotoURL: gig.assignedYouthPhotoURL,
-                  targetRole: 'freelancer',
-                  gigId: gig.id,
-                  gigTitle: gig.title,
-                });
-              }
-            } catch (err: any) {
-              toast.error(tr("Failed to update gig status."), err.message);
-            }
-          },
-        },
-      ]
-    );
-  };
+  const handleCompleteGig = (gig: Gig) => { setConfirmError(''); setConfirmAction({ kind: 'complete', gig }); };
 
   const getRoleLabel = () => {
     if (role === 'admin') return 'Platform Admin';
@@ -449,61 +418,8 @@ export default function Home() {
 
   const renderGigActions = (gig: Gig) =>
     isClient ? (
-      <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={[
-            styles.primaryAction,
-            {
-              backgroundColor: (gig.applicantsCount || 0) > 0 ? colors.primary : colors.surface,
-              borderWidth: 1,
-              borderColor: (gig.applicantsCount || 0) > 0 ? colors.primary : colors.surfaceBorder,
-              paddingHorizontal: spacing.md,
-            },
-          ]}
-          onPress={() => setSelectedGigForApplicants(gig)}
-          accessibilityRole="button"
-          accessibilityLabel={tr("Applicants")}
-          activeOpacity={0.8}
-        >
-          <Ionicons
-            name="people"
-            size={16}
-            color={(gig.applicantsCount || 0) > 0 ? colors.primaryOnColor : colors.primary}
-          />
-          <Text
-            style={[
-              styles.primaryActionText,
-              {
-                color: (gig.applicantsCount || 0) > 0 ? colors.primaryOnColor : colors.primary,
-                fontFamily: fonts.bodySemiBold,
-              },
-            ]}
-          >
-            {tr("Applicants")} ({gig.applicantsCount || 0})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.secondaryAction}
-          onPress={tap(() => editGig(gig))}
-          accessibilityRole="button"
-          accessibilityLabel={tr("Edit gig")}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="create-outline" size={17} color={colors.primary} />
-          <Text style={styles.secondaryActionText}>{tr("Edit")}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.iconAction}
-          onPress={() => handleDeleteGig(gig.id, gig.title)}
-          accessibilityRole="button"
-          accessibilityLabel={tr("Delete gig")}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="trash-outline" size={18} color={colors.error} />
-        </TouchableOpacity>
-      </View>
+      <BusinessGigActions gig={gig} onApplicants={setSelectedGigForApplicants}
+        onEdit={target => tap(() => editGig(target))()} onDelete={handleDeleteGig} />
     ) : (
       <View style={styles.actionsRow}>
         <TouchableOpacity
@@ -624,24 +540,19 @@ export default function Home() {
         {!isClient && <AppBanner kind="youth" title={tr("Your next opportunity starts here.")} description={tr("Find local gigs that fit your skills and your schedule.")} action="Explore gigs" onPress={goBrowse} />}
         {isClient && (
           <View style={styles.ctaCard}>
-            <View style={{ marginBottom: spacing.md }}><AppPhoto kind="business" /></View>
-            <View style={styles.ctaBadge}>
-              <Ionicons name="flash" size={14} color={colors.primaryOnColor} />
-              <Text style={styles.ctaBadgeText}>{tr("FOR BUSINESS OWNERS")}</Text>
+            <AppPhoto kind="business" />
+            <View style={styles.ctaCopy}>
+              <Text style={styles.ctaTitle}>{tr("Need help with a task?")}</Text>
+              <Text style={styles.ctaSubtitle}>{tr("Post a gig in minutes and connect with skilled local people.")}</Text>
             </View>
-            <Text style={styles.ctaTitle}>{tr("Need Help with a Task?")}</Text>
-            <Text style={styles.ctaSubtitle}>{tr("Post a new gig in minutes and connect with local skilled youth and talented freelancers.")}</Text>
-
             <View style={styles.ctaButtonsRow}>
-              <TouchableOpacity style={styles.postGigButton} onPress={tap(goPostGig)} accessibilityRole="button" activeOpacity={0.85}>
-                <Ionicons name="add-circle-outline" size={20} color={colors.primaryOnColor} />
-                <Text style={styles.postGigButtonText}>{tr("Post New Gig")}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.manageGigsButton} onPress={tap(goMyGigs)} accessibilityRole="button" activeOpacity={0.85}>
-                <Ionicons name="list-outline" size={18} color={colors.primary} />
-                <Text style={styles.manageGigsButtonText}>{tr("My Posted Gigs ({{count}})", { count: gigs.length })}</Text>
-              </TouchableOpacity>
+              <Pressable style={({ pressed }) => [styles.postGigButton, pressed && styles.pressed]} onPress={tap(goPostGig)} accessibilityRole="button">
+                <Ionicons name="add" size={20} color={colors.primaryOnColor} />
+                <Text style={styles.postGigButtonText}>{tr("Post a gig")}</Text>
+              </Pressable>
+              <Pressable style={({ pressed }) => [styles.manageGigsButton, pressed && styles.pressed]} onPress={tap(goMyGigs)} accessibilityRole="button">
+                <Text style={styles.manageGigsButtonText}>{tr("My Gigs ({{count}})", { count: gigs.length })}</Text>
+              </Pressable>
             </View>
           </View>
         )}
@@ -808,177 +719,29 @@ export default function Home() {
           </View>
         )}
 
-        {/* Part 1: Accepted Gigs (Business Owner) */}
+        {/* Hired gigs (Business Owner) */}
         {isClient && inProgressGigs.length > 0 && (
-          <View style={styles.inProgressSectionContainer}>
-            <View style={styles.inProgressSectionHeader}>
-              <View style={styles.inProgressTitleRow}>
-                <Ionicons name="checkmark-circle" size={22} color={colors.success} />
-                <Text style={styles.inProgressSectionTitle}>
-                  {tr("Accepted Gigs")} ({inProgressGigs.length})
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={goMyGigs}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                activeOpacity={0.75}
-              >
-                <Text style={styles.inProgressViewAllText}>{tr("Manage All")} →</Text>
-              </TouchableOpacity>
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{tr("Hired gigs ({{count}})", { count: inProgressGigs.length })}</Text>
+              <Pressable onPress={goMyGigs} accessibilityRole="button" hitSlop={12}>
+                <Text style={styles.seeAllText}>{tr("Manage")}</Text>
+              </Pressable>
             </View>
-
-            <Text style={styles.inProgressSectionSubtitle}>
-              {tr("Talent is actively working on these projects. Coordinate, track progress, or mark as completed.")}
-            </Text>
-
-            <View style={styles.inProgressList}>
-              {inProgressGigs.map((gig) => {
-                const isAddingCal = calendarAddingGigId === gig.id;
-                const isAddedCal = !!calendarAddedGigIds[gig.id];
-                const isCompleted = gig.status === 'completed';
-                const hasReviewed = !!reviewedGigIds[gig.id];
-
-                return (
-                  <View key={gig.id} style={styles.projectCard}>
-                    {/* Top status bar with "You Accepted ✓" or "Completed 🎉" status */}
-                    <View style={styles.projectTopRow}>
-                      <View style={[
-                        styles.youAcceptedStatusPill,
-                        isCompleted && { backgroundColor: colors.successLight, borderColor: colors.successBorder },
-                      ]}>
-                        <Ionicons
-                          name={isCompleted ? "checkmark-done-circle" : "checkmark-circle"}
-                          size={14}
-                          color={colors.success}
-                        />
-                        <Text style={[styles.youAcceptedStatusText, isCompleted && { color: colors.success }]}>
-                          {isCompleted ? tr("Completed 🎉") : tr("You Accepted ✓")}
-                        </Text>
-                      </View>
-                      <Text style={styles.projectPayText}>
-                        {formatCurrency(gig.pay || 0)}{gig.payType === 'hourly' ? tr('/hr') : tr(' fixed')}
-                      </Text>
-                    </View>
-
-                    {/* Title */}
-                    <TouchableOpacity onPress={() => openGig(gig)} activeOpacity={0.85}>
-                      <Text style={styles.projectTitle} numberOfLines={2}>
-                        {gig.title}
-                      </Text>
-                    </TouchableOpacity>
-
-                    {/* Assigned Youth Freelancer Banner */}
-                    <View style={styles.talentBox}>
-                      <View style={styles.talentAvatarWrap}>
-                        {gig.assignedYouthPhotoURL ? (
-                          <Image source={{ uri: gig.assignedYouthPhotoURL }} style={styles.talentAvatar} contentFit="cover" />
-                        ) : (
-                          <View style={styles.talentAvatarFallback}>
-                            <Text style={styles.talentAvatarInitials}>
-                              {((gig.assignedYouthName || 'F')[0] || 'F').toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      <View style={styles.talentInfo}>
-                        <View style={styles.talentNameRow}>
-                          <Text style={styles.talentName} numberOfLines={1}>
-                            {gig.assignedYouthName || tr("Assigned Freelancer")}
-                          </Text>
-                          <View style={styles.talentBadge}>
-                            <Ionicons name="checkmark-circle" size={12} color={colors.success} />
-                            <Text style={styles.talentBadgeText}>{tr("Hired")}</Text>
-                          </View>
-                        </View>
-                        <Text style={styles.talentSub}>
-                          {tr("Assigned youth talent for this gig")}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Schedule & Location Meta */}
-                    <View style={styles.projectMetaRow}>
-                      {gig.date ? (
-                        <View style={styles.projectMetaItem}>
-                          <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
-                          <Text style={styles.projectMetaText} numberOfLines={1}>
-                            {formatCalendarDate(gig.date)}{gig.time ? ` at ${gig.time}` : ''}
-                          </Text>
-                        </View>
-                      ) : null}
-                      {gig.location ? (
-                        <View style={styles.projectMetaItem}>
-                          <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
-                          <Text style={styles.projectMetaText} numberOfLines={1}>
-                            {gig.location}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-
-                    {/* Real Project Actions */}
-                    <View style={styles.projectActionsGrid}>
-                      <TouchableOpacity
-                        style={styles.projectPrimaryAction}
-                        onPress={() => handleMessageAssignedFreelancer(gig)}
-                        activeOpacity={0.85}
-                      >
-                        <Ionicons name="chatbubbles" size={16} color={colors.primaryOnColor} />
-                        <Text style={styles.projectPrimaryActionText}>{tr("Message Freelancer")}</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.projectSecondaryAction, isAddedCal && styles.projectCalendarAddedAction]}
-                        onPress={() => handleAddToCalendar(gig)}
-                        disabled={isAddingCal || isAddedCal}
-                        activeOpacity={0.85}
-                      >
-                        {isAddingCal ? (
-                          <ActivityIndicator size="small" color={colors.primary} />
-                        ) : (
-                          <>
-                            <Ionicons
-                              name={isAddedCal ? "checkmark-circle" : "calendar-outline"}
-                              size={16}
-                              color={isAddedCal ? colors.success : colors.primary}
-                            />
-                            <Text style={[styles.projectSecondaryActionText, isAddedCal && { color: colors.success }]}>
-                              {isAddedCal ? tr("Scheduled ✓") : tr("Calendar")}
-                            </Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-
-                      {isCompleted ? (
-                        hasReviewed ? (
-                          <View style={styles.projectRatedAction}>
-                            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                            <Text style={styles.projectRatedActionText}>{tr("Reviewed ✓")}</Text>
-                          </View>
-                        ) : (
-                          <TouchableOpacity
-                            style={styles.projectRateNowAction}
-                            onPress={() => handleRateFreelancer(gig)}
-                            activeOpacity={0.85}
-                          >
-                            <Ionicons name="star" size={16} color={colors.star} />
-                            <Text style={styles.projectRateNowActionText}>{tr("Rate Freelancer")}</Text>
-                          </TouchableOpacity>
-                        )
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.projectCompleteAction}
-                          onPress={() => handleCompleteGig(gig)}
-                          activeOpacity={0.85}
-                        >
-                          <Ionicons name="checkmark-done-circle" size={17} color={colors.success} />
-                          <Text style={styles.projectCompleteActionText}>{tr("Complete & Rate")}</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
+            <View style={styles.gigsList}>
+              {inProgressGigs.map((gig) => (
+                <HiredGigCard
+                  key={gig.id}
+                  gig={gig}
+                  calendarState={calendarAddingGigId === gig.id ? 'adding' : calendarAddedGigIds[gig.id] ? 'added' : 'idle'}
+                  reviewed={!!reviewedGigIds[gig.id]}
+                  onOpen={openGig}
+                  onMessage={handleMessageAssignedFreelancer}
+                  onCalendar={handleAddToCalendar}
+                  onComplete={handleCompleteGig}
+                  onRate={handleRateFreelancer}
+                />
+              ))}
             </View>
           </View>
         )}
@@ -1005,23 +768,14 @@ export default function Home() {
           ) : loadError ? (
             <ErrorState message={loadError} onRetry={() => setLoadAttempt((n) => n + 1)} />
           ) : isClient && openGigs.length === 0 && inProgressGigs.length > 0 ? (
-            <View style={styles.allAssignedCard}>
-              <View style={styles.allAssignedIconWrap}>
-                <Ionicons name="sparkles" size={24} color={colors.success} />
-              </View>
-              <Text style={styles.allAssignedTitle}>{tr("All Gigs In Progress! 🎉")}</Text>
-              <Text style={styles.allAssignedSubtitle}>
-                {tr("All your posted gigs have been accepted and are currently in progress. Post a new gig whenever you need more help!")}
-              </Text>
-              <TouchableOpacity
-                style={styles.postAnotherBtn}
-                onPress={tap(goPostGig)}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="add-circle-outline" size={18} color={colors.primaryOnColor} />
-                <Text style={styles.postAnotherBtnText}>{tr("Post New Gig")}</Text>
-              </TouchableOpacity>
-            </View>
+            <EmptyState
+              icon="sparkles-outline"
+              title="Every gig has someone working on it"
+              description={tr("Post a new gig whenever you need more help.")}
+              actionLabel="Post a gig"
+              actionIcon="add"
+              onAction={goPostGig}
+            />
           ) : (isClient ? openGigs : gigs).length === 0 ? (
             isClient ? (
               <EmptyState
@@ -1108,6 +862,20 @@ export default function Home() {
         />
       )}
 
+      <ConfirmSheet
+        visible={!!confirmAction}
+        destructive={confirmAction?.kind === 'delete'}
+        icon={confirmAction?.kind === 'delete' ? 'trash-outline' : 'checkmark-done-outline'}
+        title={confirmAction?.kind === 'delete' ? 'Delete Gig' : 'Mark as Completed'}
+        message={confirmAction?.kind === 'delete'
+          ? tr("Are you sure you want to remove \"{{value0}}\"? This cannot be undone.", { value0: confirmAction.gig.title })
+          : confirmAction ? tr("Are you sure you want to mark \"{{value0}}\" as completed? You can then rate and review the freelancer.", { value0: confirmAction.gig.title }) : undefined}
+        confirmLabel={confirmAction?.kind === 'delete' ? 'Delete' : 'Complete Gig'}
+        loading={confirmBusy}
+        error={confirmError}
+        onConfirm={runConfirmedAction}
+        onCancel={() => setConfirmAction(null)}
+      />
       {ratingTarget && (
         <RatingModal
           visible={Boolean(ratingTarget)}
@@ -1193,7 +961,7 @@ const styles = StyleSheet.create({
   },
   headerBadgeText: {
     fontFamily: fonts.bodyBold,
-    fontSize: 11,
+    fontSize: 12,
     color: colors.primaryOnColor,
   },
   greeting: {
@@ -1228,36 +996,26 @@ const styles = StyleSheet.create({
   // CTA Card
   ctaCard: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
-    padding: spacing.lg,
+    padding: spacing.md,
+    gap: spacing.md,
     marginBottom: spacing.lg,
   },
-  ctaBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-    gap: 4,
-    marginBottom: spacing.sm,
+  ctaCopy: {
+    gap: spacing.xs,
   },
-  ctaBadgeText: {
-    ...typography.overline,
-    color: colors.primaryOnColor,
+  pressed: {
+    opacity: 0.8,
   },
   ctaTitle: {
     ...typography.h2,
     color: colors.text,
-    marginBottom: 4,
   },
   ctaSubtitle: {
-    ...typography.bodySmall,
+    ...typography.body,
     color: colors.textSecondary,
-    marginBottom: spacing.md,
   },
   ctaButtonsRow: {
     flexDirection: 'row',
@@ -1422,14 +1180,6 @@ const styles = StyleSheet.create({
     borderColor: colors.surfaceBorder,
     borderRadius: borderRadius.md,
   },
-  iconAction: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.errorLight,
-    borderRadius: borderRadius.md,
-  },
   acceptedSectionContainer: {
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.lg,
@@ -1589,342 +1339,4 @@ const styles = StyleSheet.create({
   },
 
   // Active in-progress gigs (Business Owner)
-  inProgressSectionContainer: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  inProgressSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  inProgressTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  pulseDotWrap: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: colors.accentLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.accent,
-  },
-  inProgressSectionTitle: {
-    fontSize: 18,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-  },
-  inProgressViewAllText: {
-    fontSize: 13,
-    fontFamily: fonts.bodyBold,
-    color: colors.primary,
-  },
-  inProgressSectionSubtitle: {
-    fontSize: 13,
-    fontFamily: fonts.body,
-    color: colors.textSecondary,
-    marginBottom: spacing.md,
-  },
-  inProgressList: {
-    gap: spacing.md,
-  },
-  projectCard: {
-    backgroundColor: colors.successLight,
-    borderRadius: borderRadius.xl,
-    padding: spacing.md,
-    borderWidth: 1.5,
-    borderColor: colors.successBorder,
-    marginBottom: spacing.sm,
-  },
-  projectTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  youAcceptedStatusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: colors.successLight,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-    borderWidth: 1.5,
-    borderColor: colors.successBorder,
-  },
-  youAcceptedStatusText: {
-    fontSize: 12,
-    fontFamily: fonts.bodyBold,
-    color: colors.success,
-  },
-  projectStatusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.accentLight,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-  },
-  projectStatusText: {
-    fontSize: 12,
-    fontFamily: fonts.bodyBold,
-    color: colors.accent,
-  },
-  projectPayText: {
-    fontSize: 16,
-    fontFamily: fonts.bodyBold,
-    color: colors.accent,
-  },
-  projectTitle: {
-    fontSize: 17,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-    marginBottom: spacing.sm,
-  },
-  talentBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.surface,
-    padding: spacing.sm,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    marginBottom: spacing.sm,
-  },
-  talentAvatarWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  talentAvatar: {
-    width: '100%',
-    height: '100%',
-  },
-  talentAvatarFallback: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  talentAvatarInitials: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 16,
-    color: colors.primary,
-  },
-  talentInfo: {
-    flex: 1,
-  },
-  talentNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  talentName: {
-    fontSize: 14,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-  },
-  talentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: colors.successLight,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: borderRadius.full,
-  },
-  talentBadgeText: {
-    fontSize: 10,
-    fontFamily: fonts.bodyBold,
-    color: colors.success,
-  },
-  talentSub: {
-    fontSize: 12,
-    fontFamily: fonts.body,
-    color: colors.textMuted,
-    marginTop: 1,
-  },
-  projectMetaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  projectMetaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  projectMetaText: {
-    fontSize: 12,
-    fontFamily: fonts.bodyMedium,
-    color: colors.textSecondary,
-  },
-  projectActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  projectPrimaryAction: {
-    flex: 1.2,
-    minWidth: 110,
-    minHeight: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  projectPrimaryActionText: {
-    color: colors.primaryOnColor,
-    fontSize: 13,
-    fontFamily: fonts.bodyBold,
-  },
-  projectSecondaryAction: {
-    flex: 1,
-    minWidth: 95,
-    minHeight: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  projectSecondaryActionText: {
-    color: colors.text,
-    fontSize: 13,
-    fontFamily: fonts.bodySemiBold,
-  },
-  projectCalendarAddedAction: {
-    backgroundColor: colors.successLight,
-    borderColor: colors.successBorder,
-  },
-  projectCompleteAction: {
-    flex: 1.4,
-    minWidth: 130,
-    minHeight: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: colors.successLight,
-    borderWidth: 1.5,
-    borderColor: colors.success,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  projectCompleteActionText: {
-    color: colors.success,
-    fontSize: 13,
-    fontFamily: fonts.bodyBold,
-  },
-  projectRateNowAction: {
-    flex: 1.4,
-    minWidth: 130,
-    minHeight: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: colors.warningLight,
-    borderWidth: 1.5,
-    borderColor: colors.warningBorder,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  projectRateNowActionText: {
-    color: colors.warning,
-    fontSize: 13,
-    fontFamily: fonts.bodyBold,
-  },
-  projectRatedAction: {
-    flex: 1.2,
-    minWidth: 110,
-    minHeight: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    backgroundColor: colors.successLight,
-    borderWidth: 1.5,
-    borderColor: colors.success,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  projectRatedActionText: {
-    color: colors.success,
-    fontSize: 13,
-    fontFamily: fonts.bodyBold,
-  },
-  allAssignedCard: {
-    backgroundColor: colors.successLight,
-    borderWidth: 1.5,
-    borderColor: colors.successBorder,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    alignItems: 'center',
-    textAlign: 'center',
-  },
-  allAssignedIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.successLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  allAssignedTitle: {
-    fontSize: 17,
-    fontFamily: fonts.bodyBold,
-    color: colors.success,
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  allAssignedSubtitle: {
-    fontSize: 13,
-    fontFamily: fonts.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.md,
-    lineHeight: 18,
-  },
-  postAnotherBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.md,
-  },
-  postAnotherBtnText: {
-    color: colors.primaryOnColor,
-    fontSize: 14,
-    fontFamily: fonts.bodyBold,
-  },
 });

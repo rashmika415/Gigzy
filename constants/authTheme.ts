@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, fonts } from './theme';
+import { colors, fonts, spacing, typography } from './theme';
 
 export const authColors = {
   background: colors.background,
@@ -16,10 +16,10 @@ export const authColors = {
 };
 
 export const authStyles = StyleSheet.create({
-  form: { gap: 18 },
-  paragraph: { fontFamily: fonts.body, fontSize: 15, lineHeight: 23, color: authColors.secondary },
-  link: { fontFamily: fonts.bodyMedium, color: authColors.primary, fontSize: 15 },
-  footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 4, marginTop: 24 },
-  footerText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 22, color: authColors.secondary },
+  form: { gap: spacing.md + 2 },
+  paragraph: { ...typography.body, lineHeight: 23, color: authColors.secondary },
+  link: { ...typography.body, fontFamily: fonts.bodySemiBold, color: authColors.primary },
+  footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: spacing.xs, marginTop: spacing.lg },
+  footerText: { ...typography.body, fontSize: 14, color: authColors.secondary },
   footerLink: { minHeight: 44, justifyContent: 'center' },
 });

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 import { createApplication } from '../../services/applicationService';
+import { formatCurrency } from '../../localization/format';
 import type { Gig } from '../../types/gig';
 
 interface ApplyModalProps {
@@ -135,7 +136,7 @@ export default function ApplyModal({
             <View style={styles.gigSummaryPill}>
               <Ionicons name="briefcase-outline" size={14} color={colors.primary} />
               <Text style={styles.gigSummaryText} numberOfLines={1}>
-                {gig.title} • ${gig.pay}{gig.payType === 'hourly' ? tr("/hr") : tr(" fixed")} • {gig.location}
+                {gig.title} • {formatCurrency(gig.pay)}{gig.payType === 'hourly' ? tr("/hr") : tr(" fixed")} • {gig.location}
               </Text>
             </View>
 

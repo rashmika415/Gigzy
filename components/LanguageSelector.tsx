@@ -5,7 +5,7 @@ import { useLanguage } from '../localization/LanguageProvider';
 import { Text } from './LocalizedText';
 import { colors, borderRadius, spacing, fonts } from '../constants/theme';
 
-export default function LanguageSelector() {
+export default function LanguageSelector({ onSelect }: { onSelect?: () => void } = {}) {
   const { t, i18n } = useTranslation();
   const { changeLanguage, error } = useLanguage();
   return <View style={styles.container}>
@@ -13,7 +13,7 @@ export default function LanguageSelector() {
     <View style={styles.options}>{LANGUAGES.map(language => {
       const selected = i18n.resolvedLanguage === language.code;
       return <TouchableOpacity key={language.code} accessibilityRole="radio" accessibilityLabel={language.label}
-        accessibilityState={{ checked: selected }} aria-checked={selected} onPress={() => changeLanguage(language.code)} style={[styles.option, selected && styles.selected]}>
+        accessibilityState={{ checked: selected }} aria-checked={selected} onPress={() => { changeLanguage(language.code); onSelect?.(); }} style={[styles.option, selected && styles.selected]}>
         <Text style={[styles.label, selected && styles.selectedLabel]}>{language.label}</Text>
       </TouchableOpacity>;
     })}</View>

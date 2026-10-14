@@ -1,13 +1,13 @@
 import { Text } from '../../components/LocalizedText';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { AuthBrand, AuthButton, AuthPhoto } from '../../components/auth/AuthUI';
+import Animated from 'react-native-reanimated';
+import { AuthBrand, AuthButton, AuthLanguageButton, AuthPhoto, authEntrance } from '../../components/auth/AuthUI';
 import { authColors as palette } from '../../constants/authTheme';
-import { fonts } from '../../constants/theme';
-import LanguageSelector from '../../components/LanguageSelector';
+import { borderRadius, fonts, shadows, spacing, typography } from '../../constants/theme';
 
 const FEATURES: { label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { label: 'Local gigs', icon: 'location-outline' },
@@ -18,56 +18,52 @@ export default function Welcome() {
   const { t } = useTranslation();
   const { width, height } = useWindowDimensions();
   const wide = width >= 900;
-  const picture = <View style={[styles.picture, wide && styles.widePicture]}>
-    <AuthPhoto style={{ height: wide ? 510 : Math.min(310, Math.max(210, height * 0.31)), borderRadius: 26 }} />
+  const picture = <Animated.View entering={authEntrance(0)} style={[styles.picture, wide && styles.widePicture]}>
+    <AuthPhoto style={{ height: wide ? 510 : Math.min(310, Math.max(210, height * 0.31)), borderRadius: borderRadius.xl }} />
     <View style={styles.photoNote}>
       <View style={styles.noteIcon}><Ionicons name="location-outline" size={18} color={palette.primary} /></View>
       <View><Text style={styles.noteTitle}>{t("Opportunity starts nearby")}</Text><Text style={styles.noteSubtitle}>{t("Your skills. Your community.")}</Text></View>
     </View>
-  </View>;
+  </Animated.View>;
   return <SafeAreaView style={styles.page}>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-      <View style={styles.header}><AuthBrand />
-        <TouchableOpacity accessibilityRole="link" onPress={() => router.push('/(auth)/login')} style={styles.headerLink}><Text style={styles.signIn}>{t("Sign in")}</Text><Ionicons name="arrow-forward" size={16} color={palette.primary} /></TouchableOpacity>
-      </View>
-      <View style={{ width: '100%', maxWidth: 1080, alignSelf: 'center' }}><LanguageSelector /></View>
+      <View style={styles.header}><AuthBrand /><AuthLanguageButton /></View>
       <View style={[styles.hero, wide && styles.wideHero]}>
         {!wide && picture}
-        <View style={[styles.copy, wide && styles.wideCopy]}>
+        <Animated.View entering={authEntrance(1)} style={[styles.copy, wide && styles.wideCopy]}>
           <View style={styles.eyebrowRow}><View style={styles.dot} /><Text style={styles.eyebrow}>{t("LOCAL WORK. REAL OPPORTUNITY.")}</Text></View>
           <Text accessibilityRole="header" style={[styles.title, width < 360 && styles.smallTitle, wide && styles.wideTitle]}>{t("Find your next gig,")}{' '}<Text style={styles.highlight}>{t("close to home.")}</Text>
           </Text>
           <Text style={styles.subtitle}>{t("Connect with local businesses. Put your skills to work. Build something for yourself.")}</Text>
           <View style={styles.features}>{FEATURES.map(feature => <View style={styles.feature} key={feature.label}>
-            <Ionicons name={feature.icon} size={15} color={palette.primary} /><Text style={styles.featureText}>{t(feature.label)}</Text>
+            <Ionicons name={feature.icon} size={16} color={palette.primary} /><Text style={styles.featureText}>{t(feature.label)}</Text>
           </View>)}</View>
-          <View style={styles.actions}><AuthButton title={t("Get started")} onPress={() => router.push('/(auth)/role-select')} />
+          <Animated.View entering={authEntrance(3)} style={styles.actions}>
+            <AuthButton title={t("Get started")} onPress={() => router.push('/(auth)/role-select')} />
+            <AuthButton title={t("I already have an account")} secondary arrow={false} onPress={() => router.push('/(auth)/login')} />
             <Text style={styles.actionNote}>{t("For people finding work and businesses hiring.")}</Text>
-          </View>
-        </View>
+          </Animated.View>
+        </Animated.View>
         {wide && picture}
       </View>
-      <View style={styles.footer}><Text style={styles.footerText}>{t("Good work starts with a connection.")}</Text><Text style={styles.footerBrand}>{t("Made for your community.")}</Text></View>
     </ScrollView>
   </SafeAreaView>;
 }
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: palette.background }, scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 24 },
   header: { width: '100%', maxWidth: 1080, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 20, marginBottom: 10 },
-  headerLink: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 }, signIn: { fontFamily: fonts.bodyMedium, fontSize: 14, color: palette.primary },
   hero: { width: '100%', maxWidth: 480, alignSelf: 'center', flex: 1, justifyContent: 'center', gap: 30 },
   wideHero: { maxWidth: 1080, flexDirection: 'row', alignItems: 'center', gap: 64, paddingVertical: 48 },
   picture: { width: '100%', paddingBottom: 16 }, widePicture: { flex: 1, width: undefined },
-  photoNote: { position: 'absolute', bottom: 0, left: 16, right: 16, alignSelf: 'flex-start', backgroundColor: palette.surface, borderRadius: 16, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 10,
-    shadowColor: '#172B27', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.07, shadowRadius: 14, elevation: 3 },
-  noteIcon: { backgroundColor: palette.mint, borderRadius: 12, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  noteTitle: { fontFamily: fonts.bodyMedium, fontSize: 13, color: palette.text }, noteSubtitle: { fontFamily: fonts.body, fontSize: 11, color: palette.secondary, marginTop: 3 },
-  copy: { width: '100%' }, wideCopy: { flex: 1, width: undefined }, eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: palette.primary }, eyebrow: { fontFamily: fonts.bodyMedium, color: palette.primary, fontSize: 10, letterSpacing: 1.25 },
-  title: { fontFamily: fonts.heading, fontSize: 37, lineHeight: 44, letterSpacing: -1.6, color: palette.text }, smallTitle: { fontSize: 32, lineHeight: 39 }, wideTitle: { fontSize: 56, lineHeight: 63, letterSpacing: -2.4 },
-  highlight: { color: palette.primary }, subtitle: { fontFamily: fonts.body, color: palette.secondary, fontSize: 16, lineHeight: 25, marginTop: 16, maxWidth: 390 },
-  features: { flexDirection: 'row', flexWrap: 'wrap', gap: 13, marginTop: 22 }, feature: { flexDirection: 'row', alignItems: 'center', gap: 5 }, featureText: { fontFamily: fonts.bodyMedium, color: palette.secondary, fontSize: 11 },
-  actions: { gap: 12, marginTop: 28, maxWidth: 400 }, actionNote: { fontFamily: fonts.body, fontSize: 12, color: palette.secondary, textAlign: 'center', lineHeight: 18 },
-  footer: { width: '100%', maxWidth: 1080, alignSelf: 'center', paddingTop: 32, marginTop: 26, borderTopWidth: 1, borderTopColor: palette.border, alignItems: 'center', gap: 6 },
-  footerText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: palette.text }, footerBrand: { fontFamily: fonts.body, fontSize: 11, color: palette.secondary },
+  photoNote: { position: 'absolute', bottom: 0, left: spacing.md, right: spacing.md, alignSelf: 'flex-start', backgroundColor: palette.surface, borderRadius: borderRadius.md, padding: spacing.sm + spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, ...shadows.card },
+  noteIcon: { backgroundColor: palette.mint, borderRadius: borderRadius.sm + 2, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  noteTitle: { ...typography.label, color: palette.text }, noteSubtitle: { ...typography.caption, fontFamily: fonts.body, color: palette.secondary, marginTop: 2 },
+  copy: { width: '100%' }, wideCopy: { flex: 1, width: undefined }, eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm + spacing.xs },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: palette.primary }, eyebrow: { ...typography.overline, color: palette.primary },
+  title: { fontFamily: fonts.heading, fontSize: 34, lineHeight: 41, letterSpacing: -0.6, color: palette.text }, smallTitle: { fontSize: 30, lineHeight: 37 }, wideTitle: { fontSize: 52, lineHeight: 60, letterSpacing: -1 },
+  highlight: { color: palette.primary }, subtitle: { ...typography.body, fontSize: 16, lineHeight: 25, color: palette.secondary, marginTop: spacing.md, maxWidth: 390 },
+  features: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.lg },
+  feature: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm + spacing.xs, borderRadius: borderRadius.full, backgroundColor: palette.mint },
+  featureText: { ...typography.label, color: palette.primaryDark },
+  actions: { gap: spacing.sm + spacing.xs, marginTop: spacing.xl, maxWidth: 400 }, actionNote: { ...typography.caption, fontFamily: fonts.body, lineHeight: 18, color: palette.secondary, textAlign: 'center', marginTop: spacing.xs },
 });
