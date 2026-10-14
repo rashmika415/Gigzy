@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { SavedGigsProvider } from '../../context/SavedGigsContext';
 import { registerDeviceForPush } from '../../services/pushNotificationService';
 import { subscribeToGigAnnouncements } from '../../services/notificationService';
+import { releaseExpiredSuspension } from '../../services/adminService';
 
 /**
  * App layout — wraps the tab navigator and all stack-pushed screens.
@@ -23,6 +24,13 @@ export default function AppLayout() {
   const { user, userData, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    const until = userData?.suspendedUntil?.toMillis?.() ?? new Date(userData?.suspendedUntil ?? 0).getTime();
+    if (!loading && user?.uid && userData?.suspended && userData.suspensionType === 'temporary' && Number.isFinite(until) && until <= Date.now()) {
+      releaseExpiredSuspension(user.uid).catch(error => console.warn('Could not release expired suspension:', error));
+    }
+  }, [loading, user?.uid, userData?.suspended, userData?.suspensionType, userData?.suspendedUntil]);
 
   useEffect(() => {
     if (loading || !user?.uid || userData?.role !== 'freelancer' || userData?.suspended) return;

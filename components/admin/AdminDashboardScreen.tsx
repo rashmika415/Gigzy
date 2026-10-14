@@ -7,15 +7,16 @@ import { useTranslation } from 'react-i18next';
 import { Text, TextInput } from '../LocalizedText';
 import LanguageSelector from '../LanguageSelector';
 import AdminNotificationPanel from './AdminNotificationPanel';
+import UserModerationModal from './UserModerationModal';
 import { useAuth } from '../../context/AuthContext';
 import { auth } from '../../FirebaseConfig';
 import { colors, fonts } from '../../constants/theme';
-import { fetchAdminPage, fetchAdminStats, removeGigFromDiscovery, setUserSuspension } from '../../services/adminService';
+import { fetchAdminPage, fetchAdminStats, removeGigFromDiscovery } from '../../services/adminService';
 import type { AdminCursor, AdminStats, AdminUser } from '../../services/adminService';
 import type { Gig } from '../../types/gig';
 
 type Panel = 'overview' | 'users' | 'gigs' | 'notifications';
-type Action = { kind: 'suspend' | 'reinstate' | 'remove'; id: string; name: string };
+type Action = { kind: 'remove'; id: string; name: string };
 const PANELS: { key: Panel; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'overview', label: 'Overview', icon: 'grid-outline' },
   { key: 'users', label: 'Users', icon: 'people-outline' },
@@ -42,6 +43,7 @@ export default function AdminDashboardScreen() {
   const [expandedGig, setExpandedGig] = useState('');
   const [revision, setRevision] = useState(0);
   const [action, setAction] = useState<Action>();
+  const [moderatingUser, setModeratingUser] = useState<AdminUser>();
   const [reason, setReason] = useState('');
   const [actionError, setActionError] = useState('');
   const [acting, setActing] = useState(false);
@@ -91,8 +93,7 @@ export default function AdminDashboardScreen() {
     if (!action || actionLock.current) return;
     actionLock.current = true; setActing(true); setActionError('');
     try {
-      if (action.kind === 'remove') await removeGigFromDiscovery(action.id, reason);
-      else await setUserSuspension(action.id, action.kind === 'suspend', reason);
+      await removeGigFromDiscovery(action.id, reason);
       if (!mounted.current) return;
       setNotice('Changes saved.'); setAction(undefined); refresh();
     } catch (error) { if (mounted.current) setActionError(message(error)); }
@@ -167,8 +168,8 @@ export default function AdminDashboardScreen() {
                   <View style={styles.rowCopy}><Text style={styles.rowTitle}>{item.fullName || item.businessName || t('Unnamed user')}</Text><Text selectable style={styles.secondary}>{item.email || item.id}</Text>
                     <View style={styles.badges}><Badge label={label(item.role)} /><Badge label={item.suspended ? t('Suspended') : t('Active')} danger={!!item.suspended} /></View>
                     {!!item.suspended && !!item.suspensionReason && <Text style={styles.secondary}>{item.suspensionReason}</Text>}</View>
-                  {item.role !== 'admin' && item.id !== user?.uid && <Button title={item.suspended ? t('Reinstate') : t('Suspend')} danger={!item.suspended}
-                    onPress={() => openAction({ kind: item.suspended ? 'reinstate' : 'suspend', id: item.id, name: item.fullName || item.email || item.id })} />}</View>;
+                  {item.role !== 'admin' && item.id !== user?.uid && <Button title={t('Moderate')} danger={!!item.suspended}
+                    onPress={() => { setNotice(''); setModeratingUser(item); }} />}</View>;
               }
               const item = row as Gig;
               return <View key={item.id} style={styles.row}><View style={styles.rowCopy}><Text style={styles.rowTitle}>{item.title || t('Untitled gig')}</Text>
@@ -195,14 +196,14 @@ export default function AdminDashboardScreen() {
     </View>
     <Modal visible={!!action} transparent animationType="fade" onRequestClose={() => { if (!acting) setAction(undefined); }}>
       <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView style={styles.dialog} contentContainerStyle={styles.dialogContent} keyboardShouldPersistTaps="handled">
-        <Text accessibilityRole="header" style={styles.sectionTitle}>{action?.kind === 'remove' ? t('Remove from discovery') : action?.kind === 'suspend' ? t('Suspend account') : t('Reinstate account')}</Text><Text style={styles.rowTitle}>{action?.name}</Text>
-        <Text style={styles.secondary}>{action?.kind === 'remove' ? t('This closes the gig, stops new applications and prevents the business from reopening it. Existing applications are preserved.')
-          : action?.kind === 'suspend' ? t('This blocks the member from posting, applying and messaging until reinstated.') : t('This restores the member’s access to the platform.')}</Text>
-        {action?.kind !== 'reinstate' && <TextInput accessibilityLabel={t('Reason')} placeholder={t('Reason (5–500 characters)')} value={reason} onChangeText={setReason} multiline maxLength={500} editable={!acting} style={[styles.input, styles.reason]} />}
+        <Text accessibilityRole="header" style={styles.sectionTitle}>{t('Remove from discovery')}</Text><Text style={styles.rowTitle}>{action?.name}</Text>
+        <Text style={styles.secondary}>{t('This closes the gig, stops new applications and prevents the business from reopening it. Existing applications are preserved.')}</Text>
+        <TextInput accessibilityLabel={t('Reason')} placeholder={t('Reason (5–500 characters)')} value={reason} onChangeText={setReason} multiline maxLength={500} editable={!acting} style={[styles.input, styles.reason]} />
         {!!actionError && <Text accessibilityRole="alert" style={styles.error}>{t(actionError)}</Text>}
-        <View style={styles.actions}><Button title={t('Cancel')} disabled={acting} onPress={() => setAction(undefined)} /><Button title={t('Confirm')} danger={action?.kind !== 'reinstate'} primary={action?.kind === 'reinstate'} busy={acting} onPress={confirmAction} /></View>
+        <View style={styles.actions}><Button title={t('Cancel')} disabled={acting} onPress={() => setAction(undefined)} /><Button title={t('Confirm')} danger busy={acting} onPress={confirmAction} /></View>
       </ScrollView></KeyboardAvoidingView>
     </Modal>
+    <UserModerationModal key={moderatingUser?.id ?? 'closed'} user={moderatingUser} onClose={() => setModeratingUser(undefined)} onChanged={() => { setNotice('Changes saved.'); refresh(); }} />
   </SafeAreaView>;
 }
 
