@@ -8,8 +8,8 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
+import { useToast } from '../../context/ToastContext';
 import { router } from 'expo-router';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,6 +47,7 @@ export default function CelebrationModal({
   onOpenChat,
 }: CelebrationModalProps) {
   useTranslation();
+  const toast = useToast();
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [calendarAdded, setCalendarAdded] = useState(false);
 
@@ -86,34 +87,30 @@ export default function CelebrationModal({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
 
-    const result = await addGigToCalendar({
-      title: displayGig,
-      date: gigDate || new Date().toISOString().slice(0, 10),
-      time: gigTime,
-      location: gigLocation,
-      pay: gigPay,
-      payType: gigPayType,
-      counterpartName: displayName,
-      counterpartRole: 'freelancer',
-      gigId,
-      applicationId,
-      description: `Gigzy scheduled gig with ${displayName}`,
-    });
-
-    setCalendarAdding(false);
-    if (result.success) {
+    try {
+      const result = await addGigToCalendar({
+        title: displayGig,
+        date: gigDate || new Date().toISOString().slice(0, 10),
+        time: gigTime,
+        location: gigLocation,
+        pay: gigPay,
+        payType: gigPayType,
+        counterpartName: displayName,
+        counterpartRole: 'freelancer',
+        gigId,
+        applicationId,
+        description: `Gigzy scheduled gig with ${displayName}`,
+      });
+      if (!result.success) throw new Error(result.error || 'Could not add gig to calendar.');
       setCalendarAdded(true);
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
-      Alert.alert(
-        'Gig Scheduled! 📅',
-        result.method === 'native'
-          ? `Added "${displayGig}" to your device calendar (${result.calendarName || 'Calendar'}).`
-          : `Opened calendar for "${displayGig}".`
-      );
-    } else {
-      Alert.alert('Calendar', result.error || 'Could not add gig to calendar.');
+      toast.success(tr('Added to calendar'));
+    } catch (err: any) {
+      toast.error(tr('Could not add gig to calendar.'), err?.message ? tr(err.message) : undefined);
+    } finally {
+      setCalendarAdding(false);
     }
   };
 

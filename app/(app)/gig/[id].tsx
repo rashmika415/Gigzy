@@ -1,19 +1,19 @@
-import { formatCurrency, formatRelativeDate } from '../../../localization/format';
+import { formatCalendarDate, formatCurrency, formatRelativeDate } from '../../../localization/format';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Share, Alert } from 'react-native';
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { ActivityIndicator, Platform, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../../components/LocalizedText';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../../context/AuthContext';
-import { colors, spacing, borderRadius, fonts } from '../../../constants/theme';
+import { borderRadius, colors, spacing, typography } from '../../../constants/theme';
 import { subscribeToGig } from '../../../services/gigService';
 import { getOrCreateChat } from '../../../services/chatService';
-import { StatusPill, Chip, LoadingState, ErrorState } from '../../../components';
-import CloseGigButton from '../../../components/CloseGigButton';
-import ViewApplicantsButton from '../../../components/ViewApplicantsButton';
+import { Chip, ErrorState, LoadingState, StatusPill } from '../../../components';
 import BookmarkButton from '../../../components/BookmarkButton';
 import GigMeetingPoint from '../../../components/GigMeetingPoint';
 import GigApplicationAction from '../../../components/applications/GigApplicationAction';
@@ -29,21 +29,20 @@ import { useToast } from '../../../context/ToastContext';
 
 /** Resolve category id or name to the category object */
 function resolveCategory(raw: string) {
-  const found = GIG_CATEGORIES.find(
-    (c) => c.id === raw || c.name.toLowerCase() === raw.toLowerCase(),
-  );
+  const found = GIG_CATEGORIES.find(c => c.id === raw || c.name.toLowerCase() === raw.toLowerCase());
   return found ?? { id: raw, name: raw, icon: 'grid-outline' };
 }
 
-/** Human-readable relative date helper */
 function formatPostedDate(ts: any): string {
   if (!ts) return '';
   const millis = ts?.toMillis ? ts.toMillis() : new Date(ts).getTime();
   return formatRelativeDate(new Date(millis));
 }
 
+const LOCATION_LABEL: Record<string, string> = { remote: 'Remote', 'on-site': 'On-site', hybrid: 'Hybrid' };
+
 export default function GigDetailScreen() {
-  useTranslation();
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user, userData } = useAuth();
   const toast = useToast();
@@ -109,121 +108,86 @@ export default function GigDetailScreen() {
     if (!validCoordinates(gig?.coordinates)) return;
     setLocating(true);
     try { setDistance(distanceKm(await getCurrentCoordinates(), gig.coordinates)); }
-    catch (failure) { toast.error(tr("Location unavailable"), failure instanceof Error ? failure.message : tr("Try again.")); }
+    catch (failure) { toast.error(tr('Location unavailable'), failure instanceof Error ? failure.message : tr('Try again.')); }
     finally { setLocating(false); }
   };
 
-  const gigOwner = gig?.postedBy?.uid === user?.uid;
+  const gigOwner = !!gig && gig.postedBy?.uid === user?.uid;
+  const isWorker = role === 'freelancer' && !gigOwner;
+  const isHiredWorker = !!gig && !!user && gig.assignedYouthId === user.uid;
+  // Workers can ask questions while a gig is open; the hired worker can keep talking afterwards.
+  const canMessage = isWorker && !!gig && (gig.status === 'open' || isHiredWorker);
+  const canRate = !!gig && gig.status === 'completed' && (gigOwner ? !!gig.assignedYouthId : isHiredWorker);
   const cat = gig ? resolveCategory(gig.category) : null;
-
-  // ── Actions ──
 
   const handleShare = async () => {
     if (!gig) return;
     try {
       await Share.share({
-        message: tr("Check out {{title}} on Gigzy: {{pay}} {{rate}}", { title: gig.title, pay: formatCurrency(gig.pay), rate: gig.payType === "hourly" ? tr("/hr") : tr(" Fixed Price").trim() }),
+        message: tr('Check out {{title}} on Gigzy: {{pay}} {{rate}}', { title: gig.title, pay: formatCurrency(gig.pay), rate: gig.payType === 'hourly' ? tr('/hr') : tr(' Fixed Price').trim() }),
       });
     } catch {}
   };
 
   const handleEditGig = () => {
     if (!gig) return;
-    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
-    router.push({
-      pathname: '/(app)/post-gig',
-      params: { editGigId: gig.id },
-    } as any);
+    if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    router.push({ pathname: '/(app)/post-gig', params: { editGigId: gig.id } } as any);
   };
 
   const handleContactBusiness = async () => {
-    if (startingChat) return;
-    if (!user || !gig) return;
-    if (gigOwner) {
-      router.push('/(app)/(tabs)/my-gigs' as any);
-      return;
-    }
-
-    if (gig.status !== 'open') {
-      toast.info(tr("Gig Closed"), tr("This gig is no longer accepting applications."));
-      return;
-    }
-
-    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+    if (startingChat || !user || !gig || !canMessage) return;
+    const businessUid = gig.postedBy?.uid || (gig as any).businessId || (gig as any).clientId || '';
+    if (!businessUid) { toast.error(tr('Chat Error'), tr('Unable to identify the gig creator.')); return; }
     setStartingChat(true);
-
     try {
-      const currentParticipant = {
-        uid: user.uid,
-        fullName: userData?.fullName || user.displayName || 'Freelancer',
-        photoURL: userData?.photoURL || '',
-        role: (userData?.role as any) || 'freelancer',
-        email: user.email || '',
-      };
-
-      const businessUid =
-        (typeof gig.postedBy === 'object' && gig.postedBy?.uid) ||
-        (typeof gig.postedBy === 'string' && gig.postedBy) ||
-        (gig as any).businessId ||
-        (gig as any).clientId ||
-        '';
-
-      if (!businessUid) {
-        Alert.alert(tr("Chat Error"), tr("Unable to identify the gig creator."));
-        return;
-      }
-
-      const businessParticipant = {
-        uid: businessUid,
-        fullName:
-          (typeof gig.postedBy === 'object' && gig.postedBy?.fullName) ||
-          (gig as any).businessName ||
-          'Business Owner',
-        photoURL: '',
-        role: 'client' as const,
-        email:
-          (typeof gig.postedBy === 'object' && gig.postedBy?.email) || '',
-      };
-
-      const chat = await getOrCreateChat(currentParticipant, businessParticipant, gig);
-      router.push({
-        pathname: '/(app)/chat/[id]',
-        params: { id: chat.id },
-      } as any);
+      const chat = await getOrCreateChat(
+        { uid: user.uid, fullName: userData?.fullName || user.displayName || 'Freelancer', photoURL: userData?.photoURL || '', role: (userData?.role as any) || 'freelancer', email: user.email || '' },
+        { uid: businessUid, fullName: gig.postedBy?.fullName || (gig as any).businessName || 'Business Owner', photoURL: '', role: 'client', email: gig.postedBy?.email || '' },
+        gig,
+      );
+      router.push({ pathname: '/(app)/chat/[id]', params: { id: chat.id } } as any);
     } catch (err: any) {
-      toast.error(tr("Failed to start conversation."), err.message);
+      toast.error(tr('Failed to start conversation.'), err?.message);
     } finally {
       setStartingChat(false);
     }
   };
 
-  // ── Render ──
-
   if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Header onBack={() => router.back()} />
-        <LoadingState message={tr("Loading gig details…")} size="large" />
-      </SafeAreaView>
-    );
+    return <SafeAreaView style={styles.container}>
+      <Header onBack={() => router.back()} />
+      <LoadingState message={tr('Loading gig details…')} size="large" />
+    </SafeAreaView>;
   }
 
   if (error || !gig || gig.moderationRemoved) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Header onBack={() => router.back()} />
-        <View style={styles.padH}>
-          <ErrorState
-            title={gig?.moderationRemoved ? tr('Gig removed by a moderator') : gig === null && !error ? tr("Gig not found") : tr("Failed to load gig")}
-            message={gig?.moderationRemoved ? tr('This gig is no longer available. Existing applications remain in your application history.') : error || tr("This gig may have been removed or does not exist.")}
-            onRetry={error ? () => setRetry(value => value + 1) : undefined}
-          />
-        </View>
-      </SafeAreaView>
-    );
+    const missingId = !id;
+    return <SafeAreaView style={styles.container}>
+      <Header onBack={() => router.back()} />
+      <View style={styles.padH}>
+        <ErrorState
+          title={gig?.moderationRemoved ? tr('Gig removed by a moderator') : (gig === null && !error) || missingId ? tr('Gig not found') : tr('Failed to load gig')}
+          message={gig?.moderationRemoved ? tr('This gig is no longer available. Existing applications remain in your application history.') : error && !missingId ? error : tr('This gig may have been removed or does not exist.')}
+          onRetry={error && !missingId ? () => setRetry(value => value + 1) : undefined}
+        />
+      </View>
+    </SafeAreaView>;
   }
 
+  const rating = (gig.postedBy as any)?.ratingAverage;
+  const ratingCount = (gig.postedBy as any)?.ratingCount;
+  const when = gig.date
+    ? gig.time ? tr('{{date}} at {{time}}', { date: formatCalendarDate(gig.date), time: gig.time }) : formatCalendarDate(gig.date)
+    : tr('Flexible');
+
   return (
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <Header onBack={() => router.back()} onShare={handleShare} />
+
+      <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* ── Title block ── */}
+        <View style={styles.hero}>
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <Header
@@ -242,166 +206,113 @@ export default function GigDetailScreen() {
         <View style={styles.heroSection}>
           {/* Category & Status row */}
           <View style={styles.badgeRow}>
-            <View style={styles.categoryBadge}>
-              <Ionicons name={cat!.icon as any} size={14} color={colors.primary} />
-              <Text style={styles.categoryText}>{tr(cat!.name)}</Text>
-            </View>
+            <Chip label={t(cat!.name)} icon={cat!.icon as any} size="sm" />
             <StatusPill status={gig.status} />
           </View>
-
-          <ViewApplicantsButton key={`applicants-${gig.id}`} gig={gig} />
-                    <CloseGigButton gig={gig} />
-
-          {/* Title */}
-          <Text style={styles.gigTitle}>{gig.title}</Text>
-          {role === 'freelancer' && <BookmarkButton gigId={gig.id} title={gig.title} showLabel />}
-
-          {/* Posted by & time */}
-          <View style={styles.postedRow}>
-            <View style={styles.posterAvatar}>
-              <Text style={styles.posterAvatarText}>
-                {(gig.postedBy.fullName?.[0] ?? '?').toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.posterInfo}>
-              <Text style={styles.posterName}>{gig.postedBy.fullName}</Text>
-              <Text style={styles.postedTime}>{tr("Posted {{date}}", { date: formatPostedDate(gig.createdAt) })}
-              </Text>
-            </View>
+          <View style={styles.titleRow}>
+            <Text accessibilityRole="header" style={styles.gigTitle}>{gig.title}</Text>
+            {role === 'freelancer' && <BookmarkButton gigId={gig.id} title={gig.title} />}
           </View>
+          <Text style={styles.posted}>{t('Posted {{date}}', { date: formatPostedDate(gig.createdAt) })}</Text>
         </View>
 
-        {/* ── Pay & Key Details Card ── */}
-        <View style={styles.detailsCard}>
-          {/* Pay highlight */}
-          <View style={styles.paySection}>
-            <View>
-              <Text style={styles.payLabel}>{tr("COMPENSATION")}</Text>
-              <View style={styles.payRow}>
-                <Text style={styles.payAmount}>{formatCurrency(gig.pay)}</Text>
-                <Text style={styles.payType}>
-                  {gig.payType === 'hourly' ? tr(" / hour") : tr(" Fixed Price")}
+        {/* ── Key facts ── */}
+        <View style={styles.card}>
+          <Fact icon="wallet-outline" label="Pay" highlight
+            value={`${formatCurrency(gig.pay)}${gig.payType === 'hourly' ? t('/hr') : ` · ${t('Fixed price')}`}`} />
+          <Fact icon="calendar-outline" label="Date & time" value={when} />
+          <Fact icon={gig.locationType === 'remote' ? 'globe-outline' : 'location-outline'}
+            label={LOCATION_LABEL[gig.locationType] ?? 'Location'} value={gig.location || t('Remote')}>
+            {gig.locationType !== 'remote' && (validCoordinates(gig.coordinates)
+              ? <Pressable onPress={showDistance} disabled={locating} hitSlop={8} accessibilityRole="button" style={styles.inlineLink}>
+                {locating && <ActivityIndicator size="small" color={colors.primary} />}
+                <Text style={styles.linkText}>
+                  {locating ? t('Finding your location…') : distance !== undefined ? t('{{value0}} km away (straight-line distance)', { value0: distance.toFixed(1) }) : t('Show distance from me')}
                 </Text>
-              </View>
-            </View>
-            <View style={styles.payIconCircle}>
-              <Ionicons name="wallet" size={22} color={colors.primary} />
-            </View>
-          </View>
-
-          {/* Divider */}
-          <View style={styles.divider} />
-
-          {gig.locationType !== 'remote' && (validCoordinates(gig.coordinates) ?
-            <TouchableOpacity onPress={showDistance} disabled={locating}><Text style={styles.categoryText}>
-              {locating ? tr("Finding your location?") : distance !== undefined ? tr("{{value0}} km away (straight-line distance)", { value0: distance.toFixed(1) }) : tr("Show distance from me")}
-            </Text></TouchableOpacity> : <Text style={styles.postedTime}>{tr("Distance unavailable for this gig.")}</Text>)}
-          {/* Specs Grid */}
-          <View style={styles.specsGrid}>
-            <SpecItem
-              icon="calendar-outline"
-              label={tr("Deadline")}
-              value={gig.time ? tr("{{date}} at {{time}}", { date: gig.date || tr("Flexible"), time: gig.time }) : gig.date || tr("Flexible")}
-            />
-            <SpecItem
-              icon={gig.locationType === 'remote' ? 'globe-outline' : 'location-outline'}
-              label={tr("Location ({{value0}})", { value0: tr(gig.locationType) })}
-              value={gig.location || tr("Remote")}
-            />
-            <SpecItem
-              icon="people-outline"
-              label={tr("Applicants")}
-              value={tr("Applications: {{count}}", { count: gig.applicantsCount || 0 })}
-            />
-            <SpecItem
-              icon="eye-outline"
-              label={tr("Views")}
-              value={tr("Views: {{count}}", { count: gig.viewsCount || 0 })}
-            />
-          </View>
+              </Pressable>
+              : <Text style={styles.factHint}>{t('Distance unavailable for this gig.')}</Text>)}
+          </Fact>
+          <Fact icon="people-outline" label="Applicants" value={String(gig.applicantsCount || 0)} last />
         </View>
 
         <GigMeetingPoint gig={gig} />
 
-        {/* ── Description Section ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="document-text-outline" size={16} color={colors.primary} />
-            {'  '}{tr("Job Description")}</Text>
-          <Text style={styles.descriptionText}>{gig.description}</Text>
-        </View>
+        {/* ── Description ── */}
+        <Section icon="document-text-outline" title="Job Description">
+          <Text style={styles.body}>{gig.description}</Text>
+        </Section>
 
-        {/* ── Skills Section ── */}
-        {gig.skills && gig.skills.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              <Ionicons name="flash-outline" size={16} color={colors.primary} />
-              {'  '}{tr("Required Skills")}</Text>
+        {gig.skills?.length > 0 && (
+          <Section icon="flash-outline" title="Required Skills">
             <View style={styles.skillsWrap}>
-              {gig.skills.map((skill, i) => (
-                <Chip key={i} label={skill} icon="checkmark-circle-outline" />
-              ))}
+              {gig.skills.map(skill => <Chip key={skill} label={skill} icon="checkmark-circle-outline" />)}
             </View>
-          </View>
+          </Section>
         )}
 
-        {/* ── Posted By Section ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="business-outline" size={16} color={colors.primary} />
-            {'  '}{tr("Posted By")}</Text>
+        {/* ── Business ── */}
+        <Section icon="business-outline" title="Posted By">
           <View style={styles.posterCard}>
-            <View style={styles.posterCardAvatar}>
-              <Text style={styles.posterCardAvatarText}>
-                {(gig.postedBy.fullName?.[0] ?? '?').toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.posterCardInfo}>
-              <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/profile/[id]', params: { id: gig.postedBy.uid } })}>
-                <Text style={styles.posterCardName}>{gig.postedBy.fullName}</Text>
-                {typeof (gig.postedBy as any)?.ratingAverage === 'number' && (gig.postedBy as any).ratingAverage > 0 ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginVertical: 2 }}>
-                    <Ionicons name="star" size={13} color={colors.star} />
-                    <Text style={{ fontSize: 12, fontFamily: fonts.bodySemiBold, color: colors.textSecondary }}>
-                      {(gig.postedBy as any).ratingAverage.toFixed(1)}
-                      {(gig.postedBy as any).ratingCount ? ` (${(gig.postedBy as any).ratingCount} ${tr("reviews")})` : ''}
+            <Pressable onPress={() => router.push({ pathname: '/(app)/profile/[id]', params: { id: gig.postedBy.uid } })}
+              accessibilityRole="button" accessibilityLabel={t('View business profile')}
+              style={({ pressed }) => [styles.posterMain, pressed && styles.pressed]}>
+              <View style={styles.posterAvatar}>
+                <Text style={styles.posterAvatarText}>{(gig.postedBy.fullName?.[0] ?? '?').toUpperCase()}</Text>
+              </View>
+              <View style={styles.posterInfo}>
+                <Text style={styles.posterName} numberOfLines={1}>{gig.postedBy.fullName}</Text>
+                {typeof rating === 'number' && rating > 0
+                  ? <View style={styles.ratingRow}>
+                    <Ionicons name="star" size={14} color={colors.star} />
+                    <Text style={styles.factHint}>
+                      {rating.toFixed(1)}{ratingCount ? ` · ${t('{{count}} reviews', { count: ratingCount })}` : ''}
                     </Text>
                   </View>
-                ) : null}
-                <Text style={styles.categoryText}>{tr("View business profile")}</Text>
-              </TouchableOpacity>
-              <Text style={styles.posterCardEmail}>{gig.postedBy.email}</Text>
-            </View>
-            {!gigOwner && role === 'freelancer' && gig.status === 'open' && (
-              <TouchableOpacity
-                style={styles.posterChatBtn}
-                onPress={handleContactBusiness}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.primaryOnColor} />
-              </TouchableOpacity>
+                  : <Text style={styles.linkText}>{t('View business profile')}</Text>}
+              </View>
+            </Pressable>
+            {canMessage && (
+              <Pressable onPress={handleContactBusiness} disabled={startingChat} accessibilityRole="button" accessibilityLabel={t('Message business')}
+                style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}>
+                {startingChat ? <ActivityIndicator color={colors.primaryOnColor} /> : <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.primaryOnColor} />}
+              </Pressable>
             )}
           </View>
-        </View>
-
-        {/* ── Gig ID footer ── */}
-        <View style={styles.gigIdRow}>
-          <Ionicons name="finger-print-outline" size={13} color={colors.textMuted} />
-          <Text style={styles.gigIdText}>{tr("ID:")}{' '}{gig.id}</Text>
-        </View>
+          {canRate && !gigOwner && (
+            <Pressable onPress={() => setShowRatingModal(true)} accessibilityRole="button"
+              style={({ pressed }) => [styles.rateButton, pressed && styles.pressed]}>
+              <Ionicons name="star-outline" size={18} color={colors.star} />
+              <Text style={styles.rateText}>{t('Rate this business')}</Text>
+            </Pressable>
+          )}
+        </Section>
       </ScrollView>
 
-      {/* ── Bottom Action Bar ── */}
+      {/* ── Sticky action bar ── */}
       {!gigOwner && role !== 'client' && (
-        <View style={styles.bottomBar}>
-          <View style={styles.bottomPayPreview}>
-            <Text style={styles.bottomPayLabel}>{tr("Pay")}</Text>
-            <Text style={styles.bottomPayValue}>
-              {formatCurrency(gig.pay)}{gig.payType === 'hourly' ? tr("/hr") : ''}
+        <SafeAreaView edges={['bottom']} style={styles.bottomBar}>
+          <View style={styles.bottomPay}>
+            <Text style={styles.bottomPayLabel}>{t('Pay')}</Text>
+            <Text style={styles.bottomPayValue} numberOfLines={1}>
+              {formatCurrency(gig.pay)}{gig.payType === 'hourly' ? <Text style={styles.bottomPayType}>{t('/hr')}</Text> : null}
             </Text>
           </View>
-
           <GigApplicationAction gig={gig} />
+        </SafeAreaView>
+      )}
+
+      {gigOwner && (
+        <SafeAreaView edges={['bottom']} style={styles.bottomBar}>
+          <Pressable onPress={() => setShowApplicantsModal(true)} accessibilityRole="button"
+            style={({ pressed }) => [styles.barButton, styles.barPrimary, pressed && styles.pressed]}>
+            <Ionicons name="people-outline" size={18} color={colors.primaryOnColor} />
+            <Text style={styles.barPrimaryText}>{t('Applicants ({{count}})', { count: gig.applicantsCount || 0 })}</Text>
+          </Pressable>
+          {canRate && (
+            <Pressable onPress={() => setShowRatingModal(true)} accessibilityRole="button" accessibilityLabel={t('Rate Freelancer')}
+              style={({ pressed }) => [styles.barIcon, pressed && styles.pressed]}>
+              <Ionicons name="star-outline" size={20} color={colors.star} />
+            </Pressable>
 
           {Boolean(gig.assignedYouthId === user?.uid && (gig.status === 'in-progress' || gig.status === 'completed')) && (
             <>
@@ -459,56 +370,32 @@ export default function GigDetailScreen() {
               </TouchableOpacity>
             </>
           )}
-
-          <TouchableOpacity
-            style={styles.updateBtn}
-            onPress={handleEditGig}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="create-outline" size={17} color={colors.primary} />
-            <Text style={styles.updateBtnText}>{tr("Update")}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.manageBtn}
-            onPress={() => router.push('/(app)/(tabs)/my-gigs' as any)}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="list-outline" size={17} color={colors.text} />
-            <Text style={styles.manageBtnText}>{tr("My Gigs")}</Text>
-          </TouchableOpacity>
-        </View>
+          <Pressable onPress={handleEditGig} accessibilityRole="button"
+            style={({ pressed }) => [styles.barButton, styles.barSecondary, pressed && styles.pressed]}>
+            <Ionicons name="create-outline" size={18} color={colors.primary} />
+            <Text style={styles.barSecondaryText}>{t('Edit')}</Text>
+          </Pressable>
+        </SafeAreaView>
       )}
 
-      {gig && showApplicantsModal && (
-        <ApplicantListModal
-          visible={showApplicantsModal}
-          gigId={gig.id}
-          gigTitle={gig.title}
-          businessId={user?.uid || ''}
-          gigDate={gig.date}
-          gigTime={gig.time}
-          gigLocation={gig.location}
-          gigPay={gig.pay}
-          gigPayType={gig.payType}
-          onClose={() => setShowApplicantsModal(false)}
-        />
+      {showApplicantsModal && (
+        <ApplicantListModal visible gigId={gig.id} gigTitle={gig.title} businessId={user?.uid || ''}
+          gigDate={gig.date} gigTime={gig.time} gigLocation={gig.location} gigPay={gig.pay} gigPayType={gig.payType}
+          onClose={() => setShowApplicantsModal(false)} />
       )}
 
-      {gig && showRatingModal && (
+      {showRatingModal && (
         <RatingModal
-          visible={showRatingModal}
+          visible
           targetUserId={gigOwner ? (gig.assignedYouthId || '') : (gig.postedBy?.uid || '')}
+          targetUserName={gigOwner ? (gig.assignedYouthName || tr('Youth Freelancer')) : (gig.postedBy?.fullName || tr('Business Owner'))}
           targetUserName={gigOwner ? (gig.assignedYouthName || tr("Youth Freelancer")) : (gig.postedBy?.fullName || tr("Business Owner"))}
           targetUserPhotoURL={gigOwner ? gig.assignedYouthPhotoURL : undefined}
           targetRole={gigOwner ? 'freelancer' : 'client'}
           gigId={gig.id}
           gigTitle={gig.title}
           onClose={() => setShowRatingModal(false)}
-          onSuccess={() => {
-            setShowRatingModal(false);
-            toast.success(tr("Review submitted successfully!"));
-          }}
+          onSuccess={() => { setShowRatingModal(false); toast.success(tr('Review submitted successfully!')); }}
         />
       )}
 
@@ -531,6 +418,21 @@ export default function GigDetailScreen() {
 
 // ── Sub-components ──
 
+function Header({ onBack, onShare }: { onBack: () => void; onShare?: () => void }) {
+  const { t } = useTranslation();
+  return <View style={styles.header}>
+    <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel={t('Go back')}
+      style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}>
+      <Ionicons name="chevron-back" size={24} color={colors.text} />
+    </Pressable>
+    <Text accessibilityRole="header" style={styles.headerTitle}>{t('Gig Details')}</Text>
+    {onShare
+      ? <Pressable onPress={onShare} accessibilityRole="button" accessibilityLabel={t('Share')}
+        style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}>
+        <Ionicons name="share-outline" size={20} color={colors.primary} />
+      </Pressable>
+      : <View style={styles.headerBtn} />}
+  </View>;
 function Header({ onBack, onShare, onEdit, onReport }: { onBack: () => void; onShare?: () => void; onEdit?: () => void; onReport?: () => void }) {
   useTranslation();
   return (
@@ -585,29 +487,91 @@ function Header({ onBack, onShare, onEdit, onReport }: { onBack: () => void; onS
   );
 }
 
-function SpecItem({ icon, label, value }: { icon: string; label: string; value: string }) {
-  useTranslation();
-  return (
-    <View style={styles.specItem}>
-      <View style={styles.specIconCircle}>
-        <Ionicons name={icon as any} size={16} color={colors.primary} />
-      </View>
-      <View style={styles.specTextWrap}>
-        <Text style={styles.specLabel}>{label}</Text>
-        <Text style={styles.specValue} numberOfLines={1}>{value}</Text>
-      </View>
+function Section({ icon, title, children }: { icon: keyof typeof Ionicons.glyphMap; title: string; children: ReactNode }) {
+  const { t } = useTranslation();
+  return <View style={styles.section}>
+    <View style={styles.sectionHeader}>
+      <Ionicons name={icon} size={18} color={colors.primary} />
+      <Text accessibilityRole="header" style={styles.sectionTitle}>{t(title)}</Text>
     </View>
-  );
+    {children}
+  </View>;
 }
 
-// ── Styles ──
+function Fact({ icon, label, value, highlight = false, last = false, children }: {
+  icon: keyof typeof Ionicons.glyphMap; label: string; value: string; highlight?: boolean; last?: boolean; children?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return <View style={[styles.fact, !last && styles.factDivider]}>
+    <View style={[styles.factIcon, highlight && styles.factIconHighlight]}>
+      <Ionicons name={icon} size={18} color={colors.primary} />
+    </View>
+    <View style={styles.factCopy}>
+      <Text style={styles.factLabel}>{t(label)}</Text>
+      <Text style={[styles.factValue, highlight && styles.factValueHighlight]}>{value}</Text>
+      {children}
+    </View>
+  </View>;
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
+  padH: { paddingHorizontal: spacing.md },
+  pressed: { opacity: 0.75 },
+  scrollContent: { padding: spacing.md, paddingBottom: spacing.xl, gap: spacing.lg },
+
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  headerBtn: { width: 44, height: 44, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { ...typography.title, color: colors.text },
+
+  hero: { gap: spacing.sm },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  gigTitle: { ...typography.display, flex: 1, color: colors.text },
+  posted: { ...typography.bodySmall, color: colors.textSecondary },
+
+  card: { backgroundColor: colors.surface, borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.surfaceBorder, paddingHorizontal: spacing.md },
+  fact: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + spacing.xs, paddingVertical: spacing.sm + spacing.xs },
+  factDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.surfaceBorder },
+  factIcon: { width: 36, height: 36, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated },
+  factIconHighlight: { backgroundColor: colors.primaryLight },
+  factCopy: { flex: 1, minWidth: 0, gap: 2 },
+  factLabel: { ...typography.caption, fontFamily: typography.bodySmall.fontFamily, color: colors.textSecondary },
+  factValue: { ...typography.body, color: colors.text },
+  factValueHighlight: { ...typography.h3, color: colors.primaryDark },
+  factHint: { ...typography.bodySmall, color: colors.textSecondary },
+  inlineLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2, minHeight: 32 },
+  linkText: { ...typography.label, color: colors.primary },
+
+  section: { gap: spacing.sm + spacing.xs },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sectionTitle: { ...typography.h3, color: colors.text },
+  body: { ...typography.body, lineHeight: 24, color: colors.textSecondary },
+  skillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+
+  posterCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + spacing.xs, padding: spacing.sm + spacing.xs, borderRadius: borderRadius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
+  posterMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm + spacing.xs },
+  posterAvatar: { width: 48, height: 48, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight },
+  posterAvatarText: { ...typography.h3, color: colors.primary },
+  posterInfo: { flex: 1, minWidth: 0, gap: 2 },
+  posterName: { ...typography.title, color: colors.text },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  chatButton: { width: 48, height: 48, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+  rateButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.surfaceBorder, backgroundColor: colors.surface },
+  rateText: { ...typography.title, fontSize: 15, color: colors.text },
+
+  bottomBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + spacing.xs, paddingHorizontal: spacing.md, paddingTop: spacing.sm + spacing.xs, paddingBottom: spacing.sm, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.surfaceBorder },
+  bottomPay: { minWidth: 96, maxWidth: 140 },
+  bottomPayLabel: { ...typography.caption, fontFamily: typography.bodySmall.fontFamily, color: colors.textSecondary },
+  bottomPayValue: { ...typography.title, color: colors.text },
+  bottomPayType: { ...typography.caption, color: colors.textSecondary },
+  barButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderRadius: borderRadius.md },
+  barPrimary: { flex: 1, backgroundColor: colors.primary },
+  barPrimaryText: { ...typography.title, fontSize: 15, color: colors.primaryOnColor },
+  barSecondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
+  barSecondaryText: { ...typography.title, fontSize: 15, color: colors.primary },
+  barIcon: { width: 48, height: 48, borderRadius: borderRadius.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.surfaceBorder, backgroundColor: colors.surface },
   padH: { paddingHorizontal: spacing.lg },
   scrollContent: {
     paddingHorizontal: spacing.lg,

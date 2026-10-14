@@ -1,41 +1,65 @@
-import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../../localization/i18n';
 import { formatCurrency } from '../../../localization/format';
-import CloseGigButton from '../../../components/CloseGigButton';
-import ViewApplicantsButton from '../../../components/ViewApplicantsButton';
-import AppBanner from '../../../components/AppBanner';
-import { STATUS_STYLES } from '../../../components/StatusPill';
-import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Modal, Platform, RefreshControl, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Text, TextInput } from '../../../components/LocalizedText';
-import { borderRadius, colors, shadows, spacing, fonts } from "../../../constants/theme";
-import { useAuth } from "../../../context/AuthContext";
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text } from '../../../components/LocalizedText';
+import { borderRadius, colors, spacing, typography } from '../../../constants/theme';
+import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
-import SkeletonList from '../../../components/Skeleton';
+import { Chip, EmptyState, ErrorState, GigCard, SearchBar, SkeletonList, STATUS_STYLES } from '../../../components';
+import ConfirmSheet from '../../../components/ConfirmSheet';
+import OptionSheet, { type SheetOption } from '../../../components/OptionSheet';
+import GigDetailSheet from '../../../components/business/GigDetailSheet';
+import BusinessGigActions from '../../../components/business/BusinessGigActions';
 import { ApplicantListModal } from '../../../components/applications';
 import { RatingModal } from '../../../components/reviews';
 import { ReportModal } from '../../../components/reports';
 import {
-    calculateBusinessGigStats,
-    deleteGig,
-    filterAndSortGigs,
-    getGigsByClient,
-    subscribeToClientGigs,
-    updateGigStatus,
-} from "../../../services/gigService";
-import {
-    BusinessGigStats,
-    Gig,
-    GIG_CATEGORIES,
-    GigSortOption,
-    GigStatus,
-} from "../../../types/gig";
+  calculateBusinessGigStats,
+  deleteGig,
+  filterAndSortGigs,
+  getGigsByClient,
+  subscribeToClientGigs,
+  updateGigStatus,
+} from '../../../services/gigService';
+import { Gig, GIG_CATEGORIES, GigSortOption, GigStatus } from '../../../types/gig';
 
-const STATUS_CONFIG = STATUS_STYLES;
+const haptic = (kind: 'light' | 'select' | 'success' = 'light') => {
+  if (Platform.OS === 'web') return;
+  const run = kind === 'select' ? Haptics.selectionAsync()
+    : kind === 'success' ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+    : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  void run.catch(() => {});
+};
+
+const SORT_OPTIONS: SheetOption<GigSortOption>[] = [
+  { id: 'newest', label: 'Newest first', icon: 'calendar-outline' },
+  { id: 'oldest', label: 'Oldest first', icon: 'time-outline' },
+  { id: 'pay-high', label: 'Highest pay', icon: 'trending-up-outline' },
+  { id: 'pay-low', label: 'Lowest pay', icon: 'trending-down-outline' },
+  { id: 'applicants', label: 'Most applicants', icon: 'people-outline' },
+];
+
+const STATUS_DESCRIPTIONS: Partial<Record<GigStatus, string>> = {
+  open: 'Accepting applications and visible to freelancers',
+  'in-progress': 'Work is under way with a hired freelancer',
+  completed: 'The work is finished and delivered',
+  cancelled: 'Closed and no longer accepting applications',
+};
+
+const STATUS_OPTIONS: SheetOption<GigStatus>[] = (['open', 'in-progress', 'completed', 'cancelled'] as GigStatus[]).map(id => ({
+  id,
+  label: STATUS_STYLES[id].label,
+  description: STATUS_DESCRIPTIONS[id],
+  icon: STATUS_STYLES[id].icon,
+  color: STATUS_STYLES[id].text,
+  tint: STATUS_STYLES[id].bg,
+}));
 
 export default function MyGigs() {
   const { t } = useTranslation();
@@ -43,6 +67,7 @@ export default function MyGigs() {
   const toast = useToast();
   const role = userData?.role;
 
+  // Data
   const [selectedGigForApplicants, setSelectedGigForApplicants] = useState<Gig | null>(null);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [ratingTarget, setRatingTarget] = useState<{ userId: string; userName: string; userPhotoURL?: string; gigId?: string; gigTitle?: string } | null>(null);
@@ -60,93 +85,67 @@ export default function MyGigs() {
   const [allGigs, setAllGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState("");
+  const [loadError, setLoadError] = useState('');
 
-  // Filter & Search states
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<GigStatus | "all">(
-    "all",
-  );
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<GigSortOption>("newest");
-  const [showSortModal, setShowSortModal] = useState(false);
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<GigStatus | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<GigSortOption>('newest');
+  const [showSort, setShowSort] = useState(false);
 
-  // Status Change Modal state
-  const [statusModalVisible, setStatusModalVisible] = useState(false);
-  const [selectedGigForStatus, setSelectedGigForStatus] = useState<Gig | null>(
-    null,
-  );
+  // Sheets
+  const [detailGig, setDetailGig] = useState<Gig | null>(null);
+  const [statusGig, setStatusGig] = useState<Gig | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Gig | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [applicantsGig, setApplicantsGig] = useState<Gig | null>(null);
+  const [ratingTarget, setRatingTarget] = useState<{ userId: string; userName: string; gigId?: string; gigTitle?: string } | null>(null);
 
-  // Detail Modal state
-  const [detailModalVisible, setDetailModalVisible] = useState(false);
-  const [selectedGigDetail, setSelectedGigDetail] = useState<Gig | null>(null);
-
-  // 1. Subscribe to Firestore real-time client gigs
   useEffect(() => {
-    if (!user || role !== 'client') {
-      return;
-    }
-
-    const unsubscribe = subscribeToClientGigs(
+    if (!user || role !== 'client') return;
+    return subscribeToClientGigs(
       user.uid,
-      (clientGigs) => {
-        setAllGigs(clientGigs);
-        setLoadError("");
-        setLoading(false);
-      },
-      (err) => {
-        setLoadError(err.message || "Failed to load your gigs.");
-        setLoading(false);
-      },
+      clientGigs => { setAllGigs(clientGigs); setLoadError(''); setLoading(false); },
+      err => { setLoadError(err.message || 'Failed to load your gigs.'); setLoading(false); },
     );
-
-    return () => {
-      unsubscribe();
-    };
   }, [user, role]);
 
-  // Manual pull-to-refresh handler
   const handleRefresh = async () => {
     if (!user) return;
     setRefreshing(true);
     try {
-      const freshGigs = await getGigsByClient(user.uid);
-      setAllGigs(freshGigs);
-      setLoadError("");
+      setAllGigs(await getGigsByClient(user.uid));
+      setLoadError('');
     } catch (err: any) {
-      setLoadError(err.message || "Failed to refresh gigs.");
+      setLoadError(err.message || 'Failed to refresh gigs.');
     } finally {
       setRefreshing(false);
     }
   };
 
-  // 2. Computed Business Stats
-  const stats: BusinessGigStats = useMemo(() => {
-    return calculateBusinessGigStats(allGigs);
-  }, [allGigs]);
+  const stats = useMemo(() => calculateBusinessGigStats(allGigs), [allGigs]);
+  const filteredGigs = useMemo(() => filterAndSortGigs(allGigs, {
+    status: selectedStatus, category: selectedCategory, searchQuery, sortBy,
+  }), [allGigs, selectedStatus, selectedCategory, searchQuery, sortBy]);
+  const filtersActive = searchQuery.length > 0 || selectedStatus !== 'all' || selectedCategory !== 'all';
 
-  // 3. Filtered & Sorted Gigs
-  const filteredGigs = useMemo(() => {
-    return filterAndSortGigs(allGigs, {
-      status: selectedStatus,
-      category: selectedCategory,
-      searchQuery: searchQuery,
-      sortBy: sortBy,
-    });
-  }, [allGigs, selectedStatus, selectedCategory, searchQuery, sortBy]);
-
-  // Status change handler
-  const handleOpenStatusModal = (gig: Gig) => {
-    setSelectedGigForStatus(gig);
-    setStatusModalVisible(true);
-  };
+  const clearFilters = () => { setSearchQuery(''); setSelectedStatus('all'); setSelectedCategory('all'); };
 
   const handleUpdateStatus = async (newStatus: GigStatus) => {
-    if (!selectedGigForStatus) return;
-    const currentGig = selectedGigForStatus;
+    if (!statusGig || statusUpdating) return;
+    const gig = statusGig;
+    if (gig.status === newStatus) { setStatusGig(null); return; }
     setStatusUpdating(true);
     try {
+      await updateGigStatus(gig.id, newStatus);
+      haptic('success');
+      setStatusGig(null);
+      toast.success(tr('Status updated'));
+      if (newStatus === 'completed' && gig.assignedYouthId) {
+        setRatingTarget({ userId: gig.assignedYouthId, userName: t('Youth Freelancer'), gigId: gig.id, gigTitle: gig.title });
       await updateGigStatus(currentGig.id, newStatus);
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -164,12 +163,16 @@ export default function MyGigs() {
         setRatingModalVisible(true);
       }
     } catch (error: any) {
-      toast.error(tr("Status Update Failed"), error.message || tr("Could not update gig status."));
+      toast.error(tr('Status Update Failed'), error.message || tr('Could not update gig status.'));
     } finally {
       setStatusUpdating(false);
     }
   };
 
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setDeleteError('');
   const handleReportGig = (gig: Gig) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -223,466 +226,100 @@ export default function MyGigs() {
   // Edit gig handler
   const handleEditGig = (gig: Gig) => {
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
-    router.push({
-      pathname: '/(app)/post-gig',
-      params: { editGigId: gig.id },
-    } as any);
-  };
-
-  // View gig details
-  const handleOpenDetails = (gig: Gig) => {
-    setSelectedGigDetail(gig);
-    setDetailModalVisible(true);
-  };
-
-  const getSortLabel = (sort: GigSortOption) => {
-    switch (sort) {
-      case "newest":
-        return "Newest First";
-      case "oldest":
-        return "Oldest First";
-      case "pay-high":
-        return "Highest Pay";
-      case "pay-low":
-        return "Lowest Pay";
-      case "applicants":
-        return "Most Applicants";
-      default:
-        return "Sort";
+      await deleteGig(deleteTarget.id, user?.uid);
+      haptic('success');
+      setDeleteTarget(null);
+      toast.success(tr('Gig deleted'));
+    } catch (err: any) {
+      setDeleteError(err.message || 'Failed to delete gig.');
+    } finally {
+      setDeleting(false);
     }
   };
 
-  useEffect(() => {
-    if (userData && role !== 'client') {
-      Alert.alert(
-        tr("Access Restricted"),
-        tr("This page is for business owners to manage their posted gigs."),
-        [{ text: tr("OK"), onPress: () => router.back() }],
-      );
-    }
-  }, [userData, role]);
+  const editGig = (gig: Gig) => {
+    haptic();
+    setDetailGig(null);
+    router.push({ pathname: '/(app)/post-gig', params: { editGigId: gig.id } } as any);
+  };
+
+  const openApplicants = (gig: Gig) => { haptic(); setDetailGig(null); setApplicantsGig(gig); };
+  const openStatus = (gig: Gig) => { setDetailGig(null); setStatusGig(gig); };
 
   if (userData && role !== 'client') {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: colors.textSecondary, fontSize: 15 }}>{tr("Redirecting...")}</Text>
-      </SafeAreaView>
-    );
+    return <SafeAreaView style={[styles.container, styles.centered]}>
+      <EmptyState icon="lock-closed-outline" title="Access Restricted"
+        description={tr('This page is for business owners to manage their posted gigs.')}
+        actionLabel="Go back" onAction={() => router.back()} secondary />
+    </SafeAreaView>;
   }
 
+  const statusTabs: { id: GigStatus | 'all'; label: string; count: number }[] = [
+    { id: 'all', label: 'All', count: stats.total },
+    { id: 'open', label: 'Open', count: stats.open },
+    { id: 'in-progress', label: 'In Progress', count: stats.inProgress },
+    { id: 'completed', label: 'Completed', count: stats.completed },
+    { id: 'cancelled', label: 'Cancelled', count: stats.cancelled },
+  ];
+
+  const renderActions = (gig: Gig) => <BusinessGigActions gig={gig} onApplicants={openApplicants} onEdit={editGig}
+    onDelete={target => { setDeleteError(''); setDeleteTarget(target); }}
+    onRate={target => setRatingTarget({ userId: target.assignedYouthId!, userName: target.assignedYouthName || t('Youth Freelancer'), gigId: target.id, gigTitle: target.title })} />;
+
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Background ambient lighting */}
-
-
-
-      {/* Top Navigation Header */}
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <View>
-            <View style={styles.titleRow}>
-              <Text style={styles.headerTitle}>{tr("My Posted Gigs")}</Text>
-              <View style={styles.liveBadge}>
-                <View style={styles.livePulse} />
-                <Text style={styles.liveBadgeText}>{tr("Live")}</Text>
-              </View>
-            </View>
-            <Text style={styles.headerSubtitle}>{tr("Manage listings: {{count}}", { count: allGigs.length })}</Text>
-          </View>
+        <View style={styles.headerCopy}>
+          <Text accessibilityRole="header" style={styles.headerTitle}>{t('My Gigs')}</Text>
+          <Text style={styles.headerSubtitle}>{t('{{count}} posted', { count: allGigs.length })}</Text>
         </View>
-
-        <View style={styles.headerRightActions}>
-          <TouchableOpacity
-            style={styles.headerMessagesBtn}
-            onPress={() => {
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              } catch {}
-              router.push("/(app)/applications" as any);
-            }}
-            activeOpacity={0.8}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            accessibilityLabel={tr("All Applications")}
-          >
-            <Ionicons
-              name="people-outline"
-              size={20}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.headerMessagesBtn}
-            onPress={() => {
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              } catch {}
-              router.push("/(app)/(tabs)/messages" as any);
-            }}
-            activeOpacity={0.8}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          >
-            <Ionicons
-              name="chatbubbles-outline"
-              size={20}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.postNewBtn}
-            onPress={() => {
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              } catch {}
-              router.push("/(app)/post-gig" as any);
-            }}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="add" size={18} color={colors.primaryOnColor} />
-            <Text style={styles.postNewBtnText}>{tr("Post Gig")}</Text>
-          </TouchableOpacity>
-        </View>
+        <Pressable onPress={() => { haptic(); router.push('/(app)/post-gig' as any); }} accessibilityRole="button"
+          style={({ pressed }) => [styles.postButton, pressed && styles.pressed]}>
+          <Ionicons name="add" size={20} color={colors.primaryOnColor} />
+          <Text style={styles.postButtonText}>{t('Post Gig')}</Text>
+        </Pressable>
       </View>
 
       <ScrollView
         style={styles.flex}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-          />
-        }
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
       >
-        <TouchableOpacity
-          accessibilityRole="button"
-          style={[styles.metricCard, { marginBottom: spacing.md }]}
-          onPress={() => router.push('/(app)/add-ratings' as any)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="star-outline" size={22} color={colors.primary} />
-          <Text style={styles.metricLabel}>{tr("Add Ratings")}</Text>
-        </TouchableOpacity>
-        <AppBanner compact kind="business" title={tr("Good help, close to home.")} description={tr("Manage your opportunities and connect with local talent.")} />
-        {/* Business Metrics Carousel / Grid */}
-        <View style={styles.metricsSection}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.metricsContainer}
-          >
-            {/* Open / Active */}
-            <TouchableOpacity
-              style={[
-                styles.metricCard,
-                selectedStatus === "open" && styles.metricCardSelected,
-              ]}
-              onPress={() =>
-                setSelectedStatus(selectedStatus === "open" ? "all" : "open")
-              }
-              activeOpacity={0.8}
-            >
-              <View
-                style={[
-                  styles.metricIconWrap,
-                  { backgroundColor: colors.successLight },
-                ]}
-              >
-                <Ionicons name="radio-button-on" size={18} color={colors.success} />
-              </View>
-              <Text style={styles.metricValue}>{stats.open}</Text>
-              <Text style={styles.metricLabel}>{tr("Open & Active")}</Text>
-            </TouchableOpacity>
-
-            {/* In Progress */}
-            <TouchableOpacity
-              style={[
-                styles.metricCard,
-                selectedStatus === "in-progress" && styles.metricCardSelected,
-              ]}
-              onPress={() =>
-                setSelectedStatus(
-                  selectedStatus === "in-progress" ? "all" : "in-progress",
-                )
-              }
-              activeOpacity={0.8}
-            >
-              <View
-                style={[
-                  styles.metricIconWrap,
-                  { backgroundColor: colors.warningLight },
-                ]}
-              >
-                <Ionicons name="time-outline" size={18} color={colors.warning} />
-              </View>
-              <Text style={styles.metricValue}>{stats.inProgress}</Text>
-              <Text style={styles.metricLabel}>{tr("In Progress")}</Text>
-            </TouchableOpacity>
-
-            {/* Total Applicants */}
-            <TouchableOpacity
-              style={styles.metricCard}
-              onPress={() => router.push('/(app)/applications')}
-              accessibilityRole="button"
-              accessibilityLabel={tr("View Applications")}
-              activeOpacity={0.8}
-            >
-              <View
-                style={[
-                  styles.metricIconWrap,
-                  { backgroundColor: colors.accentLight },
-                ]}
-              >
-                <Ionicons name="people-outline" size={18} color={colors.accent} />
-              </View>
-              <Text style={styles.metricValue}>{stats.totalApplicants}</Text>
-              <Text style={styles.metricLabel}>{tr("Applicants")}</Text>
-            </TouchableOpacity>
-
-            {/* Completed */}
-            <TouchableOpacity
-              style={[
-                styles.metricCard,
-                selectedStatus === "completed" && styles.metricCardSelected,
-              ]}
-              onPress={() =>
-                setSelectedStatus(
-                  selectedStatus === "completed" ? "all" : "completed",
-                )
-              }
-              activeOpacity={0.8}
-            >
-              <View
-                style={[
-                  styles.metricIconWrap,
-                  { backgroundColor: colors.infoLight },
-                ]}
-              >
-                <Ionicons
-                  name="checkmark-circle-outline"
-                  size={18}
-                  color={colors.info}
-                />
-              </View>
-              <Text style={styles.metricValue}>{stats.completed}</Text>
-              <Text style={styles.metricLabel}>{tr("Completed")}</Text>
-            </TouchableOpacity>
-
-            {/* Total Budget */}
-            <View style={styles.metricCard}>
-              <View
-                style={[
-                  styles.metricIconWrap,
-                  { backgroundColor: colors.successLight },
-                ]}
-              >
-                <Ionicons name="wallet-outline" size={18} color={colors.success} />
-              </View>
-              <Text style={styles.metricValue}>
-                {formatCurrency(stats.totalBudget)}
-              </Text>
-              <Text style={styles.metricLabel}>{tr("Total Budget")}</Text>
+        {/* Summary */}
+        <View style={styles.summary}>
+          <Pressable onPress={() => router.push('/(app)/applications' as any)} accessibilityRole="button"
+            style={({ pressed }) => [styles.summaryTile, pressed && styles.pressed]}>
+            <View style={[styles.summaryIcon, { backgroundColor: colors.accentLight }]}><Ionicons name="people-outline" size={18} color={colors.accent} /></View>
+            <Text style={styles.summaryValue}>{stats.totalApplicants}</Text>
+            <View style={styles.summaryLabelRow}>
+              <Text style={styles.summaryLabel}>{t('Applicants')}</Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
             </View>
-          </ScrollView>
-        </View>
-
-        {/* Search and Sort Toolbar */}
-        <View style={styles.toolbarSection}>
-          <View style={styles.searchBarContainer}>
-            <Ionicons
-              name="search-outline"
-              size={18}
-              color={colors.textMuted}
-            />
-            <TextInput
-              style={styles.searchInput}
-              placeholder={tr("Search by title, skill, location...")}
-              placeholderTextColor={colors.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCapitalize="none"
-              returnKeyType="search"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setSearchQuery("")}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons
-                  name="close-circle"
-                  size={18}
-                  color={colors.textMuted}
-                />
-              </TouchableOpacity>
-            )}
+          </Pressable>
+          <View style={styles.summaryTile}>
+            <View style={[styles.summaryIcon, { backgroundColor: colors.successLight }]}><Ionicons name="wallet-outline" size={18} color={colors.success} /></View>
+            <Text style={styles.summaryValue} numberOfLines={1} adjustsFontSizeToFit>{formatCurrency(stats.totalBudget)}</Text>
+            <Text style={styles.summaryLabel}>{t('Total Budget')}</Text>
           </View>
-
-          <TouchableOpacity
-            style={styles.sortButton}
-            onPress={() => setShowSortModal(true)}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="swap-vertical" size={16} color={colors.primary} />
-            <Text style={styles.sortButtonText} numberOfLines={1}>
-              {tr(getSortLabel(sortBy))}
-            </Text>
-          </TouchableOpacity>
         </View>
+        <Pressable onPress={() => router.push('/(app)/add-ratings' as any)} accessibilityRole="button"
+          style={({ pressed }) => [styles.rateRow, pressed && styles.pressed]}>
+          <Ionicons name="star-outline" size={18} color={colors.star} />
+          <Text style={styles.rateText}>{t('Rate freelancers you have worked with')}</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </Pressable>
 
-        {/* Status Filter Segmented Tabs */}
-        <View style={styles.statusTabsWrapper}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.statusTabsContainer}
-          >
-            {[
-              { id: "all", label: "All Gigs", count: stats.total },
-              { id: "open", label: "Open", count: stats.open },
-              {
-                id: "in-progress",
-                label: "In Progress",
-                count: stats.inProgress,
-              },
-              { id: "completed", label: "Completed", count: stats.completed },
-              { id: "cancelled", label: "Cancelled", count: stats.cancelled },
-            ].map((tab) => {
-              const isSelected = selectedStatus === tab.id;
-              return (
-                <TouchableOpacity
-                  key={tab.id}
-                  style={[
-                    styles.statusTab,
-                    isSelected && styles.statusTabSelected,
-                  ]}
-                  onPress={() => {
-                    try {
-                      Haptics.selectionAsync();
-                    } catch {}
-                    setSelectedStatus(tab.id as any);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.statusTabText,
-                      isSelected && styles.statusTabTextSelected,
-                    ]}
-                  >
-                    {tr(tab.label)}
-                  </Text>
-                  <View
-                    style={[
-                      styles.tabBadge,
-                      isSelected && styles.tabBadgeSelected,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.tabBadgeText,
-                        isSelected && styles.tabBadgeTextSelected,
-                      ]}
-                    >
-                      {tab.count}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Category Pills Filter */}
-        <View style={styles.categoriesWrapper}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesContainer}
-          >
-            <TouchableOpacity
-              style={[
-                styles.categoryChip,
-                selectedCategory === "all" && styles.categoryChipSelected,
-              ]}
-              onPress={() => setSelectedCategory("all")}
-              activeOpacity={0.8}
-            >
-              <Text
-                style={[
-                  styles.categoryChipText,
-                  selectedCategory === "all" && styles.categoryChipTextSelected,
-                ]}
-              >{tr("All Categories")}</Text>
-            </TouchableOpacity>
-
-            {GIG_CATEGORIES.map((cat) => {
-              const isSelected =
-                selectedCategory.toLowerCase() === cat.name.toLowerCase();
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[
-                    styles.categoryChip,
-                    isSelected && styles.categoryChipSelected,
-                  ]}
-                  onPress={() =>
-                    setSelectedCategory(isSelected ? "all" : cat.name)
-                  }
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name={cat.icon as any}
-                    size={14}
-                    color={isSelected ? colors.primaryOnColor : colors.textSecondary}
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      isSelected && styles.categoryChipTextSelected,
-                    ]}
-                  >
-                    {tr(cat.name)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Gigs List / Empty / Error Views */}
-        <View style={styles.listSection}>
-          <View style={styles.listHeaderRow}>
-            <Text style={styles.listCountText}>{tr("Showing {{visible}} of {{total}} gigs", { visible: filteredGigs.length, total: allGigs.length })}</Text>
-            {(searchQuery.length > 0 ||
-              selectedStatus !== "all" ||
-              selectedCategory !== "all") && (
-              <TouchableOpacity
-                onPress={() => {
-                  setSearchQuery("");
-                  setSelectedStatus("all");
-                  setSelectedCategory("all");
-                }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.resetFiltersText}>{tr("Reset Filters")}</Text>
-              </TouchableOpacity>
-            )}
+        {/* Search & sort */}
+        <View style={styles.toolbar}>
+          <View style={styles.flex}>
+            <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder={tr('Search by title, skill, location...')} />
           </View>
+          <Pressable onPress={() => setShowSort(true)} accessibilityRole="button" accessibilityLabel={t('Sort')}
+            style={({ pressed }) => [styles.sortButton, pressed && styles.pressed]}>
+            <Ionicons name="swap-vertical" size={18} color={colors.primary} />
+          </Pressable>
 
           {loading && user ? (
             <SkeletonList variant="gig" count={3} />
@@ -1048,370 +685,68 @@ export default function MyGigs() {
             </View>
           )}
         </View>
+
+        {/* Status filter */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow} style={styles.chipScroll}>
+          {statusTabs.map(tab => <Chip key={tab.id} label={t(tab.label)} count={tab.count}
+            variant={selectedStatus === tab.id ? 'selected' : 'default'}
+            onPress={() => { haptic('select'); setSelectedStatus(tab.id); }} />)}
+        </ScrollView>
+
+        {/* Category filter */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow} style={styles.chipScroll}>
+          <Chip label={t('All Categories')} variant={selectedCategory === 'all' ? 'selected' : 'default'} onPress={() => setSelectedCategory('all')} />
+          {GIG_CATEGORIES.map(cat => {
+            const isSelected = selectedCategory.toLowerCase() === cat.name.toLowerCase();
+            return <Chip key={cat.id} label={t(cat.name)} icon={cat.icon as any} variant={isSelected ? 'selected' : 'default'}
+              onPress={() => setSelectedCategory(isSelected ? 'all' : cat.name)} />;
+          })}
+        </ScrollView>
+
+        <View style={styles.listHeader}>
+          <Text style={styles.listCount}>{t('Showing {{visible}} of {{total}} gigs', { visible: filteredGigs.length, total: allGigs.length })}</Text>
+          {filtersActive && <Pressable onPress={clearFilters} hitSlop={8} accessibilityRole="button">
+            <Text style={styles.resetText}>{t('Reset Filters')}</Text>
+          </Pressable>}
+        </View>
+
+        {loading && user ? (
+          <SkeletonList variant="gig" count={3} />
+        ) : loadError ? (
+          <ErrorState title="Failed to Load Gigs" message={loadError} retryLabel="Retry" onRetry={handleRefresh} />
+        ) : filteredGigs.length === 0 ? (
+          allGigs.length === 0
+            ? <EmptyState icon="briefcase-outline" title="No Gigs Posted Yet"
+              description={tr('Start by posting your first gig. Reach skilled local youth and top freelancers in minutes.')}
+              actionLabel="Post Your First Gig" actionIcon="add-circle" onAction={() => router.push('/(app)/post-gig' as any)} />
+            : <EmptyState icon="filter-outline" title="No Matching Gigs Found"
+              description={tr('Try adjusting your search keywords, status tabs, or category filters.')}
+              actionLabel="Clear All Filters" onAction={clearFilters} secondary />
+        ) : (
+          <View style={styles.list}>
+            {filteredGigs.map(gig => <GigCard key={gig.id} gig={gig} showAssigned
+              onPress={setDetailGig} onStatusPress={setStatusGig} onApplicantsPress={openApplicants}
+              renderActions={renderActions} />)}
+          </View>
+        )}
       </ScrollView>
 
-      {/* Status Change Modal */}
-      <Modal
-        visible={statusModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setStatusModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.statusModalCard}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>{tr("Update Gig Status")}</Text>
-                <Text style={styles.modalSubtitle} numberOfLines={1}>
-                  {selectedGigForStatus?.title}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setStatusModalVisible(false)}
-                style={styles.modalCloseBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="close" size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
+      <GigDetailSheet gig={detailGig} onClose={() => setDetailGig(null)}
+        onEdit={editGig} onChangeStatus={openStatus} onApplicants={openApplicants} />
 
-            {statusUpdating ? (
-              <View style={styles.modalLoadingBox}>
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={styles.modalLoadingText}>{tr("Updating status in Firestore...")}</Text>
-              </View>
-            ) : (
-              <View style={styles.statusOptionsList}>
-                {(
-                  [
-                    "open",
-                    "in-progress",
-                    "completed",
-                    "cancelled",
-                  ] as GigStatus[]
-                ).map((statusKey) => {
-                  const cfg = STATUS_CONFIG[statusKey];
-                  const isCurrent = selectedGigForStatus?.status === statusKey;
+      <OptionSheet visible={!!statusGig} title="Update Gig Status" subtitle={statusGig?.title}
+        options={STATUS_OPTIONS} selected={statusGig?.status} loading={statusUpdating}
+        onSelect={handleUpdateStatus} onClose={() => setStatusGig(null)} />
 
-                  return (
-                    <TouchableOpacity
-                      key={statusKey}
-                      style={[
-                        styles.statusOptionRow,
-                        isCurrent && {
-                          backgroundColor: cfg.bg,
-                          borderColor: cfg.border,
-                        },
-                      ]}
-                      onPress={() => handleUpdateStatus(statusKey)}
-                      activeOpacity={0.8}
-                    >
-                      <View style={styles.statusOptionLeft}>
-                        <View
-                          style={[
-                            styles.statusOptionDot,
-                            { backgroundColor: cfg.text },
-                          ]}
-                        />
-                        <View>
-                          <Text
-                            style={[
-                              styles.statusOptionLabel,
-                              { color: isCurrent ? cfg.text : colors.text },
-                            ]}
-                          >
-                            {tr(cfg.label)}
-                          </Text>
-                          <Text style={styles.statusOptionDesc}>
-                            {statusKey === "open" &&
-                              "Accepting proposals & visible to applicants"}
-                            {statusKey === "in-progress" &&
-                              "Work is actively ongoing with a freelancer"}
-                            {statusKey === "completed" &&
-                              "Project completed and delivered"}
-                            {statusKey === "cancelled" &&
-                              "Listing closed and no longer accepting applications"}
-                          </Text>
-                        </View>
-                      </View>
+      <OptionSheet visible={showSort} title="Sort gigs" options={SORT_OPTIONS} selected={sortBy}
+        onSelect={id => { setSortBy(id); setShowSort(false); }} onClose={() => setShowSort(false)} />
 
-                      {isCurrent && (
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={20}
-                          color={cfg.text}
-                        />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
+      <ConfirmSheet visible={!!deleteTarget} destructive icon="trash-outline"
+        title="Delete Gig Listing" confirmLabel="Delete" loading={deleting} error={deleteError}
+        message={deleteTarget ? tr('Are you sure you want to permanently delete "{{value0}}"? This cannot be undone.', { value0: deleteTarget.title }) : undefined}
+        onConfirm={confirmDelete} onCancel={() => setDeleteTarget(null)} />
 
-      {/* Sort Option Modal */}
-      <Modal
-        visible={showSortModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowSortModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.sortModalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{tr("Sort Posted Gigs")}</Text>
-              <TouchableOpacity onPress={() => setShowSortModal(false)}>
-                <Ionicons name="close" size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.sortOptionsList}>
-              {[
-                {
-                  id: "newest",
-                  label: "Newest First (Default)",
-                  icon: "calendar-outline",
-                },
-                { id: "oldest", label: "Oldest First", icon: "time-outline" },
-                {
-                  id: "pay-high",
-                  label: "Highest Budget / Pay",
-                  icon: "trending-up-outline",
-                },
-                {
-                  id: "pay-low",
-                  label: "Lowest Budget / Pay",
-                  icon: "trending-down-outline",
-                },
-                {
-                  id: "applicants",
-                  label: "Most Applicants",
-                  icon: "people-outline",
-                },
-              ].map((opt) => {
-                const isSelected = sortBy === opt.id;
-                return (
-                  <TouchableOpacity
-                    key={opt.id}
-                    style={[
-                      styles.sortOptionItem,
-                      isSelected && styles.sortOptionItemSelected,
-                    ]}
-                    onPress={() => {
-                      setSortBy(opt.id as GigSortOption);
-                      setShowSortModal(false);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.sortOptionItemLeft}>
-                      <Ionicons
-                        name={opt.icon as any}
-                        size={18}
-                        color={
-                          isSelected ? colors.primary : colors.textSecondary
-                        }
-                      />
-                      <Text
-                        style={[
-                          styles.sortOptionItemLabel,
-                          isSelected && styles.sortOptionItemLabelSelected,
-                        ]}
-                      >
-                        {tr(opt.label)}
-                      </Text>
-                    </View>
-                    {isSelected && (
-                      <Ionicons
-                        name="checkmark"
-                        size={18}
-                        color={colors.primary}
-                      />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Gig Details Sheet Modal */}
-      <Modal
-        visible={detailModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDetailModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.detailModalCard}>
-            <View style={styles.detailModalHeader}>
-              <View style={styles.detailHeaderTop}>
-                <View style={styles.cardCategoryBadge}>
-                  <Text style={styles.cardCategoryText}>
-                    {selectedGigDetail?.category}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setDetailModalVisible(false)}
-                  style={styles.modalCloseBtn}
-                >
-                  <Ionicons name="close" size={22} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.detailTitle}>{selectedGigDetail?.title}</Text>
-            </View>
-
-            <ScrollView
-              style={styles.detailScrollBody}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Pay & Status Bar */}
-              <View style={styles.detailHighlightBox}>
-                <View>
-                  <Text style={styles.detailBoxLabel}>{tr("BUDGET / COMPENSATION")}</Text>
-                  <Text style={styles.detailPayAmount}>
-                    ${selectedGigDetail?.pay}
-                    <Text style={styles.detailPayType}>
-                      {selectedGigDetail?.payType === "hourly"
-                        ? tr(" / hour")
-                        : tr(" Fixed Price")}
-                    </Text>
-                  </Text>
-                </View>
-
-                {selectedGigDetail && (
-                  <View
-                    style={[
-                      styles.cardStatusBadge,
-                      {
-                        backgroundColor:
-                          STATUS_CONFIG[selectedGigDetail.status]?.bg,
-                        borderColor:
-                          STATUS_CONFIG[selectedGigDetail.status]?.border,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={STATUS_CONFIG[selectedGigDetail.status]?.icon}
-                      size={13}
-                      color={STATUS_CONFIG[selectedGigDetail.status]?.text}
-                    />
-                    <Text
-                      style={[
-                        styles.cardStatusText,
-                        {
-                          color: STATUS_CONFIG[selectedGigDetail.status]?.text,
-                        },
-                      ]}
-                    >
-                      {tr(STATUS_CONFIG[selectedGigDetail.status]?.label)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Specs Grid */}
-              <View style={styles.detailSpecsGrid}>
-                <View style={styles.detailSpecItem}>
-                  <Ionicons
-                    name="calendar-outline"
-                    size={16}
-                    color={colors.primary}
-                  />
-                  <View>
-                    <Text style={styles.specLabel}>{tr("Date / Deadline")}</Text>
-                    <Text style={styles.specVal}>
-                      {selectedGigDetail?.date || tr("Flexible")}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.detailSpecItem}>
-                  <Ionicons
-                    name={
-                      selectedGigDetail?.locationType === "remote"
-                        ? "globe-outline"
-                        : "location-outline"
-                    }
-                    size={16}
-                    color={colors.primary}
-                  />
-                  <View>
-                    <Text style={styles.specLabel}>{tr("Location (")}{selectedGigDetail?.locationType})
-                    </Text>
-                    <Text style={styles.specVal} numberOfLines={1}>
-                      {selectedGigDetail?.location || tr("Remote")}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.detailSpecItem}>
-                  <Ionicons
-                    name="people-outline"
-                    size={16}
-                    color={colors.primary}
-                  />
-                  <View>
-                    <Text style={styles.specLabel}>{tr("Total Applicants")}</Text>
-                    <Text style={styles.specVal}>
-                      {selectedGigDetail?.applicantsCount || 0}{' '}{tr("applicants")}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.detailSpecItem}>
-                  <Ionicons
-                    name="document-text-outline"
-                    size={16}
-                    color={colors.primary}
-                  />
-                  <View>
-                    <Text style={styles.specLabel}>{tr("Gig ID")}</Text>
-                    <Text style={styles.specVal} numberOfLines={1}>
-                      {selectedGigDetail?.id}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Description */}
-              <Text style={styles.detailSectionHeading}>{tr("Job Description")}</Text>
-              <Text style={styles.detailDescriptionText}>
-                {selectedGigDetail?.description}
-              </Text>
-
-              {/* Required Skills */}
-              {selectedGigDetail?.skills &&
-                selectedGigDetail.skills.length > 0 && (
-                  <>
-                    <Text style={styles.detailSectionHeading}>{tr("Required Skills")}</Text>
-                    <View style={styles.detailSkillsWrap}>
-                      {selectedGigDetail.skills.map((skill, i) => (
-                        <View key={i} style={styles.detailSkillChip}>
-                          <Text style={styles.detailSkillChipText}>
-                            {skill}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  </>
-                )}
-            </ScrollView>
-
-            <View style={styles.detailModalFooter}>
-              <TouchableOpacity
-                style={styles.detailEditBtn}
-                onPress={() => {
-                  setDetailModalVisible(false);
-                  if (selectedGigDetail) handleEditGig(selectedGigDetail);
-                }}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="create-outline" size={16} color={colors.primaryOnColor} />
-                <Text style={styles.detailEditBtnText}>{tr("Update Gig")}</Text>
-              </TouchableOpacity>
-
+      {applicantsGig && (
               <TouchableOpacity
                 style={styles.detailChangeStatusBtn}
                 onPress={() => {
@@ -1445,38 +780,30 @@ export default function MyGigs() {
       {/* Applicant List Modal */}
       {selectedGigForApplicants && (
         <ApplicantListModal
-          visible={Boolean(selectedGigForApplicants)}
-          gigId={selectedGigForApplicants.id}
-          gigTitle={selectedGigForApplicants.title}
+          visible
+          gigId={applicantsGig.id}
+          gigTitle={applicantsGig.title}
           businessId={user?.uid || ''}
-          gigDate={selectedGigForApplicants.date}
-          gigTime={selectedGigForApplicants.time}
-          gigLocation={selectedGigForApplicants.location}
-          gigPay={selectedGigForApplicants.pay}
-          gigPayType={selectedGigForApplicants.payType}
-          onClose={() => setSelectedGigForApplicants(null)}
+          gigDate={applicantsGig.date}
+          gigTime={applicantsGig.time}
+          gigLocation={applicantsGig.location}
+          gigPay={applicantsGig.pay}
+          gigPayType={applicantsGig.payType}
+          onClose={() => setApplicantsGig(null)}
         />
       )}
 
-      {/* Rating Modal */}
       {ratingTarget && (
         <RatingModal
-          visible={ratingModalVisible}
+          visible
           targetUserId={ratingTarget.userId}
           targetUserName={ratingTarget.userName}
           targetUserPhotoURL={ratingTarget.userPhotoURL}
           targetRole="freelancer"
           gigId={ratingTarget.gigId}
           gigTitle={ratingTarget.gigTitle}
-          onClose={() => {
-            setRatingModalVisible(false);
-            setRatingTarget(null);
-          }}
-          onSuccess={() => {
-            setRatingModalVisible(false);
-            setRatingTarget(null);
-            toast.success(tr("Review submitted successfully!"));
-          }}
+          onClose={() => setRatingTarget(null)}
+          onSuccess={() => { setRatingTarget(null); toast.success(tr('Review submitted successfully!')); }}
         />
       )}
 
@@ -1502,6 +829,39 @@ export default function MyGigs() {
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  centered: { justifyContent: 'center', padding: spacing.lg },
+  flex: { flex: 1 },
+  pressed: { opacity: 0.75 },
+
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.md },
+  headerCopy: { flex: 1 },
+  headerTitle: { ...typography.h1, color: colors.text },
+  headerSubtitle: { ...typography.bodySmall, color: colors.textSecondary },
+  postButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 44, paddingHorizontal: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.primary },
+  postButtonText: { ...typography.title, fontSize: 15, color: colors.primaryOnColor },
+
+  scrollContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md },
+
+  summary: { flexDirection: 'row', gap: spacing.sm + spacing.xs },
+  summaryTile: { flex: 1, padding: spacing.md, borderRadius: borderRadius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder, gap: spacing.xs },
+  summaryIcon: { width: 36, height: 36, borderRadius: borderRadius.sm + 2, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
+  summaryValue: { ...typography.h2, color: colors.text },
+  summaryLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  summaryLabel: { ...typography.bodySmall, color: colors.textSecondary },
+  rateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + spacing.xs, minHeight: 52, paddingHorizontal: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
+  rateText: { ...typography.body, flex: 1, color: colors.text },
+
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sortButton: { width: 48, height: 48, borderRadius: borderRadius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
+
+  chipScroll: { marginHorizontal: -spacing.md, flexGrow: 0 },
+  chipRow: { gap: spacing.sm, paddingHorizontal: spacing.md },
+
+  listHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  listCount: { ...typography.bodySmall, color: colors.textSecondary },
+  resetText: { ...typography.label, color: colors.primary },
+  list: { gap: spacing.md },
   container: {
     flex: 1,
     backgroundColor: colors.background,

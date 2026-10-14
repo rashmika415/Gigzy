@@ -1,20 +1,26 @@
-import { formatDate as localizedDate } from '../../localization/format';
+import { formatCurrency, formatDate as localizedDate } from '../../localization/format';
 import { useTranslation } from 'react-i18next';
 import { translate as tr } from '../../localization/i18n';
-import React, { useRef, useState } from 'react';
-import { Modal, View, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView, Image, Alert, ActivityIndicator, Platform } from 'react-native';
+import { useState } from 'react';
+import type { ReactNode } from 'react';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import { router } from 'expo-router';
+import { colors, spacing, borderRadius, typography } from '../../constants/theme';
 import type { Application } from '../../types/application';
-import { acceptApplication, rejectApplication } from '../../services/applicationService';
 import { addGigToCalendar } from '../../services/calendarService';
 import { RatingModal } from '../reviews';
 import { ReportModal } from '../reports';
 import { getStatusTheme } from './ApplicationCard';
 import { router } from 'expo-router';
 import { useToast } from '../../context/ToastContext';
+import { RatingModal } from '../reviews';
+import Chip from '../Chip';
+import { ApplicantAvatar, ApplicationStatusPill, toDate } from './ApplicantCard';
+import useApplicantDecision from './useApplicantDecision';
 
 interface ApplicantDetailModalProps {
   visible: boolean;
@@ -25,34 +31,35 @@ interface ApplicantDetailModalProps {
   onAccepted?: (app: Application) => void;
 }
 
-function formatDate(timestamp: any): string {
-  if (!timestamp) return 'Recently';
-  const date = timestamp?.toDate
-    ? timestamp.toDate()
-    : timestamp?.toMillis
-    ? new Date(timestamp.toMillis())
-    : new Date(timestamp);
-
-  if (isNaN(date.getTime())) return 'Recently';
-  return localizedDate(date, {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  const { t } = useTranslation();
+  return <View style={styles.section}>
+    <Text style={styles.sectionTitle}>{t(title)}</Text>
+    {children}
+  </View>;
 }
 
-export default function ApplicantDetailModal({
-  visible,
-  application,
-  businessId,
-  onClose,
-  onStatusChanged,
-  onAccepted,
-}: ApplicantDetailModalProps) {
-  useTranslation();
-  const [acting, setActing] = useState(false);
-  const submitting = useRef(false);
+export default function ApplicantDetailModal({ visible, application, businessId, onClose, onStatusChanged, onAccepted }: ApplicantDetailModalProps) {
+  const { t } = useTranslation();
   const toast = useToast();
+  const [calendarState, setCalendarState] = useState<'idle' | 'adding' | 'added'>('idle');
+  const [showRating, setShowRating] = useState(false);
+  const { request, busyId, sheet } = useApplicantDecision(businessId, {
+    onAccepted: app => {
+      onStatusChanged?.('accepted');
+      if (onAccepted) onAccepted(app);
+      else { toast.success(tr('Application Accepted! 🎉')); onClose(); }
+    },
+    onRejected: () => { onStatusChanged?.('rejected'); onClose(); },
+  });
+
+  if (!application) return null;
+
+  const applied = toDate(application.createdAt);
+  const isPending = application.status === 'pending';
+  const isHired = application.status === 'accepted' || application.status === 'completed';
+  const busy = busyId === application.id;
+  const name = application.youthName || t('Youth Freelancer');
   const [errorMsg, setErrorMsg] = useState('');
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [calendarAdded, setCalendarAdded] = useState(false);
@@ -68,366 +75,115 @@ export default function ApplicantDetailModal({
   const isPending = statusLower === 'pending';
   const isAccepted = ['accepted', 'approved', 'in-progress', 'completed'].includes(statusLower);
 
-  const handleMessageApplicant = () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
+  const openChat = () => {
     onClose();
-    const convId = application.conversationId || `conv_${application.id}`;
-    router.push({
-      pathname: '/(app)/chat/[id]',
-      params: { id: convId },
-    } as any);
+    router.push({ pathname: '/(app)/chat/[id]', params: { id: application.conversationId || `conv_${application.id}` } } as any);
   };
 
-  const handleAddToCalendar = async () => {
-    setCalendarAdding(true);
+  const addToCalendar = async () => {
+    if (calendarState !== 'idle') return;
+    setCalendarState('adding');
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {}
-
-    const result = await addGigToCalendar({
-      title: application.gigTitle || 'Gig',
-      date: application.gigDate || new Date().toISOString().slice(0, 10),
-      time: undefined,
-      location: application.gigLocation,
-      pay: application.gigPay,
-      payType: application.gigPayType,
-      counterpartName: application.youthName,
-      counterpartRole: 'freelancer',
-      gigId: application.gigId,
-      applicationId: application.id,
-      description: `Accepted Gigzy gig with youth freelancer ${application.youthName || ''}`,
-    });
-
-    setCalendarAdding(false);
-    if (result.success) {
-      setCalendarAdded(true);
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
-      Alert.alert(
-        'Gig Added to Calendar! 📅',
-        result.method === 'native'
-          ? `Added "${application.gigTitle || 'Gig'}" to your device calendar.`
-          : `Opened calendar for "${application.gigTitle || 'Gig'}".`
-      );
-    } else {
-      Alert.alert('Calendar', result.error || 'Could not add gig to calendar.');
-    }
-  };
-
-  const executeAccept = async () => {
-    if (submitting.current || !isPending) return;
-    submitting.current = true;
-    setActing(true);
-    setErrorMsg('');
-    try {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      } catch {}
-      await acceptApplication(application.id, businessId);
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
-      if (onAccepted) {
-        onAccepted(application);
-      } else {
-        toast.success(
-          tr("Application Accepted! 🎉"),
-          tr("You have accepted {{value0}} for \"{{value1}}\". Work is now in progress and a notification has been sent to the youth freelancer's dashboard.", { value0: application.youthName || 'this applicant', value1: application.gigTitle || 'this gig' })
-        );
-        router.push('/(app)/(tabs)/home' as any);
-      }
-      if (onStatusChanged) onStatusChanged('accepted');
-      onClose();
+      const result = await addGigToCalendar({
+        title: application.gigTitle || 'Gig',
+        date: application.gigDate || new Date().toISOString().slice(0, 10),
+        time: application.gigTime,
+        location: application.gigLocation,
+        pay: application.gigPay,
+        payType: application.gigPayType,
+        counterpartName: application.youthName,
+        counterpartRole: 'freelancer',
+        gigId: application.gigId,
+        applicationId: application.id,
+        description: `Accepted Gigzy gig with youth freelancer ${application.youthName || ''}`,
+      });
+      if (!result.success) throw new Error(result.error || 'Could not add gig to calendar.');
+      setCalendarState('added');
+      if (Platform.OS !== 'web') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      toast.success(tr('Added to calendar'));
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to accept application.');
-    } finally {
-      submitting.current = false;
-      setActing(false);
-    }
-  };
-
-  const executeReject = async () => {
-    if (submitting.current || !isPending) return;
-    submitting.current = true;
-    setActing(true);
-    setErrorMsg('');
-    try {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      } catch {}
-      await rejectApplication(application.id, businessId);
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      } catch {}
-      toast.success(tr("Application Rejected"), tr("The application has been rejected."));
-      if (onStatusChanged) onStatusChanged('rejected');
-      onClose();
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to reject application.');
-    } finally {
-      submitting.current = false;
-      setActing(false);
-    }
-  };
-
-  const handleAccept = () => {
-    if (Platform.OS === 'web') {
-      const confirmPrompt = tr("Are you sure you want to accept {{value0}} for \"{{value1}}\"?", { value0: application.youthName || 'this applicant', value1: application.gigTitle || 'this gig' });
-      if (typeof window !== 'undefined' && window.confirm) {
-        if (window.confirm(confirmPrompt)) {
-          void executeAccept();
-        }
-      } else {
-        void executeAccept();
-      }
-    } else {
-      Alert.alert(
-        tr("Accept Application"),
-        tr("Are you sure you want to accept {{value0}} for \"{{value1}}\"?", { value0: application.youthName || 'this applicant', value1: application.gigTitle || 'this gig' }),
-        [
-          { text: tr("Cancel"), style: 'cancel' },
-          {
-            text: tr("Accept Applicant"),
-            style: 'default',
-            onPress: () => void executeAccept(),
-          },
-        ]
-      );
-    }
-  };
-
-  const handleReject = () => {
-    if (Platform.OS === 'web') {
-      const confirmPrompt = tr("Are you sure you want to reject this application from {{value0}}?", { value0: application.youthName || 'this applicant' });
-      if (typeof window !== 'undefined' && window.confirm) {
-        if (window.confirm(confirmPrompt)) {
-          void executeReject();
-        }
-      } else {
-        void executeReject();
-      }
-    } else {
-      Alert.alert(
-        tr("Reject Application"),
-        tr("Are you sure you want to reject this application from {{value0}}?", { value0: application.youthName || 'this applicant' }),
-        [
-          { text: tr("Cancel"), style: 'cancel' },
-          {
-            text: tr("Reject"),
-            style: 'destructive',
-            onPress: () => void executeReject(),
-          },
-        ]
-      );
+      setCalendarState('idle');
+      toast.error(tr('Could not add gig to calendar.'), err?.message ? tr(err.message) : undefined);
     }
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={false}
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={onClose}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel={tr("Close applicant details")}
-          >
-            <Ionicons name="close" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{tr("Applicant Details")}</Text>
-          <View style={{ width: 38 }} />
+          <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('Close applicant details')}
+            style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
+          </Pressable>
+          <Text accessibilityRole="header" style={styles.headerTitle}>{t('Applicant Details')}</Text>
         </View>
 
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Error Banner if any */}
-          {errorMsg ? (
-            <View style={styles.errorBox}>
-              <Ionicons name="alert-circle" size={18} color={colors.error} />
-              <Text style={styles.errorText}>{tr(errorMsg)}</Text>
-            </View>
-          ) : null}
-
-          {/* Profile Overview Card */}
-          <View style={styles.profileCard}>
-            <View style={styles.avatarRow}>
-              {application.youthPhotoURL ? (
-                <Image source={{ uri: application.youthPhotoURL }} style={styles.avatar} />
-              ) : (
-                <View style={styles.avatarFallback}>
-                  <Text style={styles.avatarText}>{initial}</Text>
+        <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.profile}>
+            <ApplicantAvatar application={application} size={64} />
+            <View style={styles.profileCopy}>
+              <Text style={styles.name}>{name}</Text>
+              {applied && <Text style={styles.meta}>{t('Applied on {{date}}', { date: localizedDate(applied, { month: 'long', day: 'numeric', year: 'numeric' }) })}</Text>}
+              {!!application.youthRatingAverage && application.youthRatingAverage > 0 && (
+                <View style={styles.rating}>
+                  <Ionicons name="star" size={14} color={colors.star} />
+                  <Text style={styles.meta}>
+                    {application.youthRatingAverage.toFixed(1)}{application.youthRatingCount ? t(' ({{value0}} reviews)', { value0: application.youthRatingCount }) : ''}
+                  </Text>
                 </View>
               )}
-              <View style={styles.nameWrap}>
-                <Text style={styles.youthName}>
-                  {application.youthName || tr("Youth Freelancer")}
-                </Text>
-                <Text style={styles.appliedDate}>{tr("Applied on")}{' '}{appliedDateStr}</Text>
-                {application.youthRatingAverage && application.youthRatingAverage > 0 ? (
-                  <View style={styles.detailRatingBadge}>
-                    <Ionicons name="star" size={13} color={colors.star} />
-                    <Text style={styles.detailRatingText}>
-                      {application.youthRatingAverage.toFixed(1)}{' '}{tr("Rating")}{application.youthRatingCount ? tr(" ({{value0}} reviews)", { value0: application.youthRatingCount }) : ''}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
             </View>
+            <ApplicationStatusPill status={application.status} />
+          </View>
 
-            {/* Status Badge */}
-            <View
-              style={[
-                styles.statusBanner,
-                { backgroundColor: statusTheme.bg, borderColor: statusTheme.border },
-              ]}
-            >
-              <Ionicons name={statusTheme.icon} size={18} color={statusTheme.text} />
-              <Text style={[styles.statusBannerText, { color: statusTheme.text }]}>{tr("Application Status:")}{' '}{tr(statusTheme.label)}
+          <Section title="Message">
+            <Text style={styles.body}>{application.message || t('No message provided.')}</Text>
+          </Section>
+
+          <Section title="Availability">
+            <View style={styles.availability}>
+              <Ionicons name={application.availabilityConfirmed ? 'checkmark-circle' : 'help-circle-outline'} size={20}
+                color={application.availabilityConfirmed ? colors.success : colors.warning} />
+              <Text style={styles.body}>
+                {application.availabilityConfirmed
+                  ? t('Confirmed available on the required date and time.')
+                  : t('Has not confirmed availability yet. Ask in chat before hiring.')}
               </Text>
             </View>
-          </View>
+          </Section>
 
-          {/* Application Message Card */}
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>{tr("APPLICATION MESSAGE")}</Text>
-            <View style={styles.messageBox}>
-              <Ionicons
-                name="chatbubble-ellipses-outline"
-                size={18}
-                color={colors.primary}
-                style={{ marginTop: 2 }}
-              />
-              <Text style={styles.messageText}>
-                {application.message || tr("No message provided.")}
-              </Text>
-            </View>
-          </View>
+          {!!application.youthSkills?.length && (
+            <Section title="Skills">
+              <View style={styles.skills}>{application.youthSkills.map(skill => <Chip key={skill} label={skill} size="sm" />)}</View>
+            </Section>
+          )}
 
-          {/* Availability Card */}
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>{tr("AVAILABILITY CONFIRMATION")}</Text>
-            <View style={styles.availabilityRow}>
-              <View style={styles.checkCircle}>
-                <Ionicons name="checkmark" size={16} color={colors.success} />
-              </View>
-              <Text style={styles.availabilityText}>{tr("Confirmed available on the required date and time.")}</Text>
-            </View>
-          </View>
+          {!!application.youthBio && (
+            <Section title="About">
+              <Text style={styles.body}>{application.youthBio}</Text>
+            </Section>
+          )}
 
-          {/* Skills Card */}
-          {application.youthSkills && application.youthSkills.length > 0 ? (
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>{tr("SKILLS & SPECIALTIES")}</Text>
-              <View style={styles.skillsWrap}>
-                {application.youthSkills.map((skill, idx) => (
-                  <View key={idx} style={styles.skillBadge}>
-                    <Ionicons name="checkmark-circle-outline" size={14} color={colors.primary} />
-                    <Text style={styles.skillBadgeText}>{skill}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : null}
-
-          {/* Bio Card */}
-          {application.youthBio ? (
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>{tr("BIO / BACKGROUND")}</Text>
-              <Text style={styles.bioText}>{application.youthBio}</Text>
-            </View>
-          ) : null}
-
-          {/* Gig Context */}
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>{tr("GIG APPLIED FOR")}</Text>
-            <Text style={styles.gigTitle}>{application.gigTitle || tr("Gig Title")}</Text>
-            {application.gigLocation ? (
-              <View style={styles.metaRow}>
+          <Section title="Applied for">
+            <Text style={styles.gigTitle}>{application.gigTitle || t('Gig Title')}</Text>
+            <View style={styles.gigMeta}>
+              {!!application.gigLocation && <View style={styles.metaItem}>
                 <Ionicons name="location-outline" size={15} color={colors.textSecondary} />
-                <Text style={styles.metaText}>{application.gigLocation}</Text>
-              </View>
-            ) : null}
-            {application.gigPay !== undefined && application.gigPay !== null ? (
-              <View style={styles.metaRow}>
+                <Text style={styles.meta}>{application.gigLocation}</Text>
+              </View>}
+              {application.gigPay != null && <View style={styles.metaItem}>
                 <Ionicons name="wallet-outline" size={15} color={colors.primary} />
-                <Text style={[styles.metaText, { color: colors.primary, fontFamily: fonts.bodyBold }]}>
-                  ${application.gigPay}
-                  {application.gigPayType === 'hourly' ? tr("/hr") : tr(" fixed")}
+                <Text style={[styles.meta, styles.pay]}>
+                  {formatCurrency(application.gigPay)}{application.gigPayType === 'hourly' ? t('/hr') : t(' fixed')}
                 </Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Action Buttons (Only when Pending) */}
-          {isPending ? (
-            <View style={styles.actionsContainer}>
-              <TouchableOpacity
-                style={[styles.rejectBtn, acting && styles.disabledBtn]}
-                onPress={handleReject}
-                disabled={acting}
-                activeOpacity={0.85}
-              >
-                {acting ? (
-                  <ActivityIndicator size="small" color={colors.error} />
-                ) : (
-                  <>
-                    <Ionicons name="close-circle-outline" size={18} color={colors.error} />
-                    <Text style={styles.rejectBtnText}>{tr("Reject")}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.acceptBtn, acting && styles.disabledBtn]}
-                onPress={handleAccept}
-                disabled={acting}
-                activeOpacity={0.85}
-              >
-                {acting ? (
-                  <ActivityIndicator size="small" color={colors.primaryOnColor} />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-circle-outline" size={18} color={colors.primaryOnColor} />
-                    <Text style={styles.acceptBtnText}>{tr("Accept")}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              </View>}
             </View>
-          ) : (
-            <View>
-              <View style={styles.finalizedNotice}>
-                <Ionicons
-                  name={application.status === 'accepted' ? 'checkmark-circle' : 'information-circle'}
-                  size={20}
-                  color={statusTheme.text}
-                />
-                <Text style={[styles.finalizedNoticeText, { color: statusTheme.text }]}>{tr("This application has already been")}{' '}{tr(application.status)}.
-                </Text>
-              </View>
+          </Section>
 
-              {(isAccepted || application.status === 'completed') && (
-                <View style={styles.acceptedActionsContainer}>
-                  <TouchableOpacity
-                    style={styles.actionChatBtn}
-                    onPress={handleMessageApplicant}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="chatbubbles" size={18} color={colors.primaryOnColor} />
-                    <Text style={styles.actionChatBtnText}>{tr("Message Freelancer")}</Text>
-                  </TouchableOpacity>
-
+          {application.status === 'rejected' && (
+            <View style={styles.notice}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
+              <Text style={styles.meta}>{t('You rejected this application.')}</Text>
                   <TouchableOpacity
                     style={[
                       styles.actionCalendarBtn,
@@ -481,6 +237,53 @@ export default function ApplicantDetailModal({
           )}
         </ScrollView>
 
+        {(isPending || isHired) && (
+          <View style={styles.footer}>
+            {isPending ? (busy ? <ActivityIndicator color={colors.primary} style={styles.footerBusy} /> : <View style={styles.footerRow}>
+              <Pressable onPress={() => request(application, 'reject')} accessibilityRole="button"
+                style={({ pressed }) => [styles.button, styles.rejectButton, pressed && styles.pressed]}>
+                <Ionicons name="close" size={18} color={colors.error} />
+                <Text style={styles.rejectText}>{t('Reject')}</Text>
+              </Pressable>
+              <Pressable onPress={() => request(application, 'accept')} accessibilityRole="button"
+                style={({ pressed }) => [styles.button, styles.primaryButton, styles.grow, pressed && styles.pressed]}>
+                <Ionicons name="checkmark" size={18} color={colors.primaryOnColor} />
+                <Text style={styles.primaryText}>{t('Accept & hire')}</Text>
+              </Pressable>
+            </View>) : <>
+              <Pressable onPress={openChat} accessibilityRole="button"
+                style={({ pressed }) => [styles.button, styles.primaryButton, pressed && styles.pressed]}>
+                <Ionicons name="chatbubbles-outline" size={18} color={colors.primaryOnColor} />
+                <Text style={styles.primaryText}>{t('Message Freelancer')}</Text>
+              </Pressable>
+              <View style={styles.footerRow}>
+                <Pressable onPress={addToCalendar} disabled={calendarState !== 'idle'} accessibilityRole="button"
+                  accessibilityState={{ busy: calendarState === 'adding', disabled: calendarState !== 'idle' }}
+                  style={({ pressed }) => [styles.button, styles.secondaryButton, styles.grow, pressed && styles.pressed]}>
+                  {calendarState === 'adding' ? <ActivityIndicator color={colors.primary} /> : <>
+                    <Ionicons name={calendarState === 'added' ? 'checkmark-circle' : 'calendar-outline'} size={18}
+                      color={calendarState === 'added' ? colors.success : colors.primary} />
+                    <Text style={[styles.secondaryText, calendarState === 'added' && { color: colors.success }]}>
+                      {calendarState === 'added' ? t('In calendar') : t('Add to Calendar')}
+                    </Text>
+                  </>}
+                </Pressable>
+                <Pressable onPress={() => setShowRating(true)} accessibilityRole="button"
+                  style={({ pressed }) => [styles.button, styles.secondaryButton, styles.grow, pressed && styles.pressed]}>
+                  <Ionicons name="star-outline" size={18} color={colors.star} />
+                  <Text style={styles.secondaryText}>{t('Rate')}</Text>
+                </Pressable>
+              </View>
+            </>}
+          </View>
+        )}
+
+        {sheet}
+        {application.youthId ? (
+          <RatingModal
+            visible={showRating}
+            targetUserId={application.youthId}
+            targetUserName={name}
         {Boolean(application?.youthId) ? (
           <RatingModal
             visible={showRatingModal}
@@ -494,6 +297,8 @@ export default function ApplicantDetailModal({
             targetRole="freelancer"
             gigId={application.gigId}
             gigTitle={application.gigTitle}
+            onClose={() => setShowRating(false)}
+            onSuccess={() => { setShowRating(false); toast.success(tr('Review submitted successfully!')); }}
             onClose={() => setShowRatingModal(false)}
             onSuccess={() => {
               setShowRatingModal(false);
@@ -521,6 +326,39 @@ export default function ApplicantDetailModal({
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
+  pressed: { opacity: 0.8 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + spacing.xs, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.surfaceBorder },
+  close: { width: 44, height: 44, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated },
+  headerTitle: { ...typography.h3, color: colors.text },
+  content: { padding: spacing.md, gap: spacing.sm + spacing.xs, paddingBottom: spacing.xl },
+  profile: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + spacing.xs, padding: spacing.md, borderRadius: borderRadius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
+  profileCopy: { flex: 1, minWidth: 0, gap: 2 },
+  name: { ...typography.h3, color: colors.text },
+  meta: { ...typography.bodySmall, color: colors.textSecondary, flexShrink: 1 },
+  rating: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  section: { padding: spacing.md, borderRadius: borderRadius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder, gap: spacing.sm },
+  sectionTitle: { ...typography.label, color: colors.textSecondary },
+  body: { ...typography.body, color: colors.text, flexShrink: 1 },
+  availability: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  skills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
+  gigTitle: { ...typography.title, color: colors.text },
+  gigMeta: { gap: spacing.xs + 2 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
+  pay: { color: colors.primary, fontFamily: typography.label.fontFamily },
+  notice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.surfaceElevated },
+  footer: { padding: spacing.md, gap: spacing.sm, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.surfaceBorder },
+  footerRow: { flexDirection: 'row', gap: spacing.sm },
+  footerBusy: { minHeight: 48 },
+  button: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderRadius: borderRadius.md },
+  grow: { flex: 1 },
+  primaryButton: { backgroundColor: colors.primary },
+  primaryText: { ...typography.title, fontSize: 15, color: colors.primaryOnColor },
+  secondaryButton: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
+  secondaryText: { ...typography.title, fontSize: 15, color: colors.primary },
+  rejectButton: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.errorBorder },
+  rejectText: { ...typography.title, fontSize: 15, color: colors.error },
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,

@@ -135,7 +135,7 @@ export function validateGigForm(form: GigInput, isEdit = false): { isValid: bool
     if (isNaN(numericPay) || numericPay <= 0) {
       errors.pay = 'Pay amount must be a positive number greater than 0.';
     } else if (numericPay > 1000000) {
-      errors.pay = 'Pay amount exceeds the allowable limit ($1,000,000).';
+      errors.pay = 'Pay amount exceeds the allowable limit (LKR 1,000,000).';
     }
   }
 

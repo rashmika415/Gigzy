@@ -2,7 +2,7 @@ import { formatCurrency, formatCalendarDate } from '../localization/format';
 import { Text } from './LocalizedText';
 import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
+import { View, StyleSheet, ViewStyle, Pressable } from 'react-native';
 import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
@@ -30,6 +30,10 @@ interface GigCardProps {
   style?: ViewStyle;
   /** Show the youth account bookmark control. */
   showBookmark?: boolean;
+  /** Makes the applicants chip tappable with a full "N applicants" label (business view). */
+  onApplicantsPress?: (gig: Gig) => void;
+  /** Show a banner when a freelancer has been hired for this gig (business view). */
+  showAssigned?: boolean;
 }
 
 export default function GigCard({
@@ -40,6 +44,8 @@ export default function GigCard({
   maxSkills = 3,
   style,
   showBookmark = false,
+  onApplicantsPress,
+  showAssigned = false,
 }: GigCardProps) {
   const { t } = useTranslation();
   const locationIcon =
@@ -77,6 +83,13 @@ export default function GigCard({
         </View>
       </View>
 
+      {showAssigned && Boolean(gig.assignedYouthId || gig.status === 'in-progress') && (
+        <View style={styles.assignedBanner}>
+          <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+          <Text style={styles.assignedText}>{t("Freelancer hired")}</Text>
+        </View>
+      )}
+
       {/* ── Description ── */}
       <Text style={styles.description} numberOfLines={2}>
         {gig.description}
@@ -112,10 +125,16 @@ export default function GigCard({
           <Text style={styles.metaText}>{gig.date ? formatCalendarDate(gig.date) : t("Flexible")}</Text>
         </View>
 
-        <View
-          style={[
+        <Pressable
+          disabled={!onApplicantsPress}
+          onPress={() => onApplicantsPress?.(gig)}
+          hitSlop={8}
+          accessibilityRole={onApplicantsPress ? 'button' : undefined}
+          accessibilityLabel={t('{{count}} applicants', { count: gig.applicantsCount || 0 })}
+          style={({ pressed }) => [
             styles.applicantsChip,
             gig.applicantsCount > 0 && styles.applicantsChipActive,
+            pressed && styles.pressed,
           ]}
         >
           <Ionicons
@@ -129,9 +148,12 @@ export default function GigCard({
               gig.applicantsCount > 0 && styles.applicantsTextActive,
             ]}
           >
-            {gig.applicantsCount || 0}
+            {onApplicantsPress
+              ? t('{{count}} applicants', { count: gig.applicantsCount || 0 })
+              : gig.applicantsCount || 0}
           </Text>
-        </View>
+          {onApplicantsPress && <Ionicons name="chevron-forward" size={12} color={gig.applicantsCount > 0 ? colors.success : colors.textMuted} />}
+        </Pressable>
       </View>
     </>
   );
@@ -279,9 +301,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.full,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     gap: 4,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  assignedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs + 2,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.successLight,
+  },
+  assignedText: {
+    ...typography.caption,
+    fontFamily: typography.label.fontFamily,
+    color: colors.success,
   },
   applicantsChipActive: {
     backgroundColor: colors.successLight,

@@ -1,11 +1,9 @@
-import { formatDate as localizedDate } from '../../localization/format';
+import { formatCurrency, formatDate as localizedDate } from '../../localization/format';
 import { useTranslation } from 'react-i18next';
-import { translate as tr } from '../../localization/i18n';
-import React from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../LocalizedText';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import { colors, spacing, borderRadius, shadows, typography } from '../../constants/theme';
 import type { Application, ApplicationStatus } from '../../types/application';
 
 interface ApplicationCardProps {
@@ -51,104 +49,73 @@ export function getStatusTheme(status: ApplicationStatus) {
   }
 }
 
-function formatDate(timestamp: any): string {
-  if (!timestamp) return '';
-  const date = timestamp?.toDate
-    ? timestamp.toDate()
-    : timestamp?.toMillis
-    ? new Date(timestamp.toMillis())
-    : new Date(timestamp);
+export function ApplicationStatusPill({ status }: { status: Application['status'] }) {
+  const { t } = useTranslation();
+  const theme = getStatusTheme(status);
+  return <View style={[styles.statusPill, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+    <Ionicons name={theme.icon} size={12} color={theme.text} />
+    <Text style={[styles.statusText, { color: theme.text }]}>{t(theme.label)}</Text>
+  </View>;
+}
 
-  if (isNaN(date.getTime())) return '';
-  return localizedDate(date, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+export function toDate(timestamp: any): Date | null {
+  if (!timestamp) return null;
+  const date = timestamp?.toDate ? timestamp.toDate() : timestamp?.toMillis ? new Date(timestamp.toMillis()) : new Date(timestamp);
+  return isNaN(date.getTime()) ? null : date;
 }
 
 export default function ApplicationCard({ application, onPress }: ApplicationCardProps) {
-  useTranslation();
+  const { t } = useTranslation();
   const statusTheme = getStatusTheme(application.status);
-  const appliedDate = formatDate(application.createdAt);
+  const applied = toDate(application.createdAt);
+  const hasPay = application.gigPay !== undefined && application.gigPay !== null;
 
   return (
-    <TouchableOpacity
-      style={styles.card}
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       onPress={onPress}
-      activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel={tr("Application for {{value0}}, status {{value1}}", { value0: application.gigTitle || 'Gig', value1: statusTheme.label })}
+      accessibilityLabel={t('Application for {{value0}}, status {{value1}}', { value0: application.gigTitle || t('Gig'), value1: t(statusTheme.label) })}
     >
-      {/* Top Header Row */}
       <View style={styles.topRow}>
         <View style={styles.headerLeft}>
-          <Text style={styles.gigTitle} numberOfLines={1}>
-            {application.gigTitle || tr("Gig Opportunity")}
+          <Text style={styles.gigTitle} numberOfLines={2}>
+            {application.gigTitle || t('Gig Opportunity')}
           </Text>
-          <View style={styles.businessRow}>
-            <Ionicons name="business-outline" size={13} color={colors.textSecondary} />
+          <View style={styles.metaItem}>
+            <Ionicons name="business-outline" size={14} color={colors.textSecondary} />
             <Text style={styles.businessName} numberOfLines={1}>
-              {application.businessName || tr("Business Owner")}
+              {application.businessName || t('Business Owner')}
             </Text>
           </View>
         </View>
-
-        {/* Status Badge */}
-        <View
-          style={[
-            styles.statusPill,
-            { backgroundColor: statusTheme.bg, borderColor: statusTheme.border },
-          ]}
-        >
-          <Ionicons name={statusTheme.icon} size={12} color={statusTheme.text} />
-          <Text style={[styles.statusText, { color: statusTheme.text }]}>
-            {tr(statusTheme.label)}
-          </Text>
-        </View>
+        <ApplicationStatusPill status={application.status} />
       </View>
 
-      {/* Message snippet preview */}
-      {application.message ? (
-        <Text style={styles.messagePreview} numberOfLines={2}>
-          {'“'}{application.message}{'”'}
-        </Text>
+      {hasPay || !!application.gigLocation ? (
+        <View style={styles.metaRow}>
+          {hasPay ? (
+            <Text style={styles.payText}>
+              {formatCurrency(application.gigPay!)}
+              <Text style={styles.payType}>{application.gigPayType === 'hourly' ? t('/hr') : t(' fixed')}</Text>
+            </Text>
+          ) : null}
+          {application.gigLocation ? (
+            <View style={[styles.metaItem, styles.flexShrink]}>
+              <Ionicons name="location-outline" size={14} color={colors.textMuted} />
+              <Text style={styles.metaText} numberOfLines={1}>{application.gigLocation}</Text>
+            </View>
+          ) : null}
+        </View>
       ) : null}
 
-      {/* Divider */}
-      <View style={styles.divider} />
-
-      {/* Meta Footer Row */}
       <View style={styles.footerRow}>
-        <View style={styles.metaGroup}>
-          {application.gigLocation ? (
-            <View style={styles.metaItem}>
-              <Ionicons name="location-outline" size={12} color={colors.textMuted} />
-              <Text style={styles.metaText} numberOfLines={1}>
-                {application.gigLocation}
-              </Text>
-            </View>
-          ) : null}
-
-          {application.gigPay !== undefined && application.gigPay !== null ? (
-            <View style={styles.metaItem}>
-              <Ionicons name="wallet-outline" size={12} color={colors.primary} />
-              <Text style={styles.payText}>
-                ${application.gigPay}
-                {application.gigPayType === 'hourly' ? tr("/hr") : tr(" fixed")}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-
-        {appliedDate ? (
-          <View style={styles.metaItem}>
-            <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
-            <Text style={styles.metaText}>{tr("Applied")}{' '}{appliedDate}</Text>
-          </View>
-        ) : null}
+        <Text style={styles.metaText}>
+          {applied ? `${t('Applied')} ${localizedDate(applied)}` : ''}
+        </Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -159,88 +126,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     padding: spacing.md,
-    marginBottom: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    marginBottom: spacing.sm + spacing.xs,
     gap: spacing.sm,
+    ...shadows.card,
   },
-  headerLeft: {
-    flex: 1,
-  },
-  gigTitle: {
-    fontSize: 16,
-    fontFamily: fonts.bodyBold,
-    color: colors.text,
-    letterSpacing: -0.2,
-    marginBottom: 4,
-  },
-  businessRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  businessName: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontFamily: fonts.bodyMedium,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-  },
-  statusText: {
-    fontSize: 12,
-    fontFamily: fonts.bodyBold,
-  },
-  messagePreview: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    marginTop: spacing.sm,
-    lineHeight: 18,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.surfaceBorder,
-    marginVertical: spacing.sm,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
-  metaGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  payText: {
-    fontSize: 12,
-    fontFamily: fonts.bodyBold,
-    color: colors.primary,
-  },
+  pressed: { opacity: 0.85 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
+  headerLeft: { flex: 1, gap: spacing.xs },
+  gigTitle: { ...typography.title, color: colors.text },
+  businessName: { ...typography.bodySmall, color: colors.textSecondary, flexShrink: 1 },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: borderRadius.full, borderWidth: 1 },
+  statusText: { ...typography.caption, fontFamily: typography.label.fontFamily },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  flexShrink: { flexShrink: 1 },
+  payText: { ...typography.label, color: colors.primary },
+  payType: { ...typography.caption, color: colors.primary },
+  metaText: { ...typography.caption, color: colors.textMuted, flexShrink: 1 },
+  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.surfaceBorderSubtle },
 });

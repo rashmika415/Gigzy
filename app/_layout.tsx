@@ -5,9 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 import {
   useFonts as useSyneFonts,
-  Syne_600SemiBold,
   Syne_700Bold,
-  Syne_800ExtraBold,
 } from '@expo-google-fonts/syne';
 import {
   useFonts as useHankenFonts,
@@ -63,7 +61,7 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [syneLoaded] = useSyneFonts({ Syne_600SemiBold, Syne_700Bold, Syne_800ExtraBold });
+  const [syneLoaded] = useSyneFonts({ Syne_700Bold });
   const [hankenLoaded] = useHankenFonts({ HankenGrotesk_400Regular, HankenGrotesk_500Medium, HankenGrotesk_600SemiBold, HankenGrotesk_700Bold });
   const [localFontsLoaded] = useFonts({ NotoSansSinhala_400Regular, NotoSansSinhala_700Bold, NotoSansTamil_400Regular, NotoSansTamil_700Bold });
 
