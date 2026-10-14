@@ -6,6 +6,7 @@ import { signOut } from 'firebase/auth';
 import { useTranslation } from 'react-i18next';
 import { Text, TextInput } from '../LocalizedText';
 import LanguageSelector from '../LanguageSelector';
+import AdminNotificationPanel from './AdminNotificationPanel';
 import { useAuth } from '../../context/AuthContext';
 import { auth } from '../../FirebaseConfig';
 import { colors, fonts } from '../../constants/theme';
@@ -13,12 +14,13 @@ import { fetchAdminPage, fetchAdminStats, removeGigFromDiscovery, setUserSuspens
 import type { AdminCursor, AdminStats, AdminUser } from '../../services/adminService';
 import type { Gig } from '../../types/gig';
 
-type Panel = 'overview' | 'users' | 'gigs';
+type Panel = 'overview' | 'users' | 'gigs' | 'notifications';
 type Action = { kind: 'suspend' | 'reinstate' | 'remove'; id: string; name: string };
 const PANELS: { key: Panel; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'overview', label: 'Overview', icon: 'grid-outline' },
   { key: 'users', label: 'Users', icon: 'people-outline' },
   { key: 'gigs', label: 'Gigs', icon: 'briefcase-outline' },
+  { key: 'notifications', label: 'Notifications', icon: 'notifications-outline' },
 ];
 const message = (error: unknown) => error instanceof Error ? error.message : 'Could not load dashboard. Please retry.';
 
@@ -59,7 +61,7 @@ export default function AdminDashboardScreen() {
   }, [revision]);
   useEffect(() => {
     const request = ++pageRequest.current;
-    if (panel === 'overview') return;
+    if (panel !== 'users' && panel !== 'gigs') return;
     void Promise.resolve().then(async () => {
       if (!mounted.current || request !== pageRequest.current) return;
       setListLoading(true); setListError(''); setCursor(undefined); setHasMore(false); setRows([]);
@@ -74,7 +76,7 @@ export default function AdminDashboardScreen() {
   const refresh = () => { setStatsLoading(true); setStatsError(''); setRevision(value => value + 1); };
   const selectPanel = (next: Panel) => { if (next === panel) return; pageRequest.current++; setListLoading(false); setPanel(next); setSearch(''); setFilter('all'); setNotice(''); setExpandedGig(''); };
   const loadMore = async () => {
-    if (listLoading || !hasMore || panel === 'overview') return;
+    if (listLoading || !hasMore || (panel !== 'users' && panel !== 'gigs')) return;
     const request = ++pageRequest.current;
     setListLoading(true); setListError('');
     try {
@@ -121,16 +123,16 @@ export default function AdminDashboardScreen() {
     { label: 'Open gigs', key: 'openGigs', icon: 'flash-outline', color: colors.warning },
   ];
   const navigation = <View style={[styles.navigation, !wide && styles.mobileNavigation]}>{PANELS.map(item =>
-    <TouchableOpacity key={item.key} accessibilityRole="tab" accessibilityState={{ selected: panel === item.key }} onPress={() => selectPanel(item.key)} style={[styles.navItem, !wide && { flex: 1, minWidth: 0 }, panel === item.key && styles.selected]}>
-      <Ionicons name={item.icon} size={20} color={panel === item.key ? colors.primary : colors.textSecondary} /><Text style={panel === item.key ? styles.selectedText : styles.secondary}>{t(item.label)}</Text>
+    <TouchableOpacity key={item.key} accessibilityRole="tab" accessibilityState={{ selected: panel === item.key }} onPress={() => selectPanel(item.key)} style={[styles.navItem, !wide && styles.mobileNavItem, panel === item.key && styles.selected]}>
+      <Ionicons name={item.icon} size={wide ? 20 : 22} color={panel === item.key ? colors.primary : colors.textSecondary} /><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78} style={[panel === item.key ? styles.selectedText : styles.secondary, !wide && styles.mobileNavText]}>{t(item.label)}</Text>
     </TouchableOpacity>)}</View>;
   return <SafeAreaView style={styles.page}>
     <View style={[styles.shell, wide && styles.shellWide]}>
       {wide && <View style={styles.sidebar}><View style={styles.brand}><Ionicons name="shield-checkmark" size={25} color={colors.primary} /><Text style={styles.brandText}>Gigzy</Text></View>
         <Text style={styles.secondary}>{t('Administration')}</Text>{navigation}<Text style={styles.sidebarNote}>{t('Manage your community and opportunities.')}</Text></View>}
       <View style={styles.main}>
-        <View style={styles.header}><View style={styles.headerCopy}><Text accessibilityRole="header" style={styles.heading}>{t('Admin dashboard')}</Text>
-          <Text style={styles.secondary}>{t('Signed in as {{email}}', { email: user?.email || '' })}</Text></View><Button title={t('Sign out')} icon="log-out-outline" busy={loggingOut} disabled={acting} onPress={logout} /></View>
+        <View style={[styles.header, !wide && styles.mobileHeader]}><View style={styles.headerCopy}><Text accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={[styles.heading, !wide && styles.mobileHeading]}>{t('Admin dashboard')}</Text>
+          <Text numberOfLines={1} ellipsizeMode="middle" style={styles.secondary}>{t('Signed in as {{email}}', { email: user?.email || '' })}</Text></View><Button title={t('Sign out')} icon="log-out-outline" busy={loggingOut} disabled={acting} onPress={logout} /></View>
         {!wide && navigation}
         <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={statsLoading && !!stats} onRefresh={refresh} tintColor={colors.primary} />}>
           <View style={styles.toolbar}><LanguageSelector /><Button title={t('Refresh')} icon="refresh-outline" onPress={refresh} disabled={statsLoading || listLoading} /></View>
@@ -150,8 +152,9 @@ export default function AdminDashboardScreen() {
             </View>
             <View style={styles.section}><Text style={styles.sectionTitle}>{t('Quick actions')}</Text><View style={styles.actions}>
               <Button title={t('Manage users')} icon="people-outline" onPress={() => selectPanel('users')} primary /><Button title={t('Manage gigs')} icon="briefcase-outline" onPress={() => selectPanel('gigs')} />
+              <Button title={t('Send announcement')} icon="notifications-outline" onPress={() => selectPanel('notifications')} />
             </View><Text style={styles.secondary}>{t('Suspend accounts or remove gigs from discovery with a recorded reason.')}</Text></View>
-          </> : <View style={styles.section}>
+          </> : panel === 'notifications' ? <AdminNotificationPanel /> : <View style={styles.section}>
             <Text style={styles.sectionTitle}>{panel === 'users' ? t('User management') : t('Gig management')}</Text>
             <TextInput accessibilityLabel={t('Search loaded records')} placeholder={t('Search loaded records')} value={search} onChangeText={setSearch} style={styles.input} autoCapitalize="none" />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{filters.map(value =>
@@ -219,8 +222,8 @@ function SummaryRow({ label, value, total, warning }: { label: string; value: nu
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background }, shell: { flex: 1 }, shellWide: { flexDirection: 'row' }, sidebar: { width: 240, padding: 24, gap: 20, backgroundColor: colors.surface, borderRightWidth: 1, borderColor: colors.surfaceBorder },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10 }, brandText: { fontFamily: fonts.heading, fontSize: 28, color: colors.text }, sidebarNote: { marginTop: 'auto', color: colors.textSecondary, lineHeight: 22 },
-  navigation: { gap: 8 }, mobileNavigation: { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 12 }, navItem: { minHeight: 48, padding: 12, flexDirection: 'row', gap: 10, alignItems: 'center', borderRadius: 12 }, selected: { backgroundColor: colors.primaryLight }, selectedText: { color: colors.primary, fontFamily: fonts.bodyBold, flexShrink: 1 },
-  main: { flex: 1, minWidth: 0 }, header: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 16, justifyContent: 'space-between', padding: 24, backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.surfaceBorder }, headerCopy: { flex: 1, minWidth: 190, gap: 6 }, heading: { fontFamily: fonts.heading, fontSize: 28, color: colors.text },
+  navigation: { gap: 8 }, mobileNavigation: { flexDirection: 'row', gap: 4, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.surfaceBorder }, navItem: { minHeight: 48, padding: 12, flexDirection: 'row', gap: 10, alignItems: 'center', borderRadius: 12 }, mobileNavItem: { flex: 1, minWidth: 0, minHeight: 66, paddingVertical: 9, paddingHorizontal: 3, flexDirection: 'column', justifyContent: 'center', gap: 5 }, mobileNavText: { width: '100%', fontSize: 12, lineHeight: 16, textAlign: 'center', flexShrink: 1 }, selected: { backgroundColor: colors.primaryLight }, selectedText: { color: colors.primary, fontFamily: fonts.bodyBold, flexShrink: 1 },
+  main: { flex: 1, minWidth: 0 }, header: { flexDirection: 'row', alignItems: 'center', gap: 16, justifyContent: 'space-between', padding: 24, backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.surfaceBorder }, mobileHeader: { paddingHorizontal: 16, paddingVertical: 14, gap: 10 }, headerCopy: { flex: 1, minWidth: 0, gap: 6 }, heading: { fontFamily: fonts.heading, fontSize: 28, color: colors.text }, mobileHeading: { fontSize: 22, lineHeight: 28 },
   content: { padding: 20, gap: 20, maxWidth: 1250, width: '100%', alignSelf: 'center', paddingBottom: 40 }, toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, secondary: { color: colors.textSecondary, fontSize: 13, lineHeight: 21 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 }, statCard: { flex: 1, minWidth: 130, padding: 20, gap: 12, backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.surfaceBorder }, statIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, statValue: { fontFamily: fonts.heading, color: colors.text, fontSize: 32 },
   section: { padding: 20, gap: 16, backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.surfaceBorder }, sectionTitle: { fontSize: 20, fontFamily: fonts.heading, color: colors.text }, actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },

@@ -23,6 +23,41 @@ service cloud.firestore {
         'ratingAverage', 'ratingCount', 'skillBadges'
       ]);
     }
+    match /announcements/{announcementId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly([
+          'title', 'body', 'audience', 'targetUserId', 'status',
+          'deliveredCount', 'createdBy', 'createdAt'
+        ])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 80
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 5 && request.resource.data.body.size() <= 500
+        && request.resource.data.audience in ['all', 'freelancer', 'client', 'user']
+        && ((request.resource.data.audience == 'user'
+            && request.resource.data.targetUserId is string
+            && request.resource.data.targetUserId.size() > 0)
+          || (request.resource.data.audience != 'user'
+            && !request.resource.data.keys().hasAny(['targetUserId'])))
+        && request.resource.data.status == 'queued'
+        && request.resource.data.deliveredCount == 0
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      // On the Spark plan the authenticated admin client performs bounded
+      // delivery batches. Content and audience stay immutable after creation.
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'deliveredCount', 'lastUserId', 'startedAt',
+          'completedAt', 'failedAt', 'errorMessage'
+        ])
+        && request.resource.data.status in ['processing', 'sent', 'failed']
+        && request.resource.data.deliveredCount is int
+        && request.resource.data.deliveredCount >= resource.data.deliveredCount
+        && request.resource.data.get('errorMessage', '') is string
+        && request.resource.data.get('errorMessage', '').size() <= 500;
+      allow delete: if false;
+    }
     function validReferralCodeUpdate(userId) {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['referralCode'])
         || (!resource.data.keys().hasAny(['referralCode'])
