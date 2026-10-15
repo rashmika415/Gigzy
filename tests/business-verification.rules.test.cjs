@@ -20,6 +20,12 @@ test('verification rules isolate private requests and reserve decisions for admi
       return batch.commit();
     };
     await assertFails(updateDoc(doc(db('one'), 'users', 'one'), { verificationStatus: 'VERIFIED', isVerified: true }));
+    for (const status of ['PENDING', 'VERIFIED', 'REJECTED']) {
+      await assertFails(updateDoc(doc(db('one'), 'users', 'one'), { verificationStatus: status }));
+    }
+    await assertFails(setDoc(doc(db('new-business'), 'users', 'new-business'), {
+      ...profile, uid: 'new-business', verificationStatus: 'VERIFIED',
+    }));
     await assertSucceeds(request('one')); await assertSucceeds(request('two'));
     await assertFails(request('one'));
     await assertFails(getDoc(doc(db('worker'), 'businessVerificationRequests', 'one')));

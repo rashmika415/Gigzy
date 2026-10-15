@@ -1,39 +1,81 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Text, TextInput } from './LocalizedText';
-import { useAuth } from '../context/AuthContext';
 import { colors, spacing } from '../constants/theme';
-import { submitBusinessVerification, subscribeToVerificationRequest, type VerificationRequest } from '../services/businessVerificationService';
-export default function BusinessVerificationCard() {
-  const { t } = useTranslation(); const { user, userData } = useAuth();
+import type { UserData } from '../context/AuthContext';
+import { isBusinessVerified, submitBusinessVerification, subscribeToVerificationRequest, type VerificationRequest } from '../services/businessVerificationService';
+
+export default function BusinessVerificationCard({ userId, profile }: { userId: string; profile: UserData | null }) {
+  const { t } = useTranslation();
   const [request, setRequest] = useState<VerificationRequest | null>(null);
-  const [details, setDetails] = useState(''); const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [error, setError] = useState('');
+  const [details, setDetails] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [retry, setRetry] = useState(0);
   const lock = useRef(false);
+
   useEffect(() => {
-    if (!user || userData?.role !== 'client') return;
-    return subscribeToVerificationRequest(user.uid, setRequest, failure => setError(failure.message));
-  }, [user, userData?.role]);
-  if (!user || userData?.role !== 'client') return null;
-  const status = userData.verificationStatus;
+    return subscribeToVerificationRequest(userId, value => {
+      setRequest(value);
+      setLoading(false);
+      setLoadError('');
+      setSubmitted(false);
+    }, () => {
+      setLoadError('Could not load verification status. Please retry.');
+      setLoading(false);
+    });
+  }, [userId, retry]);
+
   const submit = async () => {
     if (lock.current) return;
-    lock.current = true; setSaving(true); setError('');
-    try { await submitBusinessVerification(details); setDetails(''); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not submit verification.'); }
-    finally { lock.current = false; setSaving(false); }
+    lock.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      await submitBusinessVerification(details);
+      setSubmitted(true);
+      setDetails('');
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Could not submit verification. Please retry.');
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
   };
-  return <View style={styles.card}><Text style={styles.title}>{t('Business verification')}</Text>
-    {!!status && <Text style={styles.text}>{t(status)}</Text>}
-    {status === 'PENDING' ? <Text style={styles.text}>{t('Your verification request is awaiting admin review.')}</Text> : status === 'VERIFIED' ? <Text style={styles.text}>{t('Your business is verified.')}</Text> : <>
-      {!!request?.rejectionReason && <Text style={styles.error}>{request.rejectionReason}</Text>}
-      <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/(app)/edit-profile')}><Text style={styles.link}>{t('Edit Profile')}</Text></TouchableOpacity>
-      <Text style={styles.text}>{t('Provide your business registration information and any details that help verify your business.')}</Text>
-      <TextInput accessibilityLabel={t('Verification details')} placeholder={t('Verification details')} value={details} onChangeText={setDetails} multiline maxLength={2000} editable={!saving} style={styles.input} />
-      <TouchableOpacity accessibilityRole="button" disabled={saving} onPress={submit} style={styles.button}>{saving ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.link}>{t('Submit for verification')}</Text>}</TouchableOpacity>
-    </>}
-    {!!error && <Text accessibilityRole="alert" style={styles.error}>{t(error)}</Text>}
+  const verified = isBusinessVerified(profile);
+  const pending = submitted || profile?.verificationStatus === 'PENDING' || request?.status === 'PENDING';
+  return <View style={styles.card}>
+    <Text style={styles.title}>{t('Business verification')}</Text>
+    {verified ? <Text style={styles.status}>{t('Verified Business')}</Text>
+      : loading ? <ActivityIndicator color={colors.primary} />
+      : loadError ? <>
+        <Text accessibilityRole="alert" style={styles.error}>{t(loadError)}</Text>
+        <TouchableOpacity accessibilityRole="button" style={styles.button} onPress={() => { setLoading(true); setLoadError(''); setRetry(value => value + 1); }}><Text style={styles.buttonText}>{t('Retry')}</Text></TouchableOpacity>
+      </> : pending ? <Text accessibilityLiveRegion="polite" style={styles.status}>{t('Verification pending. Your request has been sent to the admin for review.')}</Text>
+      : <>
+        {request?.status === 'REJECTED' && <Text style={styles.error}>{t('Verification rejected')}: {request.rejectionReason}</Text>}
+        <Text style={styles.body}>{t('Complete your business name, email, phone, address and business description in Edit Profile before applying. Add your registration details below for the admin to review.')}</Text>
+        <TextInput accessibilityLabel={t('Verification details')} placeholder={t('Business registration number and supporting details')} value={details} onChangeText={setDetails} multiline maxLength={2000} editable={!busy} style={styles.input} />
+        {!!error && <Text accessibilityRole="alert" style={styles.error}>{t(error)}</Text>}
+        <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: busy || details.trim().length < 5, busy }} style={[styles.button, (busy || details.trim().length < 5) && styles.disabled]} disabled={busy || details.trim().length < 5} onPress={() => void submit()}>
+          {busy ? <ActivityIndicator color={colors.primaryOnColor} /> : <Text style={styles.buttonText}>{t('Apply for Verification')}</Text>}
+        </TouchableOpacity>
+      </>}
   </View>;
 }
-const styles = StyleSheet.create({ card: { padding: spacing.lg, gap: spacing.sm, marginBottom: spacing.md, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder }, title: { color: colors.text, fontSize: 17, fontWeight: '700' }, text: { color: colors.textSecondary, lineHeight: 21 }, link: { color: colors.primary, fontWeight: '600' }, input: { minHeight: 100, textAlignVertical: 'top', color: colors.text, borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 12, padding: spacing.sm }, button: { minHeight: 44, padding: spacing.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.surfaceBorder, borderRadius: 12 }, error: { color: colors.error } });
+
+const styles = StyleSheet.create({
+  card: { padding: spacing.lg, gap: spacing.sm, marginBottom: spacing.lg, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
+  title: { color: colors.text, fontSize: 18, fontWeight: '700' },
+  body: { color: colors.textSecondary, lineHeight: 22 },
+  status: { color: colors.primary, lineHeight: 22, fontWeight: '600' },
+  error: { color: colors.error, lineHeight: 22 },
+  input: { color: colors.text, padding: spacing.md, borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 12, minHeight: 100, textAlignVertical: 'top' },
+  button: { minHeight: 48, padding: spacing.md, borderRadius: 24, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  buttonText: { color: colors.primaryOnColor, fontWeight: '700' },
+  disabled: { opacity: 0.5 },
+});

@@ -14,6 +14,6 @@ export default function VerifiedBusinessBadge({ userId }: { userId: string }) {
     return subscribeToProfile(userId, profile => setVerifiedId(isBusinessVerified(profile) ? userId : null), () => setVerifiedId(null));
   }, [userId]);
   if (verifiedId !== userId) return null;
-  return <View style={styles.badge}><Ionicons name="checkmark-circle" size={15} color={colors.primary} /><Text style={styles.text}>{t('Verified')}</Text></View>;
+  return <View style={styles.badge}><Ionicons name="checkmark-circle" size={15} color={colors.primary} /><Text style={styles.text}>{t('Verified Business')}</Text></View>;
 }
 const styles = StyleSheet.create({ badge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.primaryLight }, text: { color: colors.primary, fontSize: 12, fontWeight: '600' } });

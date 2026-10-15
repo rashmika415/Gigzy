@@ -1,3 +1,5 @@
+import BusinessVerificationCard from '../../../components/BusinessVerificationCard';
+import VerifiedBusinessBadge from '../../../components/VerifiedBusinessBadge';
 import { ReviewSummary, ReviewHistory } from '../../../components/ProfileReviews';
 import { useProfileReviews } from '../../../hooks/useProfileReviews';
 import { Text } from '../../../components/LocalizedText';
@@ -87,15 +89,17 @@ export default function Profile() {
             )}
             <Text style={styles.profileName}>
               {isYouth ? (userData?.fullName || t("Youth Member")) : (userData?.businessName || t("Business Owner"))}
-              {!isYouth && userData?.isVerified ? '  ✓' : ''}
             </Text>
             <View style={[styles.roleBadge, { borderColor: isYouth ? colors.primaryBorder : colors.infoBorder }]}>
               <Text style={[styles.roleText, { color: isYouth ? colors.primary : colors.accent }]}>{t(getRoleLabel())}</Text>
             </View>
+            {role === 'client' && user && <VerifiedBusinessBadge userId={user.uid} />}
             <Text style={styles.emailText}>{user?.email}</Text>
             <ReviewSummary {...reviewState} />
           </View>
         </View>
+
+        {role === 'client' && user && <BusinessVerificationCard key={user.uid} userId={user.uid} profile={userData} />}
 
         <ReviewHistory {...reviewState} />
 
